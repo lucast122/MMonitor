@@ -5,7 +5,7 @@ from mmonitor.config import images_path
 from mmonitor.dashapp.app import app
 from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
-from mmonitor.math.horizon_r import generate_image
+from mmonitor.calculations.horizon_r import generate_image
 
 
 @app.server.route(f'{images_path}/<image>.png')

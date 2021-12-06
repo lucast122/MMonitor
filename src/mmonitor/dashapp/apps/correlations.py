@@ -11,7 +11,7 @@ from plotly.graph_objects import Figure
 from mmonitor.dashapp.app import app
 from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
-from mmonitor.math.stats import scipy_correlation
+from mmonitor.calculations.stats import scipy_correlation
 
 
 class Correlations(BaseApp):
