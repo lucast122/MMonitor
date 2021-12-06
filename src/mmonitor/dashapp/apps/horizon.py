@@ -23,6 +23,9 @@ class Horizon(BaseApp):
     Calls an R script and uploads the generated image.
     """
 
+    _WIDTH = 1500
+    _HEIGHT = 1000
+
     def __init__(self, sql: MMonitorDBInterface):
         super().__init__(sql)
         self._generate_image()
@@ -36,10 +39,17 @@ class Horizon(BaseApp):
 
         q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
         df = self._sql.query_to_dataframe(q)
-        generate_image(df, 1000, 1000)
+        generate_image(df, self._WIDTH, self._HEIGHT)
 
     def _init_layout(self) -> None:
-        self.layout = html.Img(src=f'{images_path}/horizon.png')
+        header = html.H1("Horizon plot of taxonomy abundances")
+        image = html.Img(
+            src=f'{images_path}/horizon.png',
+            style={'display': 'block', 'margin-left': 'auto', 'margin-right': 'auto', 'padding': '20px'}
+        )
+        container = html.Div([header, image])
+
+        self.layout = container
 
     def _init_callbacks(self) -> None:
         pass
