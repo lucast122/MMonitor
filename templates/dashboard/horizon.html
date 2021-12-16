@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+    <h1>Horizon plot of taxonomy abundances</h1>
+
+    {% load static %}
+    <img src="{% static 'dashboard/horizon.png' %}" alt="Horizon plot of taxonomy abundances"
+         style="display: block; margin-left: auto; margin-right: auto; padding: 20px;"/>
+
+{% endblock content %}

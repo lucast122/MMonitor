@@ -2,14 +2,21 @@
 
 ### Set up app:
 
-- Install Python and packages in `requirements.txt`
+- Install Python>=3.9 
+- If your venv existed before the Django integration, create a new venv
+- `pip install -r requirements` (this will take a while)
 - Install `R` and packages `('lattice', 'latticeExtra')`
-- Set `Rscript` location in `config.py`
+- Set `Rscript` location in `MMonitor.settings.py`
 
 ### Run debug server:
 
-- PyCharm:
-  - mark `/src/` as source directory
-  - run `/src/mmonitor/__main__.py`
+- PyCharm (requires PyCharm Professional):
+  - Set up Django run configuration:
+    1. Edit configuration
+    2. Add new configuration -> Django server
+    3. Set Name to 'MMonitor'
+    4. Enable Django support (warning at the bottom)
+    5. Set root directory and path to _settings.py_
+    6. Apply and run
 - General purpose:
-  - `cd src && python -m mmonitor`
+  - `python manage.py runserver`
