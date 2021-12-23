@@ -4,8 +4,16 @@
 
     <h1>Horizon plot of taxonomy abundances</h1>
 
+    <form method="POST">{% csrf_token %}
+    <label for="horizon-width">Width:</label>
+    <input id="horizon-width" type="text" value="{{ width }}" name="width" required>
+    <label for="horizon-height">Height:</label>
+    <input id="horizon-height" type="text" value="{{ height }}" name="height" required>
+    <button type="submit" name="confirm">Generate</button>
+    </form>
+
     {% load static %}
-    <img src="{% static 'dashboard/horizon.png' %}" alt="Horizon plot of taxonomy abundances"
+    <img src="{% static 'dashboard/'|add:uid|add:'/horizon.png' %}" alt="Horizon plot of taxonomy abundances"
          style="display: block; margin-left: auto; margin-right: auto; padding: 20px;"/>
 
 {% endblock content %}

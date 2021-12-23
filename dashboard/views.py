@@ -1,3 +1,5 @@
+from os.path import isfile, join
+
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
@@ -21,7 +23,18 @@ def load_app(request, name):
 
 @login_required
 def horizon(request):
-    q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
-    df = db.query_to_dataframe(q)
-    generate_image(df, width=1500, height=1000)
-    return render(request, 'dashboard/horizon.html')
+
+    width = 1500
+    height = 1000
+    uid = request.user.id
+    image_file = join(settings.STATICFILES_DIRS[0], 'dashboard', str(uid), 'horizon.png')
+
+    if request.method == 'POST' or not isfile(image_file):
+        q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
+        df = db.query_to_dataframe(q)
+        width = int(request.POST.get("width", str(width)))
+        height = int(request.POST.get("height", str(height)))
+        generate_image(df, uid, width=width, height=height)
+
+    context = {'width': width, 'height': height, 'uid': str(uid)}
+    return render(request, 'dashboard/horizon.html', context=context)

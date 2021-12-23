@@ -3,8 +3,7 @@
 ### Set up app:
 
 - Install Python>=3.9 
-- If your venv existed before the Django integration, create a new venv
-- `pip install -r requirements` (this will take a while)
+- `pip install -r requirements.txt`
 - Install `R` and packages `('lattice', 'latticeExtra')`
 - Set `Rscript` location in `MMonitor.settings.py`
 

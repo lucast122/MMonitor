@@ -1,6 +1,7 @@
 from os import environ, getcwd, chdir
 from os.path import join, dirname, abspath
 from subprocess import call
+from pathlib import Path
 
 import pandas as pd
 from django.conf import settings
@@ -9,11 +10,9 @@ from django.conf import settings
 _R_PATH = join(dirname(abspath(__file__)), 'r')
 _CSV_FILE = join(_R_PATH, 'abundances.csv')
 _HORIZON_R_SCRIPT = join(_R_PATH, 'horizon.r')
-_IMAGE_FILE = join(settings.STATICFILES_DIRS[0], 'dashboard', 'horizon.png')
-# _IMAGE_FILE = join(_R_PATH, 'horizon.png')
 
 
-def generate_image(df: pd.DataFrame, width: int, height: int) -> None:
+def generate_image(df: pd.DataFrame, uid: int, width: int, height: int) -> None:
     """
     Generate a horizon plot of taxonomy abundances.
     Check static paths for file locations.
@@ -29,8 +28,12 @@ def generate_image(df: pd.DataFrame, width: int, height: int) -> None:
              - Find a way to generate horizon plots in Plotly
     """
 
+    image_dir = join(settings.STATICFILES_DIRS[0], 'dashboard', str(uid))
+    Path(image_dir).mkdir(parents=True, exist_ok=True)
+    image_path = join(image_dir, 'horizon.png')
+
     _write_csv(df)
-    _export_env_vars(width, height)
+    _export_env_vars(image_path, width, height)
     _call_r_script()
 
 
@@ -55,7 +58,7 @@ def _write_csv(df: pd.DataFrame) -> None:
     csv_df.to_csv(_CSV_FILE, index=False)
 
 
-def _export_env_vars(width: int, height: int) -> None:
+def _export_env_vars(image_path: str, width: int, height: int) -> None:
     """
     Export necessary variables to environment
     so that the R script can read them from the environment.
@@ -64,7 +67,7 @@ def _export_env_vars(width: int, height: int) -> None:
     environ['HORI_WIDTH'] = str(width)
     environ['HORI_HEIGHT'] = str(height)
     environ['HORI_CSV'] = _CSV_FILE
-    environ['HORI_IMAGE'] = _IMAGE_FILE
+    environ['HORI_IMAGE'] = image_path
 
 
 def _call_r_script() -> None:
