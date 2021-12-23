@@ -8,6 +8,7 @@
 /src/mmonitor/resources/r/abundances.csv
 /src/mmonitor/resources/images/horizon.png
 /static/dashboard/horizon.png
+/static/dashboard/*/horizon.png
 
 
 # User-specific stuff
