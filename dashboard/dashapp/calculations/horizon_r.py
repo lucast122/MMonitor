@@ -8,11 +8,10 @@ from django.conf import settings
 
 # static paths
 _R_PATH = join(dirname(abspath(__file__)), 'r')
-_CSV_FILE = join(_R_PATH, 'abundances.csv')
 _HORIZON_R_SCRIPT = join(_R_PATH, 'horizon.r')
 
 
-def generate_image(df: pd.DataFrame, uid: int, width: int, height: int) -> None:
+def generate_image(df: pd.DataFrame, uid: str, width: int, height: int) -> None:
     """
     Generate a horizon plot of taxonomy abundances.
     Check static paths for file locations.
@@ -28,16 +27,17 @@ def generate_image(df: pd.DataFrame, uid: int, width: int, height: int) -> None:
              - Find a way to generate horizon plots in Plotly
     """
 
-    image_dir = join(settings.STATICFILES_DIRS[0], 'dashboard', str(uid))
+    image_dir = join(settings.STATICFILES_DIRS[0], 'dashboard', uid)
     Path(image_dir).mkdir(parents=True, exist_ok=True)
     image_path = join(image_dir, 'horizon.png')
+    csv_file = join(_R_PATH, uid + '_abundances.csv')
 
-    _write_csv(df)
-    _export_env_vars(image_path, width, height)
+    _write_csv(df, csv_file)
+    _export_env_vars(image_path, width, height, csv_file)
     _call_r_script()
 
 
-def _write_csv(df: pd.DataFrame) -> None:
+def _write_csv(df: pd.DataFrame, csv_file: str) -> None:
     """
     Transpose mmonitor db to a Dataframe with only taxonomies and their abundances.
     """
@@ -55,10 +55,10 @@ def _write_csv(df: pd.DataFrame) -> None:
         csv_df[t] = pd.Series(df[f]['abundance']).reset_index(drop=True)
 
     # write file
-    csv_df.to_csv(_CSV_FILE, index=False)
+    csv_df.to_csv(csv_file, index=False)
 
 
-def _export_env_vars(image_path: str, width: int, height: int) -> None:
+def _export_env_vars(image_path: str, width: int, height: int, csv_file: str) -> None:
     """
     Export necessary variables to environment
     so that the R script can read them from the environment.
@@ -66,7 +66,7 @@ def _export_env_vars(image_path: str, width: int, height: int) -> None:
 
     environ['HORI_WIDTH'] = str(width)
     environ['HORI_HEIGHT'] = str(height)
-    environ['HORI_CSV'] = _CSV_FILE
+    environ['HORI_CSV'] = csv_file
     environ['HORI_IMAGE'] = image_path
 
 

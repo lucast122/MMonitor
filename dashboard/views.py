@@ -23,12 +23,22 @@ def load_app(request, name):
 
 @login_required
 def horizon(request):
+    """
+    Render page for horizon plot.
 
+    Render horizon plot based on current user id.
+    Calls external R script to generate plot.
+    """
+
+    # settings
     width = 1500
     height = 1000
-    uid = request.user.id
-    image_file = join(settings.STATICFILES_DIRS[0], 'dashboard', str(uid), 'horizon.png')
+    uid = str(request.user.id)
+    image_file = join(settings.STATICFILES_DIRS[0], 'dashboard', uid, 'horizon.png')
 
+    # if 'generate' button was clicked
+    # or image simply doesn't exist yet
+    # call the R script to generate a horizon plot
     if request.method == 'POST' or not isfile(image_file):
         q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
         df = db.query_to_dataframe(q)
@@ -36,5 +46,5 @@ def horizon(request):
         height = int(request.POST.get("height", str(height)))
         generate_image(df, uid, width=width, height=height)
 
-    context = {'width': width, 'height': height, 'uid': str(uid)}
+    context = {'width': width, 'height': height, 'uid': uid}
     return render(request, 'dashboard/horizon.html', context=context)

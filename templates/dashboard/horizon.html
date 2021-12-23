@@ -12,8 +12,9 @@
     <button type="submit" name="confirm">Generate</button>
     </form>
 
+    {% load cache_bust %}
     {% load static %}
-    <img src="{% static 'dashboard/'|add:uid|add:'/horizon.png' %}" alt="Horizon plot of taxonomy abundances"
+    <img src="{% static 'dashboard/'|add:uid|add:'/horizon.png' %}?{% cache_bust %}" alt="Horizon plot of taxonomy abundances"
          style="display: block; margin-left: auto; margin-right: auto; padding: 20px;"/>
 
 {% endblock content %}

@@ -9,6 +9,7 @@
 /src/mmonitor/resources/images/horizon.png
 /static/dashboard/horizon.png
 /static/dashboard/*/horizon.png
+dashboard/dashapp/calculations/r/*.csv
 
 
 # User-specific stuff
