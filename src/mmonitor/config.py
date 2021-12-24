@@ -4,8 +4,7 @@ from os.path import dirname, abspath, join
 # STATIC PATHS
 _MMONITOR_ROOT = dirname(abspath(__file__))
 _RESOURCES = join(_MMONITOR_ROOT, 'resources')
-
-mmonitor_db_path = join(_RESOURCES, 'mmonitor.db')
+mmonitor_db_path = join(_RESOURCES, 'mmonitor_centrifuge_test.sqlite3')
 images_path = join(_RESOURCES, 'images')
 r_path = join(_RESOURCES, 'r')
 
