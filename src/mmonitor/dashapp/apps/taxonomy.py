@@ -29,7 +29,7 @@ class Taxonomy(BaseApp):
         debugging purposes.
         """
 
-        maira_header = html.H1(children='Bioreactor taxonomy computed using MAIRA')
+        maira_header = html.H1(children='Bioreactor taxonomy computed using Centrifuge')
 
         # dropdown menu to select chart type
         # initialize as stacked bar chart
@@ -39,10 +39,8 @@ class Taxonomy(BaseApp):
                 {'label': 'Stacked Barchart', 'value': 'stackedbar'},
                 {'label': 'Grouped Barchart', 'value': 'groupedbar'},
                 {'label': 'Area plot', 'value': 'area'},
-                {'label': 'Scatter Plot', 'value': 'scatter'},
                 {'label': 'Pie chart', 'value': 'pie'},
                 {'label': 'Scatter 3D', 'value': 'scatter3d'},
-                {'label': 'Scatter ternary', 'value': 'scatterternary'}
             ],
             value='stackedbar'
         )
@@ -53,12 +51,20 @@ class Taxonomy(BaseApp):
 
         # pie chart options will be displayed
         # if pie chart is selected in the dropdown menu
-        pie_chart_input = dcc.Input(
+        # pie_chart_input = dcc.Input(
+        #     id='number_input_piechart',
+        #     type='number',
+        #     placeholder="Sample ID",
+        #     value=1,
+        #     style={'display': 'none'}
+        # )
+
+        pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
-            type='number',
-            placeholder="Sample ID",
-            value=1,
-            style={'display': 'none'}
+            options=[{'label': t, 'value': t} for t in self._sql.get_unique_samples()],
+            value=self._sql.get_unique_samples()[0],
+            style={'display': 'none'},
+            clearable=False,
         )
 
         # data table for debugging
@@ -86,6 +92,8 @@ class Taxonomy(BaseApp):
             Output('graph2', 'figure'),
             # this output hides the pie chart number input when no pie chart is plotted
             Output('number_input_piechart', 'style'),
+            # hides 2nd plot for pie chart
+            Output('graph2','style'),
             Input('dropdown', 'value'),
             Input('number_input_piechart', 'value'),
         )
@@ -99,7 +107,7 @@ class Taxonomy(BaseApp):
             fig1 = {'data': []}
             fig2 = {'data': []}
             piechart_style = {'display': 'none'}
-
+            fig2_style = {'display': 'block'}
             # request necessary data from database
             q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
             df = self._sql.query_to_dataframe(q)
@@ -124,19 +132,17 @@ class Taxonomy(BaseApp):
                 fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
                 fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='sample_id')
 
-            elif value == 'scatterternary':
-                fig1 = px.scatter_ternary(df, a="taxonomy", b="abundance", c="sample_id")
-                fig2 = px.scatter_ternary(df, a="sample_id", b="abundance", c="taxonomy")
 
             elif value == "pie":
                 pie_values = df.loc[df["sample_id"] == sample_value_piechart, 'abundance']
                 pie_names = df.loc[df["sample_id"] == sample_value_piechart, 'taxonomy']
                 fig1 = px.pie(df, values=pie_values, names=pie_names,
                              title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart}')
-                pie_values = df.loc[df["sample_id"] == sample_value_piechart + 1, 'abundance']
-                pie_names = df.loc[df["sample_id"] == sample_value_piechart + 1, 'taxonomy']
-                fig2 = px.pie(df, values=pie_values, names=pie_names,
-                              title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart + 1}')
+                # pie_values = df.loc[df["sample_id"] == sample_value_piechart + 1, 'abundance']
+                # pie_names = df.loc[df["sample_id"] == sample_value_piechart + 1, 'taxonomy']
+                # fig2 = px.pie(df, values=pie_values, names=pie_names,
+                #               title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart + 1}')
                 piechart_style = {'display': 'block'}
+                fig2_style = {'display': 'none'}
 
-            return fig1, fig2, piechart_style
+            return fig1, fig2, piechart_style,fig2_style

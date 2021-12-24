@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 
 
-with sqlite3.connect('mmonitor.db') as sqlite_con:
+with sqlite3.connect('mmonitor.sqlite3') as sqlite_con:
     tax_df = pd.read_sql_query("SELECT * FROM mmonitor", sqlite_con)
     meta_df = pd.read_sql_query("SELECT * FROM metadata", sqlite_con)
 
