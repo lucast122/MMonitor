@@ -5,6 +5,8 @@
 - Install Python and packages in `requirements.txt`
 - Install `R` and packages `('lattice', 'latticeExtra')`
 - Set `Rscript` location in `config.py`
+- Download latest version of centrifuge, install and make sure executable is on system path (https://github.com/DaehwanKimLab/centrifuge)
+- Either download and build new index or download pre built index for centrifuge (https://ccb.jhu.edu/software/centrifuge/manual.shtml)
 
 ### Run debug server:
 
