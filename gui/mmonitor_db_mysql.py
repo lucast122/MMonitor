@@ -1,6 +1,7 @@
 from typing import List, Tuple, Any
 
 import sqlite3
+from mysql.connector import connect
 import pandas as pd
 
 
@@ -8,6 +9,16 @@ class MMonitorDBInterface:
 
     def __init__(self, db_path: str):
         self._db_path = db_path
+
+    def create_mysql_db(self,user_name: str):
+        with connect(user='admin', password='admin', host='localhost', database='mmonitor') as mysql_con:
+            cur = mysql_con.cursor()
+            cur.execute(f"CREATE DATABASE {user_name}")
+            mysql_con.commit()
+
+
+
+
 
     def query_to_dataframe(self, query: str) -> pd.DataFrame:
         con = sqlite3.connect(self._db_path)
@@ -40,8 +51,36 @@ class MMonitorDBInterface:
 
     def get_unique_taxonomies(self) -> List[str]:
         q = "SELECT DISTINCT taxonomy FROM mmonitor"
-        return [t[0] for t in self.query_to_list(q)]
+        return [t[0] for t in self.query_t/Users/timolucas/PycharmProjects/MMonitor/src/mmonitor/userside/classifier_out/test_kraken_outo_list(q)]
 
-    def get_unique_samples(self) -> List[str]:
-        q = "SELECT DISTINCT sample_id FROM mmonitor"
-        return [t[0] for t in self.query_to_list(q)]
+    def kraken_out_to_query(self, kraken_out_path: str, tax_rank: str, sample_name: str) -> str:
+        df = pd.read_csv(
+            kraken_out_path,
+            sep='\t',
+            header=None,
+            usecols=[1, 3, 5],
+            names=['Count', 'Rank', 'Name']
+        )
+
+
+        df = df.sort_values('Count', ascending=False)
+
+        # format name
+        df['Name'] = df['Name'].apply(lambda s: s.strip())
+
+        # add sample name
+        df['Sample'] = sample_name
+
+
+        df = df[df['Rank'] == tax_rank]
+        df = df.drop(columns='Rank')
+        print(df)
+
+
+i = MMonitorDBInterface("/resources/mmonitor_centrifuge.db")
+
+
+
+
+
+

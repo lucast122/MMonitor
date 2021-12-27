@@ -149,4 +149,4 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 429916160
 RSCRIPT = 'RScript'
 
 # hacky db solution until mysql is implemented
-MMONITOR_DB_PATH = BASE_DIR / 'mmonitor.db'
+MMONITOR_DB_PATH = BASE_DIR / 'mmonitor.sqlite3'

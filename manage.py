@@ -2,9 +2,15 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from subprocess import call
 
 
 def main():
+
+    if sys.argv[1] == 'runapp':
+        call('python -m gui'.split())
+        return
+
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'MMonitor.settings')
     try:
