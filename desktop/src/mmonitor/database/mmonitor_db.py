@@ -2,6 +2,16 @@ import sqlite3
 from typing import List, Tuple, Any
 
 import pandas as pd
+from json import loads
+
+
+def _parse_dict(x):
+    return pd.Series(loads(x))
+
+
+# https://www.skytowner.com/explore/splitting_dictionary_into_separate_columns_in_pandas_dataframe
+def _explode_metadata(df):
+    return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
 
 
 class MMonitorDBInterface:
@@ -28,7 +38,7 @@ class MMonitorDBInterface:
             "WHERE mmonitor.sample_id = metadata.sample_id " \
             f"AND mmonitor.taxonomy = '{taxonomy}' " \
             "ORDER BY mmonitor.sample_id"
-        return self.query_to_dataframe(q)
+        return _explode_metadata(self.query_to_dataframe(q))
 
     def get_abundance_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
         q = f"SELECT sample_id, abundance FROM mmonitor WHERE taxonomy = '{taxonomy}' ORDER BY sample_id"
@@ -36,7 +46,7 @@ class MMonitorDBInterface:
 
     def get_all_meta(self) -> pd.DataFrame:
         q = "SELECT * FROM metadata ORDER BY sample_id"
-        return self.query_to_dataframe(q)
+        return _explode_metadata(self.query_to_dataframe(q))
 
     def get_unique_taxonomies(self) -> List[str]:
         q = "SELECT DISTINCT taxonomy FROM mmonitor"
@@ -59,12 +69,8 @@ class MMonitorDBInterface:
         )"""
         cursor.execute(create_command)
         create_command = f"""CREATE TABLE IF NOT EXISTS metadata (
-            "sample_id"	INTEGER UNIQUE,
-            "n-Butyric Acid"	REAL,
-            "n-Valeric Acid"	REAL,
-            "n-Caproic Acid"	REAL,
-            "n-Heptanoic Acid"	REAL,
-            "n-Caprylic Acid"	REAL,
+            "sample_id"	INTEGER PRIMARY KEY,
+            "data" TEXT,
             PRIMARY KEY("sample_id")
         )"""
         cursor.execute(create_command)
