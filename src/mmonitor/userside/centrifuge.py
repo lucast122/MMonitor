@@ -25,11 +25,22 @@ class CentrifugeRunner():
         except FileNotFoundError:
             self.logger.error("Make sure that centrifuge is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
-    def run_centrifuge(self, fastq_list, centrifuge_index, sample_name):
-        self.cent_out=f"{pathlib.Path(__file__).parent.resolve()}/classifier_out/{sample_name}_cent_out"
-        cmd = f'centrifuge -x {centrifuge_index} -U {self.unpack_fastq_list(fastq_list)} -p {multiprocessing.cpu_count()} -S {pathlib.Path(__file__).parent.resolve()}/classifier_out/{sample_name}_cent_out'
-        print(cmd)
-        os.system(cmd)
+    def run_centrifuge(self, sequence_list, centrifuge_index, sample_name):
+        cmd = ""
+        print(sequence_list)
+        if sequence_list[0].lower().endswith(('.fq','.fastq','.fastq.gz','.fq.gz')):
+        # if ".fastq" in sequence_list[0] or ".fq" in sequence_list[0] or ".fastq.gz" in sequence_list[0]:
+            self.cent_out=f"{pathlib.Path(__file__).parent.resolve()}/classifier_out/{sample_name}_cent_out"
+            cmd = f'centrifuge -x {centrifuge_index} -U {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {pathlib.Path(__file__).parent.resolve()}/classifier_out/{sample_name}_cent_out'
+            print(cmd)
+            os.system(cmd)
+            return
+        if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0]:
+            self.cent_out=f"{pathlib.Path(__file__).parent.resolve()}/classifier_out/{sample_name}_cent_out"
+            cmd = f'centrifuge -x {centrifuge_index} -f {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {pathlib.Path(__file__).parent.resolve()}/classifier_out/{sample_name}_cent_out'
+            print(cmd)
+            os.system(cmd)
+            return
     def make_kraken_report(self,centrifuge_index):
         cmd = f"centrifuge-kreport -x {centrifuge_index} {self.cent_out} > {self.cent_out.replace('cent_out','kraken_out')}"
         os.system(cmd)
@@ -42,7 +53,7 @@ class CentrifugeRunner():
         try:
             for file in os.listdir(folder_path):
                 print(file)
-                if file.endswith(".fastq") or file.endswith(".fq"):
+                if file.endswith(".fastq") or file.endswith(".fq") or file.endswith(".fasta") or file.endswith(".fastq.gz"):
                     files.append(f"{folder_path}/{file}")
                     found = True
             if not found:

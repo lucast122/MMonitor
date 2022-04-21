@@ -59,7 +59,7 @@ def analyze_fastq_in_folder():
     files = cent.get_files_from_folder(dir)
     print(files)
 
-    sample_name = simpledialog.askstrixng("Input sample name", "What should the sample be called?",
+    sample_name = simpledialog.askstring("Input sample name", "What should the sample be called?",
                                           parent=root)
     cent.run_centrifuge(files, centrifuge_index, sample_name)
 
@@ -88,10 +88,10 @@ def open_popup(text,title):
 
 def choose_index():
     global centrifuge_index
-    centrifuge_index = filedialog.askopenfilename(initialdir='projects/', title ="Choose project data base to use",
-                                          filetypes = (("sqlite", "*.sqlite3"), ("all files", "*.*")))
-
-
+    centrifuge_index = filedialog.askopenfilename(initialdir='projects/', title ="Choose centrifuge index to use",
+                                          filetypes = (("centrifuge index", "*.cf"), ("all files", "*.*")))
+    centrifuge_index = centrifuge_index.split(".")[0]
+    print(centrifuge_index)
 
 
 root = tk.Tk()
