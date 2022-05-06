@@ -2,7 +2,7 @@ import sqlite3
 from typing import List, Tuple, Any
 
 import pandas as pd
-from json import loads
+from json import loads, dumps
 
 
 def _parse_dict(x):
@@ -15,23 +15,38 @@ def _explode_metadata(df):
 
 
 class MMonitorDBInterface:
+    """
+    Interface to an sqlite MMonitor database.
+
+    Future:
+        - Consider switching from raw queries to an ORM like SQAlchemy.
+    """
 
     def __init__(self, db_path: str):
         self._db_path = db_path
 
     def query_to_dataframe(self, query: str) -> pd.DataFrame:
+        """
+        Query the database and receive the result as pd Dataframe
+        """
         con = sqlite3.connect(self._db_path)
         df = pd.read_sql_query(query, con)
         con.close()
         return df
 
     def query_to_list(self, query: str) -> List[Tuple[Any]]:
+        """
+        Query the database and receive the result as list
+        """
         con = sqlite3.connect(self._db_path)
         ls = list(con.execute(query))
         con.close()
         return ls
 
     def get_abundance_meta_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
+        """
+        Fetch a join of taxonomy and metadata by sample id as pd Dataframe
+        """
         q = "SELECT mmonitor.sample_id, mmonitor.abundance, metadata.* " \
             "FROM mmonitor " \
             "INNER JOIN metadata " \
@@ -41,38 +56,58 @@ class MMonitorDBInterface:
         return _explode_metadata(self.query_to_dataframe(q))
 
     def get_abundance_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
+        """
+        Fetch sample ids and abundances of a taxonomy as pd Dataframe
+        """
         q = f"SELECT sample_id, abundance FROM mmonitor WHERE taxonomy = '{taxonomy}' ORDER BY sample_id"
         return self.query_to_dataframe(q)
 
     def get_all_meta(self) -> pd.DataFrame:
+        """
+        Fetch all metadata of a sample id as pd Dataframe
+        """
         q = "SELECT * FROM metadata ORDER BY sample_id"
         return _explode_metadata(self.query_to_dataframe(q))
 
     def get_unique_taxonomies(self) -> List[str]:
+        """
+        Fetch all unique taxonomies as list
+        """
         q = "SELECT DISTINCT taxonomy FROM mmonitor"
         return [t[0] for t in self.query_to_list(q)]
 
     def get_unique_samples(self) -> List[str]:
+        """
+        Fetch all unique sample ids as list
+        """
         q = "SELECT DISTINCT sample_id FROM mmonitor"
         return [t[0] for t in self.query_to_list(q)]
 
     def create_db(self, db_name):
+        """
+        Create a new sqlite MMonitor database on the local disk
+        """
         con = sqlite3.connect(db_name)
         cursor = con.cursor()
 
+        # mmonitor taxonomies and abundances
         create_command = f"""CREATE TABLE IF NOT EXISTS mmonitor (
             read_id INTEGER PRIMARY KEY,
             taxonomy TEXT,
             abundance INTEGER,
             sample_id INTEGER,
-            project_id INTEGER
+            project_id INTEGER,
+            PRIMARY KEY ("read_id")
         )"""
+
+        # sample metadata
         cursor.execute(create_command)
         create_command = f"""CREATE TABLE IF NOT EXISTS metadata (
             "sample_id"	INTEGER PRIMARY KEY,
             "data" TEXT,
             PRIMARY KEY("sample_id")
         )"""
+
         cursor.execute(create_command)
         con.commit()
         con.close()
@@ -80,6 +115,9 @@ class MMonitorDBInterface:
 
     def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
                                      project_name: str) -> None:
+        """
+        Update MMonitor data from a file containing kraken output
+        """
         con = sqlite3.connect(self._db_path)
         cursor = con.cursor()
 
@@ -119,8 +157,14 @@ class MMonitorDBInterface:
         con.close()
 
     def append_metadata_from_csv(self, csv_file: str):
+        """
+        Update metadata from a csv
+        """
         con = sqlite3.connect(self._db_path)
         df = pd.read_csv(csv_file)
+        meta_cols = [col for col in df.columns if col != 'sample_id']
+        df['data'] = df.apply(lambda x: dumps({col: x[col] for col in meta_cols}), axis=1)
+        df = df.drop(columns=meta_cols)
         df.to_sql('metadata', con, if_exists='append', index=False)
         con.commit()
         con.close()

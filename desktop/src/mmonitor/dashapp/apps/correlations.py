@@ -260,6 +260,7 @@ class Correlations(BaseApp):
 
                 # request corresponding abundances from database
                 tax_df = self._sql.get_abundance_by_taxonomy(taxonomy)
+                joined_df = tax_df.join(meta_df, on='sample_id', how='outer', lsuffix='_t', rsuffix='_m').dropna()
 
                 # for each selected method
                 for method in methods:
@@ -275,7 +276,7 @@ class Correlations(BaseApp):
 
                         # calculate the correlation score and its probability
                         # according to the selected tests
-                        score, test_scores = scipy_correlation(tax_df['abundance'], meta_df[meta], tests, method)
+                        score, test_scores = scipy_correlation(joined_df['abundance'], joined_df[meta], tests, method)
 
                         # populate the row containing correlation scores per metadata
                         score_row[meta] = score

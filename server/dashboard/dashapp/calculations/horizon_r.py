@@ -32,15 +32,24 @@ def generate_image(df: pd.DataFrame, uid: str, width: int, height: int) -> None:
     image_path = join(image_dir, 'horizon.png')
     csv_file = join(_R_PATH, uid + '_abundances.csv')
 
-    _write_csv(df, csv_file)
-    _export_env_vars(image_path, width, height, csv_file)
+    horizon_scale = _write_csv(df, csv_file)
+    _export_env_vars(image_path, width, height, csv_file, horizon_scale)
     _call_r_script()
 
 
-def _write_csv(df: pd.DataFrame, csv_file: str) -> None:
+def _write_csv(df: pd.DataFrame, csv_file: str) -> int:
     """
     Transpose mmonitor db to a Dataframe with only taxonomies and their abundances.
     """
+
+    # calculate the width of bands for the horizon plot assuming 6 bands
+    horizon_scale = (df['abundance'].max() - df['abundance'].min()) // 6
+
+    # scale the abundances so that 0 is the origin for a better y axis label
+    def shift(x):
+        return x - horizon_scale * 3
+
+    df['abundance'] = df['abundance'].apply(shift)
 
     # target df
     csv_df = pd.DataFrame()
@@ -57,8 +66,10 @@ def _write_csv(df: pd.DataFrame, csv_file: str) -> None:
     # write file
     csv_df.to_csv(csv_file, index=False)
 
+    return horizon_scale
 
-def _export_env_vars(image_path: str, width: int, height: int, csv_file: str) -> None:
+
+def _export_env_vars(image_path: str, width: int, height: int, csv_file: str, horizon_scale: int) -> None:
     """
     Export necessary variables to environment
     so that the R script can read them from the environment.
@@ -66,6 +77,7 @@ def _export_env_vars(image_path: str, width: int, height: int, csv_file: str) ->
 
     environ['HORI_WIDTH'] = str(width)
     environ['HORI_HEIGHT'] = str(height)
+    environ['HORI_BANDWIDTH'] = str(horizon_scale)
     environ['HORI_CSV'] = csv_file
     environ['HORI_IMAGE'] = image_path
 
