@@ -1,12 +1,12 @@
 from typing import Tuple, Any, List, Iterable, Dict, Union
 
-import plotly.express as px
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash_table import DataTable
+import plotly.express as px
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+from dash_table import DataTable
 from pandas import DataFrame
 from plotly.graph_objects import Figure
 
@@ -52,6 +52,7 @@ class Correlations(BaseApp):
 
         # graph dropdown menus in a flex box
         header = html.H1('Correlations of abundances and metadata')
+
         taxonomy_dd = dcc.Dropdown(
             id='taxonomy-dd',
             options=[{'label': t, 'value': t} for t in self._taxonomies],
@@ -143,11 +144,18 @@ class Correlations(BaseApp):
         correlations_tb = DataTable(id='table-correlations', data=[], columns=[])
         download_tb = dcc.Download(id='download-tb')
 
+        CONTENT_STYLE = {
+
+            "margin-right": "2rem",
+            "padding": "2rem 1rem",
+            'margin-bottom': '200px', 'background-color': 'gainsboro'
+        }
+
         container = html.Div(
             [header, dropdowns, graph_score, graph_test, header_tb, dropdowns_tb,
              selections_tb, correlations_tb, download_tb],
-            style={'margin-bottom': '200px'}
-        )
+            style=CONTENT_STYLE)
+
         self.layout = container
 
     def _init_callbacks(self) -> None:

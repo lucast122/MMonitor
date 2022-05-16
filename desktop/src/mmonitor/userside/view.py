@@ -1,14 +1,18 @@
+import tkinter as tk
 from threading import Thread
 from time import sleep
-from webbrowser import open_new
-import tkinter as tk
 from tkinter import filedialog
 from tkinter import simpledialog
+from tkinter import ttk
+from webbrowser import open_new
+
 from requests import post
 
+from build import ROOT
 from mmonitor.dashapp.index import Index
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 from mmonitor.userside.centrifuge import CentrifugeRunner
+from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 
 """
 This file represents the basic gui for the desktop app. It is the entry point for the program and the only way 
@@ -46,31 +50,44 @@ class GUI:
         self.db_path = None
         self.centrifuge_index = None
         self.cent = CentrifugeRunner()
+        self.func = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
         self.root = tk.Tk()
         self.init_layout()
+        self.taxonomy = tk.BooleanVar()
+        self.assembly = tk.BooleanVar()
+        self.correction = tk.BooleanVar()
+        self.binning = tk.BooleanVar()
+        self.annotation = tk.BooleanVar()
+        self.kegg = tk.BooleanVar()
 
     def init_layout(self):
 
-        self.root.geometry("250x250")
+        self.root.geometry("350x250")
         self.root.title("MMonitor v0.1.0. alpha")
-        self.root.resizable(width=False, height=False)
-
+        self.root.resizable(width=False, height=True)
+        self.width = 20
+        self.height = 1
         # create buttons
         tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
         tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, fg='white', bg='#254D25').pack()
-        tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
-                  padx=10, pady=5, fg='white', bg='#254D25').pack()
-        tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
-                  padx=10, pady=5, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+        # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
+        #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
+        # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
+        #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+        tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+
         tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, fg='white', bg='#254D25').pack()
-        tk.Button(self.root, text="Quit", command=self.stop_app).pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+        tk.Button(self.root, text="Quit",
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25',
+                  command=self.stop_app).pack()
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
@@ -90,12 +107,14 @@ class GUI:
         self.db.create_db(filename)
 
     def choose_project(self):
+
         self.db_path = filedialog.askopenfilename(
             initialdir='projects/',
             title="Choose project data base to use",
             filetypes=(("sqlite", "*.sqlite3"), ("all files", "*.*"))
         )
         self.db = MMonitorDBInterface(self.db_path)
+        # self.db = "mmonitor.sqlite3"
 
     def choose_index(self):
         self.centrifuge_index = filedialog.askopenfilename(
@@ -134,6 +153,64 @@ class GUI:
 
         self.cent.make_kraken_report(self.centrifuge_index)
         self.db.update_table_with_kraken_out(f"classifier_out/{sample_name}_kraken_out", "S", sample_name, "project")
+
+    def checkbox_popup(self):
+        # open checkbox to ask what the user wants to run (in case of rerunning)
+        top = tk.Toplevel(self.root)
+        top.geometry("400x300")
+        top.title("Select analysis steps to perform.")
+        c6 = ttk.Checkbutton(top, text='Taxonomic analysis', variable=self.taxonomy)
+        c1 = ttk.Checkbutton(top, text='Assembly', variable=self.assembly)
+        c2 = ttk.Checkbutton(top, text='Correction', variable=self.correction)
+        c3 = ttk.Checkbutton(top, text='Binning', variable=self.binning)
+        c4 = ttk.Checkbutton(top, text='Annotation', variable=self.annotation)
+        c5 = ttk.Checkbutton(top, text='KEGG', variable=self.kegg)
+        c6.pack()
+        c1.pack()
+        c2.pack()
+        c3.pack()
+        c4.pack()
+        c5.pack()
+
+        tk.Label(top, text="Please select which parts of the pipeline you want to run.", font='Mistral 12 bold').place(
+            x=0, y=200)
+        tk.Button(top, text="Continue", command=lambda: [self.run_analysis_pipeline(), top.destroy()]).pack()
+
+    def ask_sample_name(self):
+        sample_name = simpledialog.askstring(
+            "Input sample name",
+            "What should the sample be called?",
+            parent=self.root
+        )
+        return sample_name
+
+    # @require_project
+    def run_analysis_pipeline(self):
+        if self.assembly.get() or self.correction.get():
+            seq_file = filedialog.askopenfilename(title="Please select a sequencing file")
+        if self.assembly.get() or self.correction.get() or self.annotation.get() or self.binning.get():
+            sample_name = self.ask_sample_name()
+            self.func.check_software_avail()
+        if self.taxonomy.get():
+            self.analyze_fastq_in_folder()
+        if self.assembly.get():
+            self.func.run_flye(seq_file, sample_name)
+        if self.correction.get():
+            self.func.run_racon(seq_file, sample_name)
+            # self.func.run_medaka(seq_file, sample_name) TODO: FIX MEDAKA
+        if self.binning.get():
+            self.func.run_binning(sample_name)
+        if self.annotation.get():
+            bins_path = f"{ROOT}/src/resources/{sample_name}/bins/"
+            self.func.run_prokka(bins_path)
+        if self.kegg.get():
+            sample_name = self.ask_sample_name()
+
+            pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+            self.kegg_thread1 = Thread(target=self.func.create_keggcharter_input(pipeline_out))
+            self.kegg_thread1.start()
+            self.kegg_thread2 = Thread(self.func.run_keggcharter(pipeline_out, f"{pipeline_out}/keggcharter.tsv"))
+            self.kegg_thread2.start()
 
     @require_project
     def start_monitoring(self):

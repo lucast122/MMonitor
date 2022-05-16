@@ -2,11 +2,11 @@ import base64
 from io import StringIO
 from typing import List, Tuple, Set
 
-import pandas as pd
-import plotly.express as px
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import pandas as pd
+import plotly.express as px
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from plotly.graph_objects import Figure
@@ -52,7 +52,7 @@ class Kraken(BaseApp):
             multiple=True
         )
 
-        # generated content
+        # pipeline_out content
         graph = dcc.Graph(id='kraken-graph')
 
         # slider to adjust entities per bar
@@ -96,7 +96,7 @@ class Kraken(BaseApp):
         )
         def _update_output(contents, slider_value, tax_rank, filenames, tax_rank_options, content_style):
             """
-            Read the uploaded files and display the generated plot.
+            Read the uploaded files and display the pipeline_out plot.
             The plot is a stacked bar chart with abundances
             projected to 100%. The number of entities per bar
             is adjustable with different elements.

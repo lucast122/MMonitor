@@ -1,11 +1,11 @@
-import dash_html_components as html
 import dash_core_components as dcc
+import dash_html_components as html
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 from flask import request
 
 from mmonitor.dashapp.app import app
-from mmonitor.dashapp.apps import correlations, taxonomy, kraken, horizon
+from mmonitor.dashapp.apps import correlations, taxonomy, kraken, horizon, kegg
 from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 
@@ -31,22 +31,28 @@ class Index(BaseApp):
         """
 
         self._apps = {
-            '/apps/correlations': {
-                'name': 'Correlations',
-                'app': correlations.Correlations(self._sql)
-            },
             '/apps/taxonomy': {
                 'name': 'Taxonomy',
                 'app': taxonomy.Taxonomy(self._sql)
+            },
+
+            '/apps/horizon': {
+                'name': 'Horizon',
+                'app': horizon.Horizon(self._sql)
+            },
+
+            '/apps/correlations': {
+                'name': 'Correlations',
+                'app': correlations.Correlations(self._sql)
             },
             '/apps/kraken2': {
                 'name': 'Kraken2',
                 'app': kraken.Kraken(self._sql)
             },
-            '/apps/horizon': {
-                'name': 'Horizon',
-                'app': horizon.Horizon(self._sql)
-            },
+            '/apps/kegg': {
+                'name': 'kegg',
+                'app': kegg.Kegg()
+            }
         }
 
     def _init_layout(self) -> None:
@@ -57,7 +63,7 @@ class Index(BaseApp):
 
         location = dcc.Location(id='url', refresh=False)
         navigation = html.Div([
-            dcc.Link(values['name'], href=url, style={'padding': '10px'})
+            dcc.Link(values['name'], href=url, style={'padding': '10px', 'font-size': "30px"})
             for url, values in self._apps.items()
         ], className="row")
         page_content = html.Div(id='page-content', children=[])

@@ -1,7 +1,7 @@
 import uuid
 
-import dash_html_components as html
 import dash_core_components as dcc
+import dash_html_components as html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from flask import send_from_directory
@@ -28,7 +28,7 @@ def serve_image(cache_bust):
 class Horizon(BaseApp):
     """
     App to display the taxonomy abundances in a horizon plot.
-    Calls an R script and uploads the generated image.
+    Calls an R script and uploads the pipeline_out image.
     """
 
     def __init__(self, sql: MMonitorDBInterface):

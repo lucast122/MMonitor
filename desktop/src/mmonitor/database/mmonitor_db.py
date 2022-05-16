@@ -1,8 +1,8 @@
 import sqlite3
+from json import loads, dumps
 from typing import List, Tuple, Any
 
 import pandas as pd
-from json import loads, dumps
 
 
 def _parse_dict(x):
@@ -97,6 +97,7 @@ class MMonitorDBInterface:
             abundance INTEGER,
             sample_id INTEGER,
             project_id INTEGER,
+            sample_date TEXT,
             PRIMARY KEY ("read_id")
         )"""
 

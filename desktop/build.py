@@ -1,10 +1,11 @@
-from subprocess import call
-from os.path import realpath, dirname, join
 from os import pathsep
+from os.path import realpath, dirname, join
+from subprocess import call
+
+ROOT = dirname(realpath(__file__))
 
 
 def main():
-    root = dirname(realpath(__file__))
     entry_point = join(root, 'src', 'mmonitor', '__main__.py')
     placeholder = join(root, 'src', 'resources', 'images', '.placeholder')
     images_dir_dest = join('resources', 'images')
