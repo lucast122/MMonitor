@@ -2,8 +2,8 @@ import base64
 import glob
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 
 from mmonitor.dashapp.app import app
 from mmonitor.dashapp.base_app import BaseApp
@@ -28,7 +28,7 @@ class Kegg(BaseApp):
 
     def _init_layout(self) -> None:
         self._static_image_route = "/static/"
-        self._samples = glob.glob("/resources/pipeline_out/*/")
+        self._samples = glob.glob("/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/*/")
         print(self._samples)
         header = html.H1("Functional mapping of annotated genomes to KEGG pathways")
         print(self._samples)

@@ -1,4 +1,6 @@
 import tkinter as tk
+# from tkcalendar import Calendar
+from datetime import date
 from threading import Thread
 from time import sleep
 from tkinter import filedialog
@@ -33,13 +35,46 @@ def require_project(func):
 
 def require_centrifuge(func):
     """Decorator that ensures that a centrifuge index was selected by the user."""
+
     def func_wrapper(*args):
         obj: GUI = args[0]
         if obj.centrifuge_index is not None and len(obj.centrifuge_index) > 0:
             return func(*args)
         else:
             obj.open_popup("Please first select a centrifuge index before analyzing files.", "Centrifuge error")
+
     return func_wrapper
+
+
+def calendar_picker(but_exit=None):
+    tkobj = tk.Tk()
+    # setting up the geomentry
+    tkobj.geometry("400x400")
+    tkobj.title("Calendar picker")
+    # creating a calender object
+    tkc = Calendar(tkobj, selectmode="day", year=2022, month=1, date=1)
+    # display on main window
+    tkc.pack(pady=40)
+
+    # getting date from the calendar
+    def fetch_date():
+        date.config(text="Selected Date is: " + tkc.get_date())
+
+    # add button to load the date clicked on calendar
+    but = tk.Button(tkobj, text="Select Date", command=fetch_date, bg="black", fg='white')
+    # displaying button on the main display
+    but.pack()
+
+    but_exit = tk.Button(tkobj, text="Exit", command=tkobj.destroy, bg="black", fg='white')
+    # displaying button on the main display
+    but_exit.pack()
+
+    # Label for showing date on main display
+    date = tk.Label(tkobj, text="", bg='black', fg='white')
+    date.pack(pady=20)
+    # starting the object
+    tkobj.mainloop()
+    return tkc.get_date()
 
 
 class GUI:
@@ -48,7 +83,7 @@ class GUI:
         # declare data base class variable, to be chosen by user with choose_project()
         self.db: MMonitorDBInterface = None
         self.db_path = None
-        self.centrifuge_index = None
+        self.centrifuge_index = "/Users/timolucas/Downloads/p_compressed_2018_4_15_2/p_compressed"
         self.cent = CentrifugeRunner()
         self.func = FunctionalAnalysisRunner()
         self.dashapp = None
@@ -65,28 +100,28 @@ class GUI:
     def init_layout(self):
 
         self.root.geometry("350x250")
-        self.root.title("MMonitor v0.1.0. alpha")
+        self.root.title("MMonitor v0.1.0 alpha")
         self.root.resizable(width=False, height=True)
         self.width = 20
         self.height = 1
         # create buttons
         tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='white').pack()
         tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
         # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
         tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
 
         tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
         tk.Button(self.root, text="Quit",
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#254D25',
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25',
                   command=self.stop_app).pack()
 
     def open_popup(self, text, title):
@@ -149,12 +184,18 @@ class GUI:
             "What should the sample be called?",
             parent=self.root
         )
-        self.cent.run_centrifuge(files, self.centrifuge_index, sample_name)
 
+        # sample_date = calendar_picker()
+        sample_date = date.today()
+        self.cent.run_centrifuge(files, self.centrifuge_index, sample_name)
         self.cent.make_kraken_report(self.centrifuge_index)
-        self.db.update_table_with_kraken_out(f"classifier_out/{sample_name}_kraken_out", "S", sample_name, "project")
+
+        self.db.update_table_with_kraken_out(
+            f"/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/{sample_name}_kraken_out",
+            "S", sample_name, "project", sample_date)
 
     def checkbox_popup(self):
+
         # open checkbox to ask what the user wants to run (in case of rerunning)
         top = tk.Toplevel(self.root)
         top.geometry("400x300")

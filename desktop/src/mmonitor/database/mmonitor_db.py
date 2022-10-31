@@ -96,17 +96,14 @@ class MMonitorDBInterface:
             taxonomy TEXT,
             abundance INTEGER,
             sample_id INTEGER,
-            project_id INTEGER,
-            sample_date TEXT,
-            PRIMARY KEY ("read_id")
+            project_id INTEGER
         )"""
 
         # sample metadata
         cursor.execute(create_command)
         create_command = f"""CREATE TABLE IF NOT EXISTS metadata (
             "sample_id"	INTEGER PRIMARY KEY,
-            "data" TEXT,
-            PRIMARY KEY("sample_id")
+            "data" TEXT
         )"""
 
         cursor.execute(create_command)
@@ -115,7 +112,7 @@ class MMonitorDBInterface:
         self._db_path = db_name
 
     def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
-                                     project_name: str) -> None:
+                                     project_name: str, sample_date):
         """
         Update MMonitor data from a file containing kraken output
         """
@@ -131,9 +128,11 @@ class MMonitorDBInterface:
         )
         df = df.sort_values('Count', ascending=False)
         # format name
-        df['Name'] = df['Name'].apply(lambda s: s.strip())
+
+        # df['Name'] = df['Name'].apply(lambda s: s.strip())
         # add sample name
         df['Sample'] = sample_name
+        df['Sample_date'] = sample_date
         df = df[df['Rank'] == tax_rank]
         df = df.drop(columns='Rank')
         for index, row in df.iterrows():
@@ -145,7 +144,7 @@ class MMonitorDBInterface:
                 # the same sample while sequencing) then add the abundance to the value in the database
                 if name_exists == 0:
                     insert_query = f"""INSERT INTO mmonitor
-                        (taxonomy, abundance, sample_id, project_id) 
+                        (taxonomy, abundance, sample_id, project_id, sample_date) 
                         VALUES 
                         ('{row['Name']}', {row['Count']}, '{sample_name}', '{project_name}')"""
                     cursor.execute(insert_query)

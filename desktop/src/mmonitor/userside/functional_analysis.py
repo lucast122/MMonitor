@@ -6,7 +6,6 @@ import subprocess
 import zipfile
 from os import path
 
-import pandas as pd
 import requests
 
 from build import ROOT

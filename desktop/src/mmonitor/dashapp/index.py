@@ -1,11 +1,11 @@
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 from flask import request
 
 from mmonitor.dashapp.app import app
-from mmonitor.dashapp.apps import correlations, taxonomy, kraken, horizon, kegg
+from mmonitor.dashapp.apps import correlations, taxonomy, horizon, kegg
 from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 
@@ -44,13 +44,13 @@ class Index(BaseApp):
             '/apps/correlations': {
                 'name': 'Correlations',
                 'app': correlations.Correlations(self._sql)
-            },
-            '/apps/kraken2': {
-                'name': 'Kraken2',
-                'app': kraken.Kraken(self._sql)
+                # },
+                # '/apps/kraken2': {
+                #     'name': 'Kraken2',
+                #     'app': kraken.Kraken(self._sql)
             },
             '/apps/kegg': {
-                'name': 'kegg',
+                'name': 'KEGG',
                 'app': kegg.Kegg()
             }
         }

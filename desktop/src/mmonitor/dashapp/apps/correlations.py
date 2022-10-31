@@ -1,12 +1,12 @@
 from typing import Tuple, Any, List, Iterable, Dict, Union
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import plotly.express as px
+from dash import dash_table
+from dash import dcc as dcc
+from dash import html as html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash_table import DataTable
 from pandas import DataFrame
 from plotly.graph_objects import Figure
 
@@ -141,14 +141,15 @@ class Correlations(BaseApp):
         )
 
         # data table and its download element
-        correlations_tb = DataTable(id='table-correlations', data=[], columns=[])
+        correlations_tb = dash_table.DataTable(id='table-correlations', data=[], columns=[])
         download_tb = dcc.Download(id='download-tb')
 
         CONTENT_STYLE = {
 
             "margin-right": "2rem",
             "padding": "2rem 1rem",
-            'margin-bottom': '200px', 'background-color': 'gainsboro'
+            'margin-bottom': '200px',
+            'font-size': '25px'
         }
 
         container = html.Div(

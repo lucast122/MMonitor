@@ -1,9 +1,9 @@
 from typing import Tuple, List, Any, Dict
 
 import plotly.express as px
-import dash_core_components as dcc
-import dash_html_components as html
-from dash_table import DataTable
+from dash import dash_table
+from dash import dcc
+from dash import html
 from dash.dependencies import Input, Output
 from plotly.graph_objects import Figure
 
@@ -70,7 +70,7 @@ class Taxonomy(BaseApp):
         # data table for debugging
         db_header = html.H4(children='SQLite Database')
         data, columns = self._generate_table_data_cols()
-        data_tb = DataTable(id='table-correlations', data=data, columns=columns)
+        data_tb = dash_table.DataTable(id='table-correlations', data=data, columns=columns)
 
         container = html.Div([maira_header, demo_dd, graph1, graph2, pie_chart_input, db_header, data_tb])
         self.layout = container
