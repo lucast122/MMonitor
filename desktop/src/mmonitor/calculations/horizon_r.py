@@ -1,6 +1,11 @@
 from os import environ, getcwd, chdir
 from os.path import join
 from subprocess import call
+# import rpy2's package module
+import rpy2.robjects.packages as rpackages
+import rpy2.robjects as robjects
+from rpy2.robjects.vectors import StrVector
+from rpy2.robjects.packages import importr
 
 import pandas as pd
 
@@ -86,5 +91,10 @@ def _call_r_script() -> None:
 
     cwd = getcwd()
     chdir(r_path)
+    # utils = rpackages.importr('utils')
+    # make sure lattice is installed
+
+    # utils.install_packages('Lattice', repos="https://cloud.r-project.org")
+
     call(['Rscript', '--no-save', _HORIZON_R_SCRIPT])
     chdir(cwd)

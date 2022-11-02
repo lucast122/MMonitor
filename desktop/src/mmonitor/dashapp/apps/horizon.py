@@ -37,7 +37,7 @@ class Horizon(BaseApp):
         self._init_callbacks()
 
     def _init_layout(self) -> None:
-        header = html.H1("Horizon plot of taxonomy abundances")
+        header = html.H1("Horizon plot built with sample abundances")
         width_label = html.Label('Width: ')
         width_input = dcc.Input(
             id='width-input',
@@ -50,8 +50,8 @@ class Horizon(BaseApp):
         )
         confirm = html.Button(
             'Generate',
-            id='confirm',
-            style={'padding': '5px'}
+            id='confirm'
+
         )
         input_container = html.Div([
             width_label,
@@ -59,14 +59,22 @@ class Horizon(BaseApp):
             height_label,
             height_input,
             confirm
-        ])
+        ], style={ "padding": "2rem 1rem", 'font-size': '12px'})
+
+        CONTENT_STYLE = {
+
+            "margin-right": "2rem",
+            "padding": "2rem 1rem",
+            'margin-bottom': '200px',
+            'font-size': '25px'
+        }
 
         image = html.Img(
             id='horizon-plot',
             alt='Please generate a Horizon Plot',
-            style={'display': 'block', 'margin-left': 'auto', 'margin-right': 'auto', 'padding': '20px'}
+            style={'display': 'block', 'margin-right': 'auto', 'padding': '20px', "max-width": "95%", "height": "auto"}
         )
-        container = html.Div([header, input_container, image])
+        container = html.Div([header, input_container, image],style=CONTENT_STYLE)
 
         self.layout = container
 

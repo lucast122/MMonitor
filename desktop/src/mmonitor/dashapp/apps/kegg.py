@@ -1,10 +1,10 @@
 import base64
 import glob
+from pathlib import Path
 
 import dash
 from dash import dcc
 from dash import html
-
 from mmonitor.dashapp.app import app
 from mmonitor.dashapp.base_app import BaseApp
 
@@ -28,26 +28,33 @@ class Kegg(BaseApp):
 
     def _init_layout(self) -> None:
         self._static_image_route = "/static/"
-        self._samples = glob.glob("/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/*/")
-        print(self._samples)
-        header = html.H1("Functional mapping of annotated genomes to KEGG pathways")
-        print(self._samples)
+        base_path = Path(__file__)
+        base_path = Path(base_path.parent.absolute().parent.absolute().parent.absolute().parent.absolute())
+        self._samples = glob.glob(f"{base_path}/resources/pipeline_out/*/")
+        header = html.H1("KEGG pathways in metagenome")
         sample_dropdown = dcc.Dropdown(id="sample-dropdown", options=[{'label': t, 'value': t} for t in self._samples],
-                                       value=self._samples[0])
-        pathway_dropdown = dcc.Dropdown(id="pathway-dropdown")
+                                       value=self._samples[0],style={"max-width": "70%", "height": "auto"})
+
+        pathway_dropdown = dcc.Dropdown(id="pathway-dropdown",style={"max-width": "70%", "height": "auto"})
         dd = html.Div(id='dd-output-container')
 
-        dropdowns = html.Div(
-            [sample_dropdown, pathway_dropdown]
-        )
+        CONTENT_STYLE = {
+
+            "margin-right": "2rem",
+            "padding": "2rem 1rem",
+            'margin-bottom': '200px',
+            'font-size': '15px'
+        }
+
 
         image = html.Img(
             id='kegg-plot',
             alt='Please select a kegg plot',
-            style={'display': 'block', 'margin-left': 'auto', 'margin-right': 'auto', 'padding': '20px'}
-        )
+            style={'display': 'block', 'margin-right': 'auto', 'padding': '20px', "max-width": "99%", "height": "auto"})
 
-        container = html.Div([header, dropdowns, dd, image])
+
+
+        container = html.Div([header, sample_dropdown, pathway_dropdown, dd, image],style=CONTENT_STYLE)
 
         self._layout = container
 

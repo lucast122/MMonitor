@@ -29,7 +29,7 @@ class Taxonomy(BaseApp):
         debugging purposes.
         """
 
-        maira_header = html.H1(children='Bioreactor taxonomy computed using Centrifuge')
+        maira_header = html.H1(children='Taxonomic composition')
 
         # dropdown menu to select chart type
         # initialize as stacked bar chart
@@ -40,10 +40,11 @@ class Taxonomy(BaseApp):
                 {'label': 'Grouped Barchart', 'value': 'groupedbar'},
                 {'label': 'Area plot', 'value': 'area'},
                 {'label': 'Pie chart', 'value': 'pie'},
-                {'label': 'Scatter 3D', 'value': 'scatter3d'},
-            ],
-            value='stackedbar'
+                {'label': 'Scatter 3D', 'value': 'scatter3d'}],
+                    style={"max-width" : "50%", "height" : "auto"},
+                    value='stackedbar'
         )
+
 
         # graph elements
         graph1 = dcc.Graph(id='graph1', figure={'data': []})
@@ -68,11 +69,19 @@ class Taxonomy(BaseApp):
         )
 
         # data table for debugging
-        db_header = html.H4(children='SQLite Database')
+        db_header = html.H4(children="Database")
         data, columns = self._generate_table_data_cols()
         data_tb = dash_table.DataTable(id='table-correlations', data=data, columns=columns)
 
-        container = html.Div([maira_header, demo_dd, graph1, graph2, pie_chart_input, db_header, data_tb])
+        CONTENT_STYLE = {
+
+            "margin-right": "2rem",
+            "padding": "2rem 1rem",
+            'margin-bottom': '200px',
+            'font-size': '25px'
+        }
+
+        container = html.Div([maira_header, demo_dd, graph1, graph2, pie_chart_input, db_header, data_tb],style=CONTENT_STYLE)
         self.layout = container
 
     def _generate_table_data_cols(self, max_rows=40) -> Tuple[List[Any], List[Any]]:

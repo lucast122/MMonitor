@@ -34,6 +34,7 @@ class Index(BaseApp):
             '/apps/taxonomy': {
                 'name': 'Taxonomy',
                 'app': taxonomy.Taxonomy(self._sql)
+
             },
 
             '/apps/horizon': {
@@ -63,7 +64,7 @@ class Index(BaseApp):
 
         location = dcc.Location(id='url', refresh=False)
         navigation = html.Div([
-            dcc.Link(values['name'], href=url, style={'padding': '10px', 'font-size': "30px"})
+            dcc.Link(values['name'], href=url, style={'padding': '10px', 'font-size': "30px", "font-weight" : "bold",  "hover" : "#B22222:"})
             for url, values in self._apps.items()
         ], className="row")
         page_content = html.Div(id='page-content', children=[])

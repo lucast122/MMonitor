@@ -99,29 +99,33 @@ class GUI:
 
     def init_layout(self):
 
-        self.root.geometry("350x250")
+        self.root.geometry("220x210")
         self.root.title("MMonitor v0.1.0 alpha")
-        self.root.resizable(width=False, height=True)
+        self.root.resizable(width=False, height=False)
         self.width = 20
         self.height = 1
         # create buttons
+
+        # uni tuebingen colours
+        # #B22222 red
+        # #444E57 grey
         tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='white').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
         tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
         # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
         tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
 
         tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
         tk.Button(self.root, text="Quit",
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg='#254D25',
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57',
                   command=self.stop_app).pack()
 
     def open_popup(self, text, title):

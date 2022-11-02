@@ -214,15 +214,15 @@
 html is set to 62.5% so that all the REM measurements throughout Skeleton
 are based on 10px sizing. So basically 1.5rem = 15px :) */
 html {
-    font-size: 62.5%;
+    font-size: 60%;
 }
 
 body {
     font-size: 1.5em; /* currently ems cause chrome bug misinterpreting rems on body element */
     line-height: 1.6;
-    font-weight: 400;
+    font-weight: 300;
     font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: rgb(50, 50, 50);
+    color:   #444E57;
 }
 
 
@@ -235,14 +235,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
-    font-size: 4.5rem;
+    font-size: 3.5rem;
     line-height: 1.2;
     letter-spacing: -.1rem;
     margin-bottom: 2rem;
 }
 
 h2 {
-    font-size: 3.6rem;
+    font-size: 3.2rem;
     line-height: 1.25;
     letter-spacing: -.1rem;
     margin-bottom: 1.8rem;
@@ -296,17 +296,39 @@ blockquote {
     margin-left: 0rem;
 }
 
+/*
 
+# uni tuebingen colours
+        # #B22222 red
+        # #444E57 grey
+ */
 /* Links
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 a {
-    color: #1EAEDB;
-    text-decoration: underline;
-    cursor: pointer;
+    background-color: #444E57 ;
+    color: white;
+    padding: 14px 25px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+}
+
+
+
+a:link {
+  background-color: #444E57;
+}
+
+a:visited {
+  background-color: #444E57;
 }
 
 a:hover {
-    color: #0FA0CE;
+  background-color: #B22222;
+}
+
+a:active {
+  background-color: #B22222;
 }
 
 

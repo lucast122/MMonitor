@@ -149,7 +149,7 @@ class Correlations(BaseApp):
             "margin-right": "2rem",
             "padding": "2rem 1rem",
             'margin-bottom': '200px',
-            'font-size': '25px'
+            'font-size': '21px'
         }
 
         container = html.Div(
