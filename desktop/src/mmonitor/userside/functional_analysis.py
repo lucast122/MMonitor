@@ -80,7 +80,7 @@ class FunctionalAnalysisRunner():
 
     def check_software_avail(self):
         try:
-            subprocess.call([f'{ROOT}/lib/Flye-2.9/bin/flye', '-h'], stdout=open(os.devnull, 'w'),
+            subprocess.call([f'python3 {ROOT}/lib/Flye-2.9/bin/flye', '-h'], stdout=open(os.devnull, 'w'),
                             stderr=subprocess.STDOUT)
         except FileNotFoundError:
             self.logger.error("Flye executable not found.")
@@ -122,7 +122,7 @@ class FunctionalAnalysisRunner():
             os.system("mkdir pipeline_out")
 
         # create output dir if it doesn't exist
-        cmd = f'{self.flye_path} --nano-raw {read_file_path} --out-dir {self.assembly_out}{sample_name} -t {self.cpus} --meta'
+        cmd = f'python {self.flye_path} --nano-raw {read_file_path} --out-dir {self.assembly_out}{sample_name} -t {self.cpus} --meta'
         os.system(cmd)
 
     def run_racon(self, read_file_path, sample_name):
@@ -195,7 +195,7 @@ class FunctionalAnalysisRunner():
         read_extractor_cmd = f"read-extractor -i {ROOT}/src/resources/pipeline_out/{sample_name}/consensus.daa  -o {ROOT}/src/resources/pipeline_out/{sample_name}/bins/%t.fasta -c Taxonomy --frameShiftCorrect"
         subprocess.call(read_extractor_cmd)
 
-    # TODO: integrade daa-meganizer and read-extractor into MMonitor
+    # TODO: integrate daa-meganizer and read-extractor into MMonitor
     # /home3/lucas/megan/tools/daa-meganizer -i $daa -mdb /abscratch/lucas/databases/megan-mapping-annotree-June-2021.db -t 48 --lcaCoveragePercent 51 -lg
     # /home3/lucas/megan/tools/read-extractor -i $daa -o $output_folder/extracted_reads/%t.fasta -c Taxonomy --frameShiftCorrect
     def run_prokka(self, bin_folder_path):

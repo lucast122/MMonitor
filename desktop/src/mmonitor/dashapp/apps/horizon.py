@@ -41,12 +41,12 @@ class Horizon(BaseApp):
         width_label = html.Label('Width: ')
         width_input = dcc.Input(
             id='width-input',
-            type='text',
+            type='text', value = "2000"
         )
         height_label = html.Label('Height: ')
         height_input = dcc.Input(
             id='height-input',
-            type='text',
+            type='text', value = "1100"
         )
         confirm = html.Button(
             'Generate',
@@ -71,10 +71,10 @@ class Horizon(BaseApp):
 
         image = html.Img(
             id='horizon-plot',
-            alt='Please generate a Horizon Plot',
+            alt='Please generate a Horizon Plot or wait for plot to load if it was already generated.',
             style={'display': 'block', 'margin-right': 'auto', 'padding': '20px', "max-width": "95%", "height": "auto"}
         )
-        container = html.Div([header, input_container, image],style=CONTENT_STYLE)
+        container = html.Div([header, input_container, image] ,style=CONTENT_STYLE)
 
         self.layout = container
 

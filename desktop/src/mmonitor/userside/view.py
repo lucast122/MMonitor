@@ -109,23 +109,25 @@ class GUI:
         # uni tuebingen colours
         # #B22222 red
         # #444E57 grey
+        button_bg = '#444E57'
+        button_active_bg = "#444E57"
         tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg,).pack()
         tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
         # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
         tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
 
         tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57').pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
         tk.Button(self.root, text="Quit",
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg='#444E57',
+                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg,
                   command=self.stop_app).pack()
 
     def open_popup(self, text, title):
