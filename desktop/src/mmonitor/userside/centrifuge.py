@@ -3,6 +3,8 @@ import multiprocessing
 import os
 import subprocess
 
+from build import ROOT
+
 
 class CentrifugeRunner:
 
@@ -31,7 +33,7 @@ class CentrifugeRunner:
     def run_centrifuge(self, sequence_list, centrifuge_index, sample_name):
         print(sequence_list)
         if sequence_list[0].lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
-            self.cent_out = f"/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/{sample_name}_cent_out"
+            self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
             # if ".fastq" in sequence_list[0] or ".fq" in sequence_list[0] or ".fastq.gz" in sequence_list[0]:
 
             cmd = f'centrifuge -x {centrifuge_index} -U {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
@@ -39,14 +41,14 @@ class CentrifugeRunner:
             os.system(cmd)
             return
         if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0]:
-            self.cent_out = f"/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/{sample_name}_cent_out"
+            self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
             cmd = f'centrifuge -x {centrifuge_index} -f {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
             print(cmd)
             os.system(cmd)
             return
 
-    def make_kraken_report(self, centrifuge_index):
-        cmd = f"centrifuge-kreport -x {centrifuge_index} {self.cent_out} > {self.cent_out.replace('cent_out', 'kraken_out')}"
+    def make_kraken_report(self):
+        cmd = f"centrifuge-kreport -x {ROOT}/src/resources/db/p_compressed {self.cent_out} > {self.cent_out.replace('cent_out', 'kraken_out')}"
         os.system(cmd)
 
     def get_files_from_folder(self, folder_path):
