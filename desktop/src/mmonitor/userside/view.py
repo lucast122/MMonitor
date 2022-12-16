@@ -83,7 +83,6 @@ class GUI:
         # declare data base class variable, to be chosen by user with choose_project()
         self.db: MMonitorDBInterface = None
         self.db_path = None
-        self.centrifuge_index = "/Users/timolucas/Downloads/p_compressed_2018_4_15_2/p_compressed"
         self.cent = CentrifugeRunner()
         self.func = FunctionalAnalysisRunner()
         self.dashapp = None
@@ -157,12 +156,12 @@ class GUI:
         self.db = MMonitorDBInterface(self.db_path)
         # self.db = "mmonitor.sqlite3"
 
-    def choose_index(self):
-        self.centrifuge_index = filedialog.askopenfilename(
-            initialdir='projects/',
-            title="Choose project data base to use",
-            filetypes=(("sqlite", "*.sqlite3"), ("all files", "*.*"))
-        )
+    # def choose_index(self):
+    #     self.centrifuge_index = filedialog.askopenfilename(
+    #         initialdir='projects/',
+    #         title="Choose project data base to use",
+    #         filetypes=(("sqlite", "*.sqlite3"), ("all files", "*.*"))
+    #     )
 
     @require_project
     def append_metadata(self):
@@ -193,8 +192,8 @@ class GUI:
 
         # sample_date = calendar_picker()
         sample_date = date.today()
-        self.cent.run_centrifuge(files, self.centrifuge_index, sample_name)
-        self.cent.make_kraken_report(self.centrifuge_index)
+        self.cent.run_centrifuge(files, sample_name)
+        self.cent.make_kraken_report()
 
         self.db.update_table_with_kraken_out(
             f"/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/{sample_name}_kraken_out",
