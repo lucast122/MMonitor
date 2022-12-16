@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import date
 from json import loads, dumps
 from typing import List, Tuple, Any
 
@@ -96,7 +97,8 @@ class MMonitorDBInterface:
             taxonomy TEXT,
             abundance INTEGER,
             sample_id INTEGER,
-            project_id INTEGER
+            project_id INTEGER,
+            sample_date TEXT
         )"""
 
         # sample metadata
@@ -132,7 +134,7 @@ class MMonitorDBInterface:
         # df['Name'] = df['Name'].apply(lambda s: s.strip())
         # add sample name
         df['Sample'] = sample_name
-        df['Sample_date'] = sample_date
+        df['Sample_date'] = date.today()
         df = df[df['Rank'] == tax_rank]
         df = df.drop(columns='Rank')
         for index, row in df.iterrows():
@@ -146,7 +148,7 @@ class MMonitorDBInterface:
                     insert_query = f"""INSERT INTO mmonitor
                         (taxonomy, abundance, sample_id, project_id, sample_date) 
                         VALUES 
-                        ('{row['Name']}', {row['Count']}, '{sample_name}', '{project_name}')"""
+                        ('{row['Name']}', {row['Count']}, '{sample_name}', '{project_name}','{sample_date}')"""
                     cursor.execute(insert_query)
                 # if taxon is new to the data base simply insert it into the table
                 elif name_exists == 1:
