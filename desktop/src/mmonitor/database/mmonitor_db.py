@@ -138,7 +138,7 @@ class MMonitorDBInterface:
         df = df[df['Rank'] == tax_rank]
         df = df.drop(columns='Rank')
         for index, row in df.iterrows():
-            if row['Count'] > 200:
+            if row['Count'] > 100:
                 check_name_exists_in_sample = f"SELECT EXISTS(SELECT 1 FROM mmonitor WHERE taxonomy='{row['Name']}' AND sample_id='{sample_name}');"
                 cursor.execute(check_name_exists_in_sample)
                 name_exists = cursor.fetchall()[0][0]

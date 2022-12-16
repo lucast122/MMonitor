@@ -4,6 +4,7 @@ from datetime import date
 from threading import Thread
 from time import sleep
 from tkinter import filedialog
+from build import ROOT
 from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
@@ -198,7 +199,7 @@ class GUI:
         self.cent.make_kraken_report()
 
         self.db.update_table_with_kraken_out(
-            f"/Users/timolucas/PycharmProjects/MMonitor/desktop/src/resources/pipeline_out/{sample_name}_kraken_out",
+            f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out",
             "S", sample_name, "project", sample_date)
 
     def checkbox_popup(self):
