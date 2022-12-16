@@ -24,26 +24,28 @@ for the user to create projects, select files and run MMonitor's computational e
 
 def require_project(func):
     """Decorator that ensures that a database was selected or created by the user."""
+
     def func_wrapper(*args):
         obj: GUI = args[0]
         if obj.db_path is not None and len(obj.db_path) > 0:
             return func(*args)
         else:
             obj.open_popup("Please first create or choose a project data base.", "No data base chosen")
-    return func_wrapper
-
-
-def require_centrifuge(func):
-    """Decorator that ensures that a centrifuge index was selected by the user."""
-
-    def func_wrapper(*args):
-        obj: GUI = args[0]
-        if obj.centrifuge_index is not None and len(obj.centrifuge_index) > 0:
-            return func(*args)
-        else:
-            obj.open_popup("Please first select a centrifuge index before analyzing files.", "Centrifuge error")
 
     return func_wrapper
+
+
+# def require_centrifuge(func):
+#     """Decorator that ensures that a centrifuge index was selected by the user."""
+#
+#     def func_wrapper(*args):
+#         obj: GUI = args[0]
+#         if obj.centrifuge_index is not None and len(obj.centrifuge_index) > 0:
+#             return func(*args)
+#         else:
+#             obj.open_popup("Please first select a centrifuge index before analyzing files.", "Centrifuge error")
+#
+#     return func_wrapper
 
 
 def calendar_picker(but_exit=None):
@@ -176,7 +178,7 @@ class GUI:
     # choose folder containing sequencing data
     # TODO: check if there is white space in path that causes problem
     @require_project
-    @require_centrifuge
+    # @require_centrifuge
     def analyze_fastq_in_folder(self):
         folder = filedialog.askdirectory(
             initialdir='/',
