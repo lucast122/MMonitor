@@ -1,3 +1,4 @@
+from os import pathsep
 from os.path import realpath, dirname, join
 import shutil
 from os.path import realpath, dirname, join
@@ -15,12 +16,12 @@ def main():
 
     # call(f"pyinstaller -D {entry_point} --name mmonitor --add-data {placeholder}{pathsep}{images_dir_dest} --add-data {r_script}{pathsep}{r_dir_dest}".split()) #use this for building new spec file
     # remove old dist and built for faster rebuilding
-    try:
-        shutil.rmtree("/Users/timolucas/PycharmProjects/MMonitor/desktop/build/mmonitor/")
-        shutil.rmtree("/Users/timolucas/PycharmProjects/MMonitor/desktop/dist/mmonitor/")
-    except:
-        call(f"pyinstaller mmonitor.spec".split())  # use this for using edited spec file
-    call(f"pyinstaller mmonitor.spec".split())  # use this for using edited spec file
+    # try:
+    #     shutil.rmtree("//home/minion-computer/PycharmProjects/MMonitor/desktop/dist/mmonitor/")
+    #     shutil.rmtree("/home/minion-computer/PycharmProjects/MMonitor/desktop/build/mmonitor/")
+    # except:
+    #     call(f"pyinstaller mmonitor.spec".split())  # use this for using edited spec file
+    call(f"pyinstaller mmonitor.spec -y".split())  # use this for using edited spec file
 
 
 if __name__ == '__main__':
