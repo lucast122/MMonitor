@@ -14,15 +14,16 @@ def create_keggcharter_input(path_to_prokka_output, output_path):
     df = pd.DataFrame(keggcharter_sheet)
     df_list = []
     df.to_csv(output_path, sep='\t')
-    for tsv in glob.glob(f"{path_to_prokka_output}/tsvs/*.tsv"):
-        data = pd.read_csv(tsv, sep='\t')
-        tax = tsv.split('.tsv')[0]
-        tax = tax.split('/')[-1]
-        tax = tax.replace('_', ' ')
-        tax = tax.replace('.fasta', ' ')
-        print(tax)
-        data["taxonomy"] = tax
-        df_list.append(data)
+    for tsv in glob.glob(f"{path_to_prokka_output}/*.tsv"):
+        if not "keggcharter.tsv" in tsv:
+            data = pd.read_csv(tsv, sep='\t')
+            tax = tsv.split('.tsv')[0]
+            tax = tax.split('/')[-1]
+            tax = tax.replace('_', ' ')
+            tax = tax.replace('.fasta', ' ')
+            print(tax)
+            data["taxonomy"] = tax
+            df_list.append(data)
     df = pd.concat(df_list)
     df.to_csv(output_path, sep='\t')
 

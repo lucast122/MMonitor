@@ -4,7 +4,6 @@ from datetime import date
 from threading import Thread
 from time import sleep
 from tkinter import filedialog
-from build import ROOT
 from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
@@ -114,22 +113,28 @@ class GUI:
         button_bg = '#444E57'
         button_active_bg = "#444E57"
         tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg,).pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg, ).pack()
         tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg).pack()
         # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
         #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
         tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg).pack()
         tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg).pack()
 
         tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg).pack()
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg).pack()
         tk.Button(self.root, text="Quit",
-                  padx=10, pady=5, width=self.width, height=self.height, fg='white', bg=button_bg,activebackground=button_active_bg,
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg,
                   command=self.stop_app).pack()
 
     def open_popup(self, text, title):
@@ -206,24 +211,19 @@ class GUI:
 
         # open checkbox to ask what the user wants to run (in case of rerunning)
         top = tk.Toplevel(self.root)
-        top.geometry("400x300")
+        top.geometry("420x232")
         top.title("Select analysis steps to perform.")
-        c6 = ttk.Checkbutton(top, text='Taxonomic analysis', variable=self.taxonomy)
-        c1 = ttk.Checkbutton(top, text='Assembly', variable=self.assembly)
-        c2 = ttk.Checkbutton(top, text='Correction', variable=self.correction)
-        c3 = ttk.Checkbutton(top, text='Binning', variable=self.binning)
-        c4 = ttk.Checkbutton(top, text='Annotation', variable=self.annotation)
-        c5 = ttk.Checkbutton(top, text='KEGG', variable=self.kegg)
-        c6.pack()
-        c1.pack()
-        c2.pack()
-        c3.pack()
-        c4.pack()
-        c5.pack()
+        frame = tk.LabelFrame(top, padx=10, pady=10)
 
-        tk.Label(top, text="Please select which parts of the pipeline you want to run.", font='Mistral 12 bold').place(
-            x=0, y=200)
-        tk.Button(top, text="Continue", command=lambda: [self.run_analysis_pipeline(), top.destroy()]).pack()
+        frame.pack(pady=20, padx=10)
+        button_width = 100
+        c6 = ttk.Checkbutton(frame, text='Taxonomic analysis', variable=self.taxonomy, width=button_width).pack()
+        c1 = ttk.Checkbutton(frame, text='Assembly', variable=self.assembly, width=button_width).pack()
+        c2 = ttk.Checkbutton(frame, text='Correction', variable=self.correction, width=button_width).pack()
+        c3 = ttk.Checkbutton(frame, text='Binning', variable=self.binning, width=button_width).pack()
+        c4 = ttk.Checkbutton(frame, text='Annotation', variable=self.annotation, width=button_width).pack()
+        c5 = ttk.Checkbutton(frame, text='KEGG', variable=self.kegg, width=button_width).pack()
+        c7 = tk.Button(top, text="Continue", command=lambda: [self.run_analysis_pipeline(), top.destroy()]).pack()
 
     def ask_sample_name(self):
         sample_name = simpledialog.askstring(
@@ -252,9 +252,23 @@ class GUI:
         if self.annotation.get():
             bins_path = f"{ROOT}/src/resources/{sample_name}/bins/"
             self.func.run_prokka(bins_path)
-        if self.kegg.get():
-            sample_name = self.ask_sample_name()
+        # if only kegg analysis is selected then the user needs to chose the path to the annotations
+        if self.kegg.get() and not self.assembly.get() and not self.correction.get() and not self.binning.get() and not self.annotation.get():
+            # sample_name = self.ask_sample_name()
+            pipeline_out = filedialog.askdirectory(
+                title="Please select the path to the prokka output (folder with tsv files with annotations).")
+            pipeline_out = f"{pipeline_out}/"
+            # pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+            self.kegg_thread1 = Thread(target=self.func.create_keggcharter_input(pipeline_out))
+            self.kegg_thread1.start()
+            self.kegg_thread2 = Thread(self.func.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
+            self.kegg_thread2.start()
 
+            # if kegg and annotation is chosen then the user only needs to select the sample name, then the tsv files from the results
+            # of the annotations will be used as input for creating keggcharter input and creating kegg maps
+        if self.kegg.get() and self.annotation.get():
+            sample_name = self.ask_sample_name()
+            # pipeline_out = filedialog.askdirectory(title="Please select the path to the prokka output (folder with tsv files with annotations).")
             pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
             self.kegg_thread1 = Thread(target=self.func.create_keggcharter_input(pipeline_out))
             self.kegg_thread1.start()

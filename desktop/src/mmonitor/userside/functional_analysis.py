@@ -6,6 +6,7 @@ import subprocess
 import zipfile
 from os import path
 
+import pandas as pd
 import requests
 
 from build import ROOT
@@ -210,7 +211,7 @@ class FunctionalAnalysisRunner():
         df = pd.DataFrame(keggcharter_sheet)
         df_list = []
         df.to_csv(path_to_prokka_output + "keggcharter.tsv", sep='\t')
-        for tsv in glob.glob(f"{path_to_prokka_output}/tsvs/*.tsv"):
+        for tsv in glob.glob(f"{path_to_prokka_output}/*.tsv"):
             print(tsv)
             data = pd.read_csv(tsv, sep='\t')
             tax = tsv.split('.tsv')[0]
@@ -225,6 +226,6 @@ class FunctionalAnalysisRunner():
         df.to_csv(path_to_prokka_output + "keggcharter.tsv", sep='\t')
 
     def run_keggcharter(self, kegg_out, keggcharter_input):
-        self.create_keggcharter_input(kegg_out, keggcharter_input)
+        # self.create_keggcharter_input(keggcharter_input)
         cmd = f"python {ROOT}/lib/KEGGCharter-0.3.4/keggcharter.py -o {kegg_out} -f {keggcharter_input} -tc taxonomy -ecc EC_number --input-quantification -mm {self.kegg_ids}"
         os.system(cmd)
