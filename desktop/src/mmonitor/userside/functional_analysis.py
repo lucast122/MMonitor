@@ -6,6 +6,7 @@ import subprocess
 import zipfile
 from os import path
 
+import pandas as pd
 import requests
 
 from build import ROOT
@@ -205,16 +206,26 @@ class FunctionalAnalysisRunner():
                   f" --force --prefix $(basename {fasta}) {fasta}  --cpus 0 --addgenes"
             subprocess.call(cmd)
 
+    """
+    This method takes as input
+    @param path_to_prokka_output: Path to the output of prokka that contains the tsv files that will get concatenated
+    @param output_path: Path to safe the final tsv file to. That tsv file can then used as input for keggcharter and has the columns with EC_number nad taxonomy
+    """
+
     def create_keggcharter_input(self, path_to_prokka_output):
         keggcharter_sheet = {'taxonomy': ['']}
         df = pd.DataFrame(keggcharter_sheet)
         df_list = []
         df.to_csv(path_to_prokka_output + "keggcharter.tsv", sep='\t')
-        for tsv in glob.glob(f"{path_to_prokka_output}/tsvs/*.tsv"):
+        for tsv in glob.glob(f"{path_to_prokka_output}/*.tsv"):
             print(tsv)
             data = pd.read_csv(tsv, sep='\t')
             tax = tsv.split('.tsv')[0]
             tax = tax.split('/')[-1]
+            try:
+                tax = tax[:tax.rfind('_')] + tax[tax.rfind('.'):]
+            except:
+                print()
             tax = tax.replace('_', ' ')
             if ".fasta" in tax:
                 tax = tax.removesuffix(".fasta")
@@ -225,6 +236,6 @@ class FunctionalAnalysisRunner():
         df.to_csv(path_to_prokka_output + "keggcharter.tsv", sep='\t')
 
     def run_keggcharter(self, kegg_out, keggcharter_input):
-        self.create_keggcharter_input(kegg_out, keggcharter_input)
+        # self.create_keggcharter_input(keggcharter_input)
         cmd = f"python {ROOT}/lib/KEGGCharter-0.3.4/keggcharter.py -o {kegg_out} -f {keggcharter_input} -tc taxonomy -ecc EC_number --input-quantification -mm {self.kegg_ids}"
         os.system(cmd)
