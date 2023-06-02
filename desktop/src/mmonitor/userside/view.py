@@ -13,8 +13,6 @@ from tkinter import ttk
 from webbrowser import open_new
 
 from PIL import Image, ImageTk
-from customtkinter import *
-from customtkinter import CTkFrame
 from requests import post
 
 from build import ROOT
