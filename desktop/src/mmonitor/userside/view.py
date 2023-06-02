@@ -115,7 +115,7 @@ class GUI:
         self.root.geometry("300x300")
         self.root.title("MMonitor v0.1.0 alpha")
         self.root.resizable(width=False, height=False)
-        ico = Image.open(f"/Users/timolucas/PycharmProjects/MMonitor/src/mmonitor/resources/images/mmonitor_logo.png")
+        ico = Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
         photo = ImageTk.PhotoImage(ico)
 
         self.root.wm_iconphoto(False, photo)
