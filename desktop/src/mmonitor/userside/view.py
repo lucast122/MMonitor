@@ -1,20 +1,30 @@
-import tkinter as tk
 # from tkcalendar import Calendar
+import gzip
+import os
+import tarfile
+import tkinter as tk
+import urllib.request
 from datetime import date
 from threading import Thread
 from time import sleep
-from tkinter import filedialog
+from tkinter import messagebox
 from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
 
+from PIL import Image, ImageTk
+from customtkinter import *
+from customtkinter import CTkFrame
 from requests import post
 
 from build import ROOT
 from mmonitor.dashapp.index import Index
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 from mmonitor.userside.centrifuge import CentrifugeRunner
+from mmonitor.userside.emu import EmuRunner
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
+
+# from mmonitor.userside.downloader import Downloader
 
 """
 This file represents the basic gui for the desktop app. It is the entry point for the program and the only way 
@@ -51,7 +61,7 @@ def require_project(func):
 def calendar_picker(but_exit=None):
     tkobj = tk.Tk()
     # setting up the geomentry
-    tkobj.geometry("400x400")
+    tkobj.geometry("500x500")
     tkobj.title("Calendar picker")
     # creating a calender object
     tkc = Calendar(tkobj, selectmode="day", year=2022, month=1, date=1)
@@ -79,6 +89,14 @@ def calendar_picker(but_exit=None):
     return tkc.get_date()
 
 
+class App(CTk):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.main_frame = CTkFrame(self)
+        self.main_frame.pack(expand=True, fill=tk.BOTH)
+
+
 class GUI:
 
     def __init__(self):
@@ -86,23 +104,31 @@ class GUI:
         self.db: MMonitorDBInterface = None
         self.db_path = None
         self.cent = CentrifugeRunner()
+        self.emu = EmuRunner()
         self.func = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
-        self.root = tk.Tk()
+        self.root = CTk()
         self.init_layout()
-        self.taxonomy = tk.BooleanVar()
+        self.taxonomy_nanopore_wgs = tk.BooleanVar()
+        self.taxonomy_nanopore_16s_bool = tk.BooleanVar()
         self.assembly = tk.BooleanVar()
         self.correction = tk.BooleanVar()
         self.binning = tk.BooleanVar()
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
 
+
     def init_layout(self):
 
-        self.root.geometry("220x210")
+        self.root.geometry("300x300")
         self.root.title("MMonitor v0.1.0 alpha")
         self.root.resizable(width=False, height=False)
+        ico = Image.open(f"/Users/timolucas/PycharmProjects/MMonitor/src/mmonitor/resources/images/mmonitor_logo.png")
+        photo = ImageTk.PhotoImage(ico)
+
+        self.root.wm_iconphoto(False, photo)
+
         self.width = 20
         self.height = 1
         # create buttons
@@ -136,6 +162,8 @@ class GUI:
                   padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
                   activebackground=button_active_bg,
                   command=self.stop_app).pack()
+
+        # console = Console(self.root)
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
@@ -181,11 +209,82 @@ class GUI:
         if csv_file is not None and len(csv_file) > 0:
             self.db.append_metadata_from_csv(csv_file)
 
+        # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
+        # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
+
+    def check_file_exists(self, filepath, url):
+        if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
+            if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
+                response = messagebox.askquestion("Centrifuge index not decompressed",
+                                                  "Index is compressed. Do you want to decompress it?")
+                if response == "yes":
+                    try:
+                        self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
+                    except FileNotFoundError as e:
+                        print(f"Requested file not found")
+            if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf") and os.path.exists(
+                    f"{ROOT}/src/resources/dec22.1.cf.gz"):
+                try:
+                    self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
+                    self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
+                    self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
+                    self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
+                except FileNotFoundError as e:
+                    print(f"Requested files not found.")
+
+
+
+
+
+        else:
+            response = messagebox.askquestion("Centrifuge index not found",
+                                              "Centrifuge index not found. Do you want to download it?"
+                                              " Might take some time, the tool is unusable while download.")
+            if response == "yes":
+                with urllib.request.urlopen(url) as response:
+                    # get file size from content-length header
+                    file_size = int(response.info().get("Content-Length"))
+                    # create progress bar widget
+                    progress = ttk.Progressbar(self.root, orient="horizontal", length=250, mode="determinate")
+                    progress.pack()
+                    progress["maximum"] = file_size
+                    progress["value"] = 0
+
+                    def update_progress(count, block_size, total_size):
+                        progress["value"] = count * block_size
+                        self.root.update_idletasks()
+
+                    # download file and update progress bar
+                    urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
+                    progress.destroy()
+                messagebox.showinfo("Download complete", "Download complete. Unpacking files...")
+
+    def unzip_tar(self, file, out_folder):
+        my_tar = tarfile.open(file, mode='r')
+        my_tar.extractall(out_folder)  # specify which folder to extract to
+        my_tar.close()
+
+    def unzip_gz(self, file):
+        with gzip.open(file, 'rb') as f:
+            file_content = f.read()
+            gzip.decompress(file_content)
+
     # choose folder containing sequencing data
     # TODO: check if there is white space in path that causes problem
     @require_project
     # @require_centrifuge
     def analyze_fastq_in_folder(self):
+        # check if centrifuge index exists, if not download it using check_file_exists method
+        centrifuge_index = "dec22"
+        download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
+                                                               "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
+        download_thread.start()
+        self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
+        self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
+        self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
+        self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
+        self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
+
         folder = filedialog.askdirectory(
             initialdir='/',
             title="Choose directory containing sequencing data"
@@ -203,26 +302,38 @@ class GUI:
         self.cent.run_centrifuge(files, sample_name)
         self.cent.make_kraken_report()
 
-        self.db.update_table_with_kraken_out(
-            f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out",
-            "S", sample_name, "project", sample_date)
+    def taxonomy_nanopore_16s(self):
+        folder = filedialog.askdirectory(
+            initialdir='/',
+            title="Choose directory containing sequencing data"
+        )
+        files = self.emu.get_files_from_folder(folder)
 
     def checkbox_popup(self):
 
         # open checkbox to ask what the user wants to run (in case of rerunning)
         top = tk.Toplevel(self.root)
-        top.geometry("420x232")
+        top.geometry("420x245")
         top.title("Select analysis steps to perform.")
-        frame = tk.LabelFrame(top, padx=10, pady=10)
-
-        frame.pack(pady=20, padx=10)
+        frame_taxonomy = tk.LabelFrame(top, padx=10, pady=2, text="Taxonomic analysis")
+        frame_functional = tk.LabelFrame(top, padx=10, pady=2, text="Functional analysis")
+        frame_taxonomy.pack(pady=5, padx=10)
+        frame_functional.pack(pady=5, padx=10)
         button_width = 100
-        c6 = ttk.Checkbutton(frame, text='Taxonomic analysis', variable=self.taxonomy, width=button_width).pack()
-        c1 = ttk.Checkbutton(frame, text='Assembly', variable=self.assembly, width=button_width).pack()
-        c2 = ttk.Checkbutton(frame, text='Correction', variable=self.correction, width=button_width).pack()
-        c3 = ttk.Checkbutton(frame, text='Binning', variable=self.binning, width=button_width).pack()
-        c4 = ttk.Checkbutton(frame, text='Annotation', variable=self.annotation, width=button_width).pack()
-        c5 = ttk.Checkbutton(frame, text='KEGG', variable=self.kegg, width=button_width).pack()
+
+        # taxonomy checkboxes
+        c6 = ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy nanopore', variable=self.taxonomy_nanopore_wgs,
+                             width=button_width).pack()
+        c8 = ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy 16s nanopore',
+                             variable=self.taxonomy_nanopore_16s_bool,
+                             width=button_width).pack()
+
+        # functional analysis checkboxes
+        c1 = ttk.Checkbutton(frame_functional, text='Assembly', variable=self.assembly, width=button_width).pack()
+        c2 = ttk.Checkbutton(frame_functional, text='Correction', variable=self.correction, width=button_width).pack()
+        c3 = ttk.Checkbutton(frame_functional, text='Binning', variable=self.binning, width=button_width).pack()
+        c4 = ttk.Checkbutton(frame_functional, text='Annotation', variable=self.annotation, width=button_width).pack()
+        c5 = ttk.Checkbutton(frame_functional, text='KEGG', variable=self.kegg, width=button_width).pack()
         c7 = tk.Button(top, text="Continue", command=lambda: [self.run_analysis_pipeline(), top.destroy()]).pack()
 
     def ask_sample_name(self):
@@ -240,8 +351,10 @@ class GUI:
         if self.assembly.get() or self.correction.get() or self.annotation.get() or self.binning.get():
             sample_name = self.ask_sample_name()
             self.func.check_software_avail()
-        if self.taxonomy.get():
+        if self.taxonomy_nanopore_wgs.get():
             self.analyze_fastq_in_folder()
+        if self.taxonomy_nanopore_16s_bool.get():
+            self.taxonomy_nanopore_16()
         if self.assembly.get():
             self.func.run_flye(seq_file, sample_name)
         if self.correction.get():

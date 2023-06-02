@@ -206,6 +206,12 @@ class FunctionalAnalysisRunner():
                   f" --force --prefix $(basename {fasta}) {fasta}  --cpus 0 --addgenes"
             subprocess.call(cmd)
 
+    """
+    This method takes as input
+    @param path_to_prokka_output: Path to the output of prokka that contains the tsv files that will get concatenated
+    @param output_path: Path to safe the final tsv file to. That tsv file can then used as input for keggcharter and has the columns with EC_number nad taxonomy
+    """
+
     def create_keggcharter_input(self, path_to_prokka_output):
         keggcharter_sheet = {'taxonomy': ['']}
         df = pd.DataFrame(keggcharter_sheet)
@@ -216,6 +222,10 @@ class FunctionalAnalysisRunner():
             data = pd.read_csv(tsv, sep='\t')
             tax = tsv.split('.tsv')[0]
             tax = tax.split('/')[-1]
+            try:
+                tax = tax[:tax.rfind('_')] + tax[tax.rfind('.'):]
+            except:
+                print()
             tax = tax.replace('_', ' ')
             if ".fasta" in tax:
                 tax = tax.removesuffix(".fasta")
