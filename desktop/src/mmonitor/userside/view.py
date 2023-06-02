@@ -7,6 +7,7 @@ import urllib.request
 from datetime import date
 from threading import Thread
 from time import sleep
+from tkinter import *
 from tkinter import messagebox
 from tkinter import simpledialog
 from tkinter import ttk
