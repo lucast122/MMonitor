@@ -87,14 +87,6 @@ def calendar_picker(but_exit=None):
     return tkc.get_date()
 
 
-class App(CTk):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.main_frame = CTkFrame(self)
-        self.main_frame.pack(expand=True, fill=tk.BOTH)
-
-
 class GUI:
 
     def __init__(self):
@@ -106,7 +98,7 @@ class GUI:
         self.func = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
-        self.root = CTk()
+        self.root = Tk()
         self.init_layout()
         self.taxonomy_nanopore_wgs = tk.BooleanVar()
         self.taxonomy_nanopore_16s_bool = tk.BooleanVar()
