@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 
-
+# TODO complete implementation of this class for 16s analysis to work
 class EmuRunner:
 
     def __init__(self):
