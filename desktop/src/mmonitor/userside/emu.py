@@ -1,19 +1,22 @@
 import logging
+import multiprocessing
 import os
 import subprocess
+from build import ROOT
+
 
 # TODO complete implementation of this class for 16s analysis to work
 class EmuRunner:
 
     def __init__(self):
         self.logger = logging.getLogger('timestamp')
-        # self.check_centrifuge()
-        # self.cent_out = ""
+        self.check_emu()
+        self.emu_out = ""
 
     @staticmethod
     def unpack_fastq_list(ls):
         """
-        Gets a list of paths and outputs a comma seperated string containing the paths used as input for centrifuge
+        Gets a list of paths and outputs a comma seperated string containing the paths used as input for emu
         """
         if len(ls) == 1:
             return f"{ls[0]}"
@@ -28,20 +31,21 @@ class EmuRunner:
                 "Make sure that emu is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
     def run_emu(self, sequence_list, sample_name):
+        self.emu_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_emu_out"
         print(sequence_list)
         if sequence_list[0].lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
             return
         if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0]:
-            # self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
-            # cmd = f'centrifuge -x {ROOT}/src/resources/p_compressed -f {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
-            # print(cmd)
-            # os.system(cmd)
-            return
+            cmd = f"emu abundance {self.unpack_fastq_list(sequence_list)} --db {ROOT}/src/resources/emu_db/ " \
+                  f"--output-dir {self.emu_out} --threads {multiprocessing.cpu_count()} "
+            print(cmd)
+            os.system(cmd)
+        return
 
     def get_files_from_folder(self, folder_path):
         """
         Gets a path to a folder, checks if path contains sequencing files with specified endings and returns list
-        containing paths to sequencing files. centrifuge
+        containing paths to sequencing files.
         """
         files = []
         found = False

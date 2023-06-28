@@ -113,6 +113,44 @@ class MMonitorDBInterface:
         con.close()
         self._db_path = db_name
 
+    def update_table_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str,
+                                  project_name: str, sample_date):
+        """
+        Update MMonitor data from a file containing emu output
+        """
+        con = sqlite3.connect(self._db_path)
+        cursor = con.cursor()
+
+        df = pd.read_csv(
+            emu_out_path,
+            sep='\t',
+            header=None,
+            usecols=[0, 1, 2, 3],
+            names=['Taxid', 'Abundance', 'Species','Genus']
+        )
+        df = df.sort_values('Abundance', ascending=False)
+        #drop first row
+        df = df.iloc[1:]
+        print(df)
+
+        # format name
+
+        # df['Name'] = df['Name'].apply(lambda s: s.strip())
+        # add sample name
+        #emu uses different columns for species and genus, so combine them to get the full species name
+        #full_name = f"{df['species']} {df['genus']}"
+        df['Sample'] = sample_name
+        df['Sample_date'] = date.today()
+        #df = df[df['Rank'] == tax_rank]
+        #df = df.drop(columns='Rank')
+        for index, row in df.iterrows():
+            #add all species to the database with their abundance percentages don't check count when doing 16s as it only outputs percentages
+            insert_query = f"""INSERT INTO mmonitor            (taxonomy, abundance, sample_id, project_id) 
+            VALUES ('{row['Species']}', {row['Abundance']}, '{sample_name}', '{project_name}')"""
+            cursor.execute(insert_query)
+        con.commit()
+        con.close()
+
     def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
                                      project_name: str, sample_date):
         """

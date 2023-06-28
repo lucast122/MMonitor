@@ -14,9 +14,7 @@ from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
 
-from PIL import Image, ImageTk
 from requests import post
-
 from build import ROOT
 from mmonitor.dashapp.index import Index
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
@@ -93,8 +91,9 @@ class GUI:
 
     def __init__(self):
         # declare data base class variable, to be chosen by user with choose_project()
-        self.db: MMonitorDBInterface = None
-        self.db_path = None
+        self.db: MMonitorDBInterface = MMonitorDBInterface(f"{ROOT}\mmonitor.sqlite3")
+
+        self.db_path = f"{ROOT}/mmonitor.sqlite"
         self.cent = CentrifugeRunner()
         self.emu = EmuRunner()
         self.func = FunctionalAnalysisRunner()
@@ -110,16 +109,15 @@ class GUI:
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
 
-
     def init_layout(self):
 
         self.root.geometry("300x300")
         self.root.title("MMonitor v0.1.0 alpha")
         self.root.resizable(width=False, height=False)
-        ico = Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
-        photo = ImageTk.PhotoImage(ico)
+        # ico = Pillow.Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
+        # photo = ImageTk.PhotoImage(ico)
 
-        self.root.wm_iconphoto(False, photo)
+        # self.root.wm_iconphoto(False, photo)
 
         self.width = 20
         self.height = 1
@@ -293,6 +291,7 @@ class GUI:
         sample_date = date.today()
         self.cent.run_centrifuge(files, sample_name)
         self.cent.make_kraken_report()
+        self.db.update_table_with_kraken_out(self.cent.cent_out,"species",sample_name,"project",sample_date)
 
     def taxonomy_nanopore_16s(self):
         folder = filedialog.askdirectory(
@@ -300,6 +299,16 @@ class GUI:
             title="Choose directory containing sequencing data"
         )
         files = self.emu.get_files_from_folder(folder)
+
+        sample_name = simpledialog.askstring(
+            "Input sample name",
+            "What should the sample be called?",
+            parent=self.root
+        )
+        # self.emu.run_emu(files, sample_name)
+        self.db.update_table_with_emu_out(
+            r"C:\Users\Timo\PycharmProjects\MMonitor\desktop\src\mmonitor\pipeline_out\soyoung\emu-test.tsv",
+            "species",sample_name,"project",date.today())
 
     def checkbox_popup(self):
 
@@ -346,7 +355,7 @@ class GUI:
         if self.taxonomy_nanopore_wgs.get():
             self.analyze_fastq_in_folder()
         if self.taxonomy_nanopore_16s_bool.get():
-            self.taxonomy_nanopore_16()
+            self.taxonomy_nanopore_16s()
         if self.assembly.get():
             self.func.run_flye(seq_file, sample_name)
         if self.correction.get():
@@ -397,3 +406,5 @@ class GUI:
             post('http://localhost:8050/shutdown')
             self.monitor_thread.join()
         self.root.destroy()
+
+
