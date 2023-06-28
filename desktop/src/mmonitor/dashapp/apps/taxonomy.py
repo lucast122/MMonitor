@@ -63,7 +63,7 @@ class Taxonomy(BaseApp):
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
             options=[{'label': t, 'value': t} for t in self._sql.get_unique_samples()],
-            value=self._sql.get_unique_samples()[1],
+            value=self._sql.get_unique_samples()[0],
             style={'display': 'none'},
             clearable=False,
         )

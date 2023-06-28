@@ -1,3 +1,4 @@
+import gzip
 import logging
 import multiprocessing
 import os
@@ -25,22 +26,29 @@ class EmuRunner:
 
     def check_emu(self):
         try:
-            subprocess.call(['emu', '-h'], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+            subprocess.call([f"{ROOT}/lib/emu-v3.4.5/emu", '-h'], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
         except FileNotFoundError:
             self.logger.error(
                 "Make sure that emu is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
     def run_emu(self, sequence_list, sample_name):
-        self.emu_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_emu_out"
+        self.emu_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
         print(sequence_list)
-        if sequence_list[0].lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
-            return
-        if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0]:
-            cmd = f"emu abundance {self.unpack_fastq_list(sequence_list)} --db {ROOT}/src/resources/emu_db/ " \
-                  f"--output-dir {self.emu_out} --threads {multiprocessing.cpu_count()} "
+        #remove concatenated files from sequence list to avoid concatenating twice
+        sequence_list = [s for s in sequence_list if "concatenated" not in s]
+        concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
+        if not os.path.exists(concat_file_name):
+            concatenate_fastq_files(sequence_list,concat_file_name)
+
+        if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0] or ".fastq" in sequence_list[0]\
+                or ".fq" in sequence_list[0]:
+            cmd = f"{ROOT}/lib/emu-v3.4.5/emu abundance {concat_file_name} --db {ROOT}/src/resources/emu_db/" \
+                  f" --output-dir {self.emu_out} --threads {multiprocessing.cpu_count()} --type map-ont --output-basename {sample_name}"
             print(cmd)
             os.system(cmd)
         return
+
+
 
     def get_files_from_folder(self, folder_path):
         """
@@ -61,3 +69,10 @@ class EmuRunner:
             return files
         except FileNotFoundError:
             self.logger.error(f"Invalid folder path")
+
+def concatenate_fastq_files(input_files, output_file):
+    with gzip.open(output_file, 'wt') as output:
+        for input_file in input_files:
+            with gzip.open(input_file, 'rt') as input:
+                for line in input:
+                    output.write(line)

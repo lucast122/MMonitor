@@ -122,7 +122,7 @@ class MMonitorDBInterface:
         cursor = con.cursor()
 
         df = pd.read_csv(
-            emu_out_path,
+            f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
             sep='\t',
             header=None,
             usecols=[0, 1, 2, 3],

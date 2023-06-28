@@ -8,14 +8,20 @@ from datetime import date
 from threading import Thread
 from time import sleep
 from tkinter import *
-from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import simpledialog
+
+import osf
 from tkinter import ttk
 from webbrowser import open_new
 
+import osfclient.cli
+import requests
+from PIL import Image, ImageTk
 from requests import post
+
 from build import ROOT
+from future.moves.tkinter import filedialog
 from mmonitor.dashapp.index import Index
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 from mmonitor.userside.centrifuge import CentrifugeRunner
@@ -91,9 +97,8 @@ class GUI:
 
     def __init__(self):
         # declare data base class variable, to be chosen by user with choose_project()
-        self.db: MMonitorDBInterface = MMonitorDBInterface(f"{ROOT}\mmonitor.sqlite3")
-
-        self.db_path = f"{ROOT}/mmonitor.sqlite"
+        self.db: MMonitorDBInterface = None
+        self.db_path = None
         self.cent = CentrifugeRunner()
         self.emu = EmuRunner()
         self.func = FunctionalAnalysisRunner()
@@ -114,10 +119,10 @@ class GUI:
         self.root.geometry("300x300")
         self.root.title("MMonitor v0.1.0 alpha")
         self.root.resizable(width=False, height=False)
-        # ico = Pillow.Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
-        # photo = ImageTk.PhotoImage(ico)
+        ico = Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
+        photo = ImageTk.PhotoImage(ico)
 
-        # self.root.wm_iconphoto(False, photo)
+        self.root.wm_iconphoto(False, photo)
 
         self.width = 20
         self.height = 1
@@ -202,7 +207,7 @@ class GUI:
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
 
-    def check_file_exists(self, filepath, url):
+    def check_cent_db_exists_download(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
             if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
                 response = messagebox.askquestion("Centrifuge index not decompressed",
@@ -221,10 +226,6 @@ class GUI:
                     self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
                 except FileNotFoundError as e:
                     print(f"Requested files not found.")
-
-
-
-
 
         else:
             response = messagebox.askquestion("Centrifuge index not found",
@@ -266,8 +267,9 @@ class GUI:
     def analyze_fastq_in_folder(self):
         # check if centrifuge index exists, if not download it using check_file_exists method
         centrifuge_index = "dec22"
-        download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
-                                                               "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
+        download_thread = Thread(
+            target=self.check_cent_db_exists_download(f"{ROOT}/src/resources/{centrifuge_index}.tar",
+                                                      "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
         download_thread.start()
         self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
         self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
@@ -291,24 +293,17 @@ class GUI:
         sample_date = date.today()
         self.cent.run_centrifuge(files, sample_name)
         self.cent.make_kraken_report()
-        self.db.update_table_with_kraken_out(self.cent.cent_out,"species",sample_name,"project",sample_date)
 
     def taxonomy_nanopore_16s(self):
-        folder = filedialog.askdirectory(
-            initialdir='/',
-            title="Choose directory containing sequencing data"
-        )
+        folder = filedialog.askdirectory(initialdir='/', title="Choose directory containing sequencing data")
         files = self.emu.get_files_from_folder(folder)
-
+        sample_date = date.today()
         sample_name = simpledialog.askstring(
             "Input sample name",
             "What should the sample be called?",
-            parent=self.root
-        )
-        # self.emu.run_emu(files, sample_name)
-        self.db.update_table_with_emu_out(
-            r"C:\Users\Timo\PycharmProjects\MMonitor\desktop\src\mmonitor\pipeline_out\soyoung\emu-test.tsv",
-            "species",sample_name,"project",date.today())
+            parent=self.root)
+        self.emu.run_emu(files, sample_name)
+        self.db.update_table_with_emu_out(self.emu.emu_out,"species",sample_name,"project",sample_date)
 
     def checkbox_popup(self):
 

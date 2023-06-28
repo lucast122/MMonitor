@@ -30,13 +30,13 @@ class CentrifugeRunner:
             self.logger.error(
                 "Make sure that centrifuge is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
-    def run_centrifuge(self, sequence_list, sample_name, centrifuge_index):
+    def run_centrifuge(self, sequence_list,sample_name):
         print(sequence_list)
         if sequence_list[0].lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
             self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
             # if ".fastq" in sequence_list[0] or ".fq" in sequence_list[0] or ".fastq.gz" in sequence_list[0]:
 
-            cmd = f'centrifuge -x {ROOT}/src/resources/{centrifuge_index} -U {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
+            cmd = f'centrifuge -x {ROOT}/src/resources/p_compressed -U {self.unpack_fastq_list(sequence_list)} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
             print(cmd)
             os.system(cmd)
             return
