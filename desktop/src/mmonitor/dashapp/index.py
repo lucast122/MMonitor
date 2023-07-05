@@ -5,7 +5,7 @@ from dash.exceptions import PreventUpdate
 from flask import request
 
 from mmonitor.dashapp.app import app
-from mmonitor.dashapp.apps import correlations, taxonomy, horizon, kegg
+from mmonitor.dashapp.apps import correlations, taxonomy, horizon, kegg, genome_browser
 from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 
@@ -53,7 +53,12 @@ class Index(BaseApp):
             '/apps/kegg': {
                 'name': 'KEGG',
                 'app': kegg.Kegg()
+            },
+            '/apps/genome_browser': {
+                'name': 'Gene Browser',
+                'app': (genome_browser.GenomeBrowser(self._sql))
             }
+
         }
 
     def _init_layout(self) -> None:

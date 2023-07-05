@@ -29,7 +29,7 @@ class Taxonomy(BaseApp):
         debugging purposes.
         """
 
-        maira_header = html.H1(children='Taxonomic composition')
+        header = html.H1(children='Taxonomic composition')
 
         # dropdown menu to select chart type
         # initialize as stacked bar chart
@@ -60,6 +60,8 @@ class Taxonomy(BaseApp):
         #     style={'display': 'none'}
         # )
 
+        header_pie_chart_sample_select = html.H1(children='Select a sample to display.')
+
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
             options=[{'label': t, 'value': t} for t in self._sql.get_unique_samples()],
@@ -73,6 +75,9 @@ class Taxonomy(BaseApp):
         data, columns = self._generate_table_data_cols()
         data_tb = dash_table.DataTable(id='table-correlations', data=data, columns=columns)
 
+        download_button = html.Button('Save as CSV', id='save-button')
+        download_component = dcc.Download(id='download-csv')
+
         CONTENT_STYLE = {
 
             "margin-right": "2rem",
@@ -81,7 +86,9 @@ class Taxonomy(BaseApp):
             'font-size': '25px'
         }
 
-        container = html.Div([maira_header, demo_dd, graph1, graph2, pie_chart_input, db_header, data_tb],style=CONTENT_STYLE)
+        container = html.Div(
+            [header, demo_dd, graph1, graph2, header_pie_chart_sample_select, pie_chart_input, db_header,
+             download_button, download_component, data_tb], style=CONTENT_STYLE)
         self.layout = container
 
     def _generate_table_data_cols(self, max_rows=40) -> Tuple[List[Any], List[Any]]:

@@ -1,6 +1,5 @@
 from mmonitor.userside.view import GUI
 
-
 def main():
     GUI().start_app()
 

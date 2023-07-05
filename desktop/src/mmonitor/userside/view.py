@@ -10,18 +10,14 @@ from time import sleep
 from tkinter import *
 from tkinter import messagebox
 from tkinter import simpledialog
-
-import osf
 from tkinter import ttk
 from webbrowser import open_new
 
-import osfclient.cli
-import requests
 from PIL import Image, ImageTk
+from future.moves.tkinter import filedialog
 from requests import post
 
 from build import ROOT
-from future.moves.tkinter import filedialog
 from mmonitor.dashapp.index import Index
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 from mmonitor.userside.centrifuge import CentrifugeRunner
@@ -113,6 +109,7 @@ class GUI:
         self.binning = tk.BooleanVar()
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
+
 
     def init_layout(self):
 
@@ -207,7 +204,7 @@ class GUI:
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
 
-    def check_cent_db_exists_download(self, filepath, url):
+    def check_file_exists(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
             if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
                 response = messagebox.askquestion("Centrifuge index not decompressed",
@@ -226,6 +223,10 @@ class GUI:
                     self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
                 except FileNotFoundError as e:
                     print(f"Requested files not found.")
+
+
+
+
 
         else:
             response = messagebox.askquestion("Centrifuge index not found",
@@ -267,9 +268,8 @@ class GUI:
     def analyze_fastq_in_folder(self):
         # check if centrifuge index exists, if not download it using check_file_exists method
         centrifuge_index = "dec22"
-        download_thread = Thread(
-            target=self.check_cent_db_exists_download(f"{ROOT}/src/resources/{centrifuge_index}.tar",
-                                                      "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
+        download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
+                                                               "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
         download_thread.start()
         self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
         self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
@@ -295,15 +295,11 @@ class GUI:
         self.cent.make_kraken_report()
 
     def taxonomy_nanopore_16s(self):
-        folder = filedialog.askdirectory(initialdir='/', title="Choose directory containing sequencing data")
+        folder = filedialog.askdirectory(
+            initialdir='/',
+            title="Choose directory containing sequencing data"
+        )
         files = self.emu.get_files_from_folder(folder)
-        sample_date = date.today()
-        sample_name = simpledialog.askstring(
-            "Input sample name",
-            "What should the sample be called?",
-            parent=self.root)
-        self.emu.run_emu(files, sample_name)
-        self.db.update_table_with_emu_out(self.emu.emu_out,"species",sample_name,"project",sample_date)
 
     def checkbox_popup(self):
 
@@ -349,8 +345,10 @@ class GUI:
             self.func.check_software_avail()
         if self.taxonomy_nanopore_wgs.get():
             self.analyze_fastq_in_folder()
+
         if self.taxonomy_nanopore_16s_bool.get():
-            self.taxonomy_nanopore_16s()
+            self.taxonomy_nanopore_16()
+            self.display_popup_message("Analysis complete. You can start monitoring now.")
         if self.assembly.get():
             self.func.run_flye(seq_file, sample_name)
         if self.correction.get():
@@ -372,6 +370,7 @@ class GUI:
             self.kegg_thread1.start()
             self.kegg_thread2 = Thread(self.func.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
             self.kegg_thread2.start()
+            self.display_popup_message("Analysis complete. You can start monitoring now.")
 
             # if kegg and annotation is chosen then the user only needs to select the sample name, then the tsv files from the results
             # of the annotations will be used as input for creating keggcharter input and creating kegg maps
@@ -384,11 +383,22 @@ class GUI:
             self.kegg_thread2 = Thread(self.func.run_keggcharter(pipeline_out, f"{pipeline_out}/keggcharter.tsv"))
             self.kegg_thread2.start()
 
+    def display_popup_message(self, message):
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showinfo("Process Completed", message)
+        root.destroy()
+
     @require_project
     def start_monitoring(self):
-        self.dashapp = Index(self.db)
-        self.monitor_thread = Thread(target=self.dashapp.run_server, args=(False,))
-        self.monitor_thread.start()
+        try:
+            self.dashapp = Index(self.db)
+            self.monitor_thread = Thread(target=self.dashapp.run_server, args=(False,))
+            self.monitor_thread.start()
+        except IndexError:
+            self.display_popup_message(
+                "No data found in database. Please first run analysis pipeline to fill DB with data.")
+            return
 
         sleep(1)
         open_new('http://localhost:8050')
@@ -401,5 +411,3 @@ class GUI:
             post('http://localhost:8050/shutdown')
             self.monitor_thread.join()
         self.root.destroy()
-
-
