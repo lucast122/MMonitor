@@ -301,6 +301,21 @@ class GUI:
         )
         files = self.emu.get_files_from_folder(folder)
 
+        sample_name = simpledialog.askstring(
+            "Input sample name",
+            "What should the sample be called?",
+            parent=self.root
+        )
+
+        sample_date = date.today()
+
+        self.emu.run_emu(files,sample_name)
+        emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+
+        self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",sample_date)
+
+
+
     def checkbox_popup(self):
 
         # open checkbox to ask what the user wants to run (in case of rerunning)
@@ -347,7 +362,7 @@ class GUI:
             self.analyze_fastq_in_folder()
 
         if self.taxonomy_nanopore_16s_bool.get():
-            self.taxonomy_nanopore_16()
+            self.taxonomy_nanopore_16s()
             self.display_popup_message("Analysis complete. You can start monitoring now.")
         if self.assembly.get():
             self.func.run_flye(seq_file, sample_name)

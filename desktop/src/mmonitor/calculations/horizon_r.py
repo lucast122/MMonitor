@@ -94,7 +94,7 @@ def _call_r_script() -> None:
     # utils = rpackages.importr('utils')
     # make sure lattice is installed
 
-    # utils.install_packages('Lattice', repos="https://cloud.r-project.org")
+    #utils.install_packages('LatticeExtra', repos="https://cloud.r-project.org")
 
     call(['Rscript', '--no-save', _HORIZON_R_SCRIPT])
     chdir(cwd)
