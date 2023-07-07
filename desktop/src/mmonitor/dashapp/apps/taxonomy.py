@@ -19,6 +19,14 @@ class Taxonomy(BaseApp):
 
     def __init__(self, sql: MMonitorDBInterface):
         super().__init__(sql)
+        q = f"SELECT * FROM mmonitor"
+        self.df = self._sql.query_to_dataframe(q)
+        # Get the number of unique values in each column
+        # get number of unique taxonomies for creation of slider. limit max taxa to plot to 50
+        self.unique_counts = self.df.nunique()[1]
+        if self.unique_counts > 50:
+            self.unique_counts = 50
+
         self._init_layout()
         self._init_callbacks()
 
@@ -41,10 +49,9 @@ class Taxonomy(BaseApp):
                 {'label': 'Area plot', 'value': 'area'},
                 {'label': 'Pie chart', 'value': 'pie'},
                 {'label': 'Scatter 3D', 'value': 'scatter3d'}],
-                    style={"max-width" : "50%", "height" : "auto"},
-                    value='stackedbar'
+            style={"max-width": "50%", "height": "auto"},
+            value='stackedbar'
         )
-
 
         # graph elements
         graph1 = dcc.Graph(id='graph1', figure={'data': []})
@@ -61,6 +68,15 @@ class Taxonomy(BaseApp):
         # )
 
         header_pie_chart_sample_select = html.H1(children='Select a sample to display.')
+        slider_header = html.H1(children='Select the number of taxa to display:')
+        slider = dcc.Slider(
+            id='slider',
+            min=1,
+            max=self.unique_counts,  # Adjust this based on the range of values in your data
+            value=1,
+            marks={i: str(i) for i in range(1, self.unique_counts + 1)},  # Adjust marks based on your data
+            step=1
+        )
 
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
@@ -87,7 +103,8 @@ class Taxonomy(BaseApp):
         }
 
         container = html.Div(
-            [header, demo_dd, graph1, graph2, header_pie_chart_sample_select, pie_chart_input, db_header,
+            [header, demo_dd, slider_header, slider, graph1, graph2, header_pie_chart_sample_select, pie_chart_input,
+             db_header,
              download_button, download_component, data_tb], style=CONTENT_STYLE)
         self.layout = container
 
@@ -112,8 +129,10 @@ class Taxonomy(BaseApp):
             Output('graph2', 'style'),
             Input('dropdown', 'value'),
             Input('number_input_piechart', 'value'),
+            Input('slider', 'value')
+
         )
-        def plot_selected_figure(value, sample_value_piechart) -> Tuple[Figure, Figure, Dict[str, str]]:
+        def plot_selected_figure(value, sample_value_piechart, slider_value) -> Tuple[Figure, Figure, Dict[str, str]]:
             """
             Populate graph1 and graph2 elements with selected plots
             and en/disable input options for the pie chart accordingly.
@@ -128,31 +147,32 @@ class Taxonomy(BaseApp):
             q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
             df = self._sql.query_to_dataframe(q)
 
+            df_subset = df.head(slider_value)
+
             if value == 'stackedbar':
-                fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="stack")
-                fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="stack")
+                fig1 = px.bar(df_subset, x="sample_id", y="abundance", color="taxonomy", barmode="stack")
+                fig2 = px.bar(df_subset, x="taxonomy", y="abundance", color="sample_id", barmode="stack")
 
             elif value == 'groupedbar':
-                fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="group")
-                fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="group")
+                fig1 = px.bar(df_subset, x="sample_id", y="abundance", color="taxonomy", barmode="group")
+                fig2 = px.bar(df_subset, x="taxonomy", y="abundance", color="sample_id", barmode="group")
 
             elif value == 'scatter':
-                fig1 = px.scatter(df, x="sample_id", y="abundance", size="abundance", color="sample_id")
-                fig2 = px.scatter(df, x="taxonomy", y="abundance", size="sample_id", color="sample_id")
+                fig1 = px.scatter(df_subset, x="sample_id", y="abundance", size="abundance", color="sample_id")
+                fig2 = px.scatter(df_subset, x="taxonomy", y="abundance", size="sample_id", color="sample_id")
 
             elif value == 'area':
-                fig1 = px.area(df, x="sample_id", y="abundance", color="taxonomy", line_group="taxonomy")
+                fig1 = px.area(df_subset, x="sample_id", y="abundance", color="taxonomy", line_group="taxonomy")
                 # fig2 = fig
 
             elif value == 'scatter3d':
-                fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
-                fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='sample_id')
-
+                fig1 = px.scatter_3d(df_subset, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
+                fig2 = px.scatter_3d(df_subset, x='abundance', y='taxonomy', z='sample_id', color='sample_id')
 
             elif value == "pie":
-                pie_values = df.loc[df["sample_id"] == sample_value_piechart, 'abundance']
-                pie_names = df.loc[df["sample_id"] == sample_value_piechart, 'taxonomy']
-                fig1 = px.pie(df, values=pie_values, names=pie_names,
+                pie_values = df_subset.loc[df["sample_id"] == sample_value_piechart, 'abundance']
+                pie_names = df_subset.loc[df["sample_id"] == sample_value_piechart, 'taxonomy']
+                fig1 = px.pie(df_subset, values=pie_values, names=pie_names,
                               title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart}')
                 # pie_values = df.loc[df["sample_id"] == sample_value_piechart + 1, 'abundance']
                 # pie_names = df.loc[df["sample_id"] == sample_value_piechart + 1, 'taxonomy']
