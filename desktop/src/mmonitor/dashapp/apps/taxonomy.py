@@ -172,17 +172,17 @@ class Taxonomy(BaseApp):
                 fig1.update_layout(
                     legend=dict(
                         orientation="v",
-                        yanchor="top",
-                        y=0.99,
-                        xanchor="right",
-                        x=0.99,
+                        y=1,
+                        x=1.1
                     ),
                     margin=dict(
                         l=100,  # Add left margin to accommodate the legend
                         r=100,  # Add right margin to accommodate the legend
                         b=100,  # Add bottom margin
-                        t=100,  # Add top margin
+                        t=100  # Add top margin
                     ),
+                    width=2000,
+                    height=1000
                 )
 
                 fig2 = px.bar(result_df, x="taxonomy", y="abundance", color="sample_id", barmode="stack")
