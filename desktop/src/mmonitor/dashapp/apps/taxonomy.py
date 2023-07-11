@@ -169,6 +169,22 @@ class Taxonomy(BaseApp):
 
             if value == 'stackedbar':
                 fig1 = px.bar(result_df, x="sample_id", y="abundance", color="taxonomy", barmode="stack")
+                fig1.update_layout(
+                    legend=dict(
+                        orientation="v",
+                        yanchor="top",
+                        y=0.99,
+                        xanchor="right",
+                        x=0.99,
+                    ),
+                    margin=dict(
+                        l=100,  # Add left margin to accommodate the legend
+                        r=100,  # Add right margin to accommodate the legend
+                        b=100,  # Add bottom margin
+                        t=100,  # Add top margin
+                    ),
+                )
+
                 fig2 = px.bar(result_df, x="taxonomy", y="abundance", color="sample_id", barmode="stack")
 
             elif value == 'groupedbar':
@@ -185,6 +201,7 @@ class Taxonomy(BaseApp):
 
             elif value == 'scatter3d':
                 fig1 = px.scatter_3d(result_df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
+
                 fig2 = px.scatter_3d(result_df, x='abundance', y='taxonomy', z='sample_id', color='sample_id')
 
             elif value == "pie":
