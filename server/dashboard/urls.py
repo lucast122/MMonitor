@@ -10,6 +10,7 @@ db = MMonitorDBInterface(settings.MMONITOR_DB_PATH)
 
 kraken.Kraken()
 taxonomy.Taxonomy(db)
+
 correlations.Correlations(db)
 
 app_name = 'dashboard'
