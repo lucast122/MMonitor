@@ -15,12 +15,19 @@ from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 
 
+
 class Taxonomy(BaseApp):
     """
     App to display the abundances of taxonomies in various formats.
     """
 
     def __init__(self, sql: MMonitorDBInterface):
+        """
+          Initialize the Taxonomy app.
+
+          Args:
+              sql (MMonitorDBInterface): An interface to the SQL database.
+        """
         super().__init__(sql)
         q = f"SELECT * FROM mmonitor"
         self.df = self._sql.query_to_dataframe(q)
@@ -28,9 +35,7 @@ class Taxonomy(BaseApp):
 
         # Get the number of unique values in each column
         # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
-        self.unique_counts = self.df.nunique()[1]
-        if self.unique_counts > 100:
-            self.unique_counts = 100
+        self.unique_counts = min(self.df.nunique()[1], 100)
 
         self._init_layout()
         self._init_callbacks()
@@ -53,6 +58,7 @@ class Taxonomy(BaseApp):
                 {'label': 'Grouped Barchart', 'value': 'groupedbar'},
                 {'label': 'Area plot', 'value': 'area'},
                 {'label': 'Pie chart', 'value': 'pie'},
+                {'label': 'Scatter plot', 'value': 'scatter'},
                 {'label': 'Scatter 3D', 'value': 'scatter3d'}],
             style={"max-width": "50%", "height": "auto"},
             value='stackedbar'
@@ -79,11 +85,10 @@ class Taxonomy(BaseApp):
             id='slider',
             min=1,
             max=self.unique_counts,  # Adjust this based on the range of values in your data
-            value=1,
+            value=10,
             marks={i: str(i) for i in range(1, self.unique_counts + 1)},  # Adjust marks based on your data
             step=1
         )
-
 
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
@@ -115,19 +120,83 @@ class Taxonomy(BaseApp):
              download_button, download_component, data_tb], style=CONTENT_STYLE)
         self.layout = container
 
-
     def _generate_table_data_cols(self, max_rows=40) -> Tuple[List[Any], List[Any]]:
         """
         Generate data to populate a dash data table with.
-        A dash data table requires the data in a dict format
-        as well as a collection of mapped column names.
+        A dash data table requires the data in a dict format as well as a collection of mapped column names.
+
+        Args:
+        max_rows (int, optional): The maximum number of rows to include in the table. Defaults to 40.
+
+        Returns:
+        Tuple[List[Any], List[Any]]: A tuple containing the data for the table in dict format and a collection of mapped column names.
         """
 
         q = f"SELECT * FROM mmonitor LIMIT {max_rows}"
         df = self._sql.query_to_dataframe(q)
         return df.to_dict('records'), [{'name': i, 'id': i} for i in df.columns]
 
+    def plot_stacked_bar(self, df):
+        fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="stack")
+        fig1.update_layout(
+            legend=dict(
+                orientation="v",
+                y=1,
+                x=1.1
+            ),
+            margin=dict(
+                l=100,  # Add left margin to accommodate the legend
+                r=100,  # Add right margin to accommodate the legend
+                b=100,  # Add bottom margin
+                t=100  # Add top margin
+            ),
+            width=2000,
+            height=1000
+        )
+
+        fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="stack")
+        return fig1, fig2
+
+    def plot_grouped_bar(self, df):
+        # Plotting code for grouped bar goes here...
+        fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="group")
+        fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="group")
+
+        return fig1, fig2
+
+    def plot_scatter(self, df):
+        fig1 = px.scatter(df, x="sample_id", y="abundance", size="abundance", color="sample_id")
+        # fig2 = px.scatter(df, x="taxonomy", y="abundance", size="sample_id", color="sample_id")
+        return fig1
+
+    def plot_area(self, df):
+        # Plotting code for area plot goes here...
+        fig1 = px.area(df, x="sample_id", y="abundance", color="taxonomy", line_group="taxonomy")
+        return fig1
+
+    def plot_scatter_3d(self, df):
+        # Plotting code for scatter 3D goes here...
+        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
+        fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='sample_id')
+        return fig1, fig2
+
+    def plot_pie(self, df,sample_value_piechart):
+        # Plotting code for pie chart goes here...
+        pie_values = df.loc[df["sample_id"] == sample_value_piechart, 'abundance']
+        pie_names = df.loc[df["sample_id"] == sample_value_piechart, 'taxonomy']
+        fig1 = px.pie(df, values=pie_values, names=pie_names,
+                      title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart}')
+        piechart_style = {'display': 'block'}
+        fig2_style = {'display': 'none'}
+        return fig1, piechart_style, fig2_style
+
     def _init_callbacks(self) -> None:
+        """
+        Initialize the callbacks for the app.
+
+        The callbacks include updating the figures when the dropdown value, piechart value, or slider value changes,
+        and downloading the CSV when the download button is clicked.
+        """
 
         @app.callback(
             Output('graph1', 'figure'),
@@ -143,19 +212,26 @@ class Taxonomy(BaseApp):
         )
         def plot_selected_figure(value, sample_value_piechart, slider_value) -> Tuple[Figure, Figure, Dict[str, str]]:
             """
-            Populate graph1 and graph2 elements with selected plots
-            and en/disable input options for the pie chart accordingly.
-            """
+            Update the figures based on the selected value from the dropdown menu, the selected sample value for the piechart,
+            and the selected number of taxa from the slider.
 
+            Args:
+            value (str): The selected value from the dropdown menu.
+            sample_value_piechart (str): The selected sample value for the piechart.
+            slider_value (int): The selected number of taxa from the slider.
+
+            Returns:
+                Tuple[Figure, Figure, Dict[str, str]]: A tuple containing two figures for the graphs and a dict for the piechart style.
+            """
             # fallback values
             fig1 = {'data': []}
             fig2 = {'data': []}
             piechart_style = {'display': 'none'}
             fig2_style = {'display': 'block'}
             # request necessary data from database
-            q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
-            df = self._sql.query_to_dataframe(q)
-            df_sorted = df.sort_values("abundance", ascending=False)
+            # q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
+            # df = self._sql.query_to_dataframe(q)
+            df_sorted = self.df.sort_values("abundance", ascending=False)
             df_grouped = df_sorted.groupby("sample_id")
             result_df = pd.DataFrame()
             for name, group in df_grouped:
@@ -168,53 +244,23 @@ class Taxonomy(BaseApp):
             self.result_df = result_df
 
             if value == 'stackedbar':
-                fig1 = px.bar(result_df, x="sample_id", y="abundance", color="taxonomy", barmode="stack")
-                fig1.update_layout(
-                    legend=dict(
-                        orientation="v",
-                        y=1,
-                        x=1.1
-                    ),
-                    margin=dict(
-                        l=100,  # Add left margin to accommodate the legend
-                        r=100,  # Add right margin to accommodate the legend
-                        b=100,  # Add bottom margin
-                        t=100  # Add top margin
-                    ),
-                    width=2000,
-                    height=1000
-                )
+                fig1, fig2 = self.plot_stacked_bar(self.result_df)
 
-                fig2 = px.bar(result_df, x="taxonomy", y="abundance", color="sample_id", barmode="stack")
 
             elif value == 'groupedbar':
-                fig1 = px.bar(result_df, x="sample_id", y="abundance", color="taxonomy", barmode="group")
-                fig2 = px.bar(result_df, x="taxonomy", y="abundance", color="sample_id", barmode="group")
+                fig1, fig2 = self.plot_grouped_bar(self.result_df)
 
             elif value == 'scatter':
-                fig1 = px.scatter(result_df, x="sample_id", y="abundance", size="abundance", color="sample_id")
-                fig2 = px.scatter(result_df, x="taxonomy", y="abundance", size="sample_id", color="sample_id")
+                fig1 = self.plot_scatter(self.result_df)
 
             elif value == 'area':
-                fig1 = px.area(result_df, x="sample_id", y="abundance", color="taxonomy", line_group="taxonomy")
-                # fig2 = fig
+                fig1 = self.plot_area(self.result_df)
 
             elif value == 'scatter3d':
-                fig1 = px.scatter_3d(result_df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
-
-                fig2 = px.scatter_3d(result_df, x='abundance', y='taxonomy', z='sample_id', color='sample_id')
+                fig1 = self.plot_scatter_3d(self.result_df)
 
             elif value == "pie":
-                pie_values = result_df.loc[df["sample_id"] == sample_value_piechart, 'abundance']
-                pie_names = result_df.loc[df["sample_id"] == sample_value_piechart, 'taxonomy']
-                fig1 = px.pie(result_df, values=pie_values, names=pie_names,
-                              title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart}')
-                # pie_values = df.loc[df["sample_id"] == sample_value_piechart + 1, 'abundance']
-                # pie_names = df.loc[df["sample_id"] == sample_value_piechart + 1, 'taxonomy']
-                # fig2 = px.pie(df, values=pie_values, names=pie_names,
-                #               title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart + 1}')
-                piechart_style = {'display': 'block'}
-                fig2_style = {'display': 'none'}
+                fig1, piechart_style, fig2_style = self.plot_pie(self.result_df,sample_value_piechart)
 
             return fig1, fig2, piechart_style, fig2_style
 

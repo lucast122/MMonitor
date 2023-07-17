@@ -15,17 +15,6 @@ class Kegg(BaseApp):
         self._init_layout()
         self._init_callbacks()
 
-    # @app.server.route('/horizon.png<cache_bust>')
-    # def serve_image(cache_bust):
-    #     """
-    #     Allows dash to display png images from  ../resources/images/
-    #
-    #     The cache_bust is a way to make the url unique.
-    #     This is necessary to force the browser to reload the
-    #     presumably 'static' image file that it had previously cached.
-    #     """
-    #     return send_from_directory(images_path, 'horizon.png')
-
     def _init_layout(self) -> None:
         self._static_image_route = "/static/"
         base_path = Path(__file__)

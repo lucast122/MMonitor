@@ -131,8 +131,6 @@ class MMonitorDBInterface:
         df = df.sort_values('Abundance', ascending=False)
         #drop first row
         df = df.iloc[1:]
-        print(df)
-
         # format name
 
         # df['Name'] = df['Name'].apply(lambda s: s.strip())
@@ -140,7 +138,7 @@ class MMonitorDBInterface:
         #emu uses different columns for species and genus, so combine them to get the full species name
         #full_name = f"{df['species']} {df['genus']}"
         df['Sample'] = sample_name
-        df['Sample_date'] = date.today()
+        df['Sample_date'] = sample_date
         #df = df[df['Rank'] == tax_rank]
         #df = df.drop(columns='Rank')
         for index, row in df.iterrows():
@@ -172,7 +170,7 @@ class MMonitorDBInterface:
         # df['Name'] = df['Name'].apply(lambda s: s.strip())
         # add sample name
         df['Sample'] = sample_name
-        df['Sample_date'] = date.today()
+        df['Sample_date'] = sample_date
         df = df[df['Rank'] == tax_rank]
         df = df.drop(columns='Rank')
         for index, row in df.iterrows():

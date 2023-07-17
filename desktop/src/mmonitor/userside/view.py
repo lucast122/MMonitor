@@ -11,11 +11,14 @@ from tkinter import *
 from tkinter import messagebox
 from tkinter import simpledialog
 from tkinter import ttk
+import tkcalendar
+
 from webbrowser import open_new
 
 from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
 from requests import post
+from tkcalendar import DateEntry
 
 from build import ROOT
 from mmonitor.dashapp.index import Index
@@ -45,59 +48,15 @@ def require_project(func):
     return func_wrapper
 
 
-# def require_centrifuge(func):
-#     """Decorator that ensures that a centrifuge index was selected by the user."""
-#
-#     def func_wrapper(*args):
-#         obj: GUI = args[0]
-#         if obj.centrifuge_index is not None and len(obj.centrifuge_index) > 0:
-#             return func(*args)
-#         else:
-#             obj.open_popup("Please first select a centrifuge index before analyzing files.", "Centrifuge error")
-#
-#     return func_wrapper
-
-
-def calendar_picker(but_exit=None):
-    tkobj = tk.Tk()
-    # setting up the geomentry
-    tkobj.geometry("500x500")
-    tkobj.title("Calendar picker")
-    # creating a calender object
-    tkc = Calendar(tkobj, selectmode="day", year=2022, month=1, date=1)
-    # display on main window
-    tkc.pack(pady=40)
-
-    # getting date from the calendar
-    def fetch_date():
-        date.config(text="Selected Date is: " + tkc.get_date())
-
-    # add button to load the date clicked on calendar
-    but = tk.Button(tkobj, text="Select Date", command=fetch_date, bg="black", fg='white')
-    # displaying button on the main display
-    but.pack()
-
-    but_exit = tk.Button(tkobj, text="Exit", command=tkobj.destroy, bg="black", fg='white')
-    # displaying button on the main display
-    but_exit.pack()
-
-    # Label for showing date on main display
-    date = tk.Label(tkobj, text="", bg='black', fg='white')
-    date.pack(pady=20)
-    # starting the object
-    tkobj.mainloop()
-    return tkc.get_date()
-
-
 class GUI:
 
     def __init__(self):
         # declare data base class variable, to be chosen by user with choose_project()
         self.db: MMonitorDBInterface = None
         self.db_path = None
-        self.cent = CentrifugeRunner()
-        self.emu = EmuRunner()
-        self.func = FunctionalAnalysisRunner()
+        self.centrifuge_runner = CentrifugeRunner()
+        self.emu_runner = EmuRunner()
+        self.functional_analysis_runner = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
         self.root = Tk()
@@ -109,6 +68,7 @@ class GUI:
         self.binning = tk.BooleanVar()
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
+        self.sample_date = None
 
 
     def init_layout(self):
@@ -150,12 +110,31 @@ class GUI:
         tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
                   padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
                   activebackground=button_active_bg).pack()
+
         tk.Button(self.root, text="Quit",
                   padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
                   activebackground=button_active_bg,
                   command=self.stop_app).pack()
 
         # console = Console(self.root)
+
+    def open_calendar(self):
+        def save_date():
+            self.sample_date = calendar.get_date()
+            dialog.destroy()
+
+        dialog = tk.Toplevel(self.root)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        calendar = DateEntry(dialog, width=12, background='darkblue',
+                             foreground='white', borderwidth=2)
+        calendar.pack(padx=10, pady=10)
+
+        submit_button = tk.Button(dialog, text="Submit", command=save_date)
+        submit_button.pack(padx=10, pady=10)
+
+        self.root.wait_window(dialog)
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
@@ -203,6 +182,39 @@ class GUI:
 
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
+    def check_emu_db_exists(self):
+        if not os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar"):
+            response = messagebox.askquestion("Emu database not found.",
+                                              "Emu DB not found. Do you want to download it?")
+            if response == "yes":
+                try:
+                    # download emu db from web if it doesn't exist
+                    self.download_file_from_web(f"{ROOT}/src/resources/emu_db/emu.tar","https://software-ab.cs.uni-tuebingen.de/download/MMonitor/emu.tar")
+                    self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar",f"{ROOT}/src/resources/emu_db/")
+
+                except FileNotFoundError as e:
+                    self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help", "Could not find emu db")
+
+
+                
+    def download_file_from_web(self,filepath,url):
+        with urllib.request.urlopen(url) as response:
+            # get file size from content-length header
+            file_size = int(response.info().get("Content-Length"))
+            # create progress bar widget
+            progress = ttk.Progressbar(self.root, orient="horizontal", length=250, mode="determinate")
+            progress.pack()
+            progress["maximum"] = file_size
+            progress["value"] = 0
+
+            def update_progress(count, block_size, total_size):
+                progress["value"] = count * block_size
+                self.root.update_idletasks()
+
+            # download file and update progress bar
+            urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
+            progress.destroy()
+        messagebox.showinfo("Download complete", "Download complete. Unpacking files...")
 
     def check_file_exists(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
@@ -233,23 +245,7 @@ class GUI:
                                               "Centrifuge index not found. Do you want to download it?"
                                               " Might take some time, the tool is unusable while download.")
             if response == "yes":
-                with urllib.request.urlopen(url) as response:
-                    # get file size from content-length header
-                    file_size = int(response.info().get("Content-Length"))
-                    # create progress bar widget
-                    progress = ttk.Progressbar(self.root, orient="horizontal", length=250, mode="determinate")
-                    progress.pack()
-                    progress["maximum"] = file_size
-                    progress["value"] = 0
-
-                    def update_progress(count, block_size, total_size):
-                        progress["value"] = count * block_size
-                        self.root.update_idletasks()
-
-                    # download file and update progress bar
-                    urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
-                    progress.destroy()
-                messagebox.showinfo("Download complete", "Download complete. Unpacking files...")
+                self.download_file_from_web(filepath,url)
 
     def unzip_tar(self, file, out_folder):
         my_tar = tarfile.open(file, mode='r')
@@ -265,7 +261,7 @@ class GUI:
     # TODO: check if there is white space in path that causes problem
     @require_project
     # @require_centrifuge
-    def analyze_fastq_in_folder(self):
+    def taxonomy_nanopore_wgs(self):
         # check if centrifuge index exists, if not download it using check_file_exists method
         centrifuge_index = "dec22"
         download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
@@ -281,7 +277,7 @@ class GUI:
             initialdir='/',
             title="Choose directory containing sequencing data"
         )
-        files = self.cent.get_files_from_folder(folder)
+        files = self.centrifuge_runner.get_files_from_folder(folder)
 
         sample_name = simpledialog.askstring(
             "Input sample name",
@@ -289,30 +285,33 @@ class GUI:
             parent=self.root
         )
 
-        # sample_date = calendar_picker()
-        sample_date = date.today()
-        self.cent.run_centrifuge(files, sample_name)
-        self.cent.make_kraken_report()
+
+        self.open_calendar()
+        self.centrifuge_runner.run_centrifuge(files, sample_name)
+        self.centrifuge_runner.make_kraken_report()
+        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out","species",sample_name,"project",self.sample_date)
 
     def taxonomy_nanopore_16s(self):
+
+        self.check_emu_db_exists()
         folder = filedialog.askdirectory(
             initialdir='/',
             title="Choose directory containing sequencing data"
         )
-        files = self.emu.get_files_from_folder(folder)
+        files = self.emu_runner.get_files_from_folder(folder)
 
         sample_name = simpledialog.askstring(
             "Input sample name",
             "What should the sample be called?",
             parent=self.root
         )
+        self.open_calendar()
 
-        sample_date = date.today()
 
-        self.emu.run_emu(files,sample_name)
+        self.emu_runner.run_emu(files, sample_name)
         emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
 
-        self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",sample_date)
+        self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
 
 
 
@@ -357,23 +356,23 @@ class GUI:
             seq_file = filedialog.askopenfilename(title="Please select a sequencing file")
         if self.assembly.get() or self.correction.get() or self.annotation.get() or self.binning.get():
             sample_name = self.ask_sample_name()
-            self.func.check_software_avail()
+            self.functional_analysis_runner.check_software_avail()
         if self.taxonomy_nanopore_wgs.get():
-            self.analyze_fastq_in_folder()
+            self.taxonomy_nanopore_wgs()
 
         if self.taxonomy_nanopore_16s_bool.get():
             self.taxonomy_nanopore_16s()
             self.display_popup_message("Analysis complete. You can start monitoring now.")
         if self.assembly.get():
-            self.func.run_flye(seq_file, sample_name)
+            self.functional_analysis_runner.run_flye(seq_file, sample_name)
         if self.correction.get():
-            self.func.run_racon(seq_file, sample_name)
+            self.functional_analysis_runner.run_racon(seq_file, sample_name)
             # self.func.run_medaka(seq_file, sample_name) TODO: FIX MEDAKA
         if self.binning.get():
-            self.func.run_binning(sample_name)
+            self.functional_analysis_runner.run_binning(sample_name)
         if self.annotation.get():
             bins_path = f"{ROOT}/src/resources/{sample_name}/bins/"
-            self.func.run_prokka(bins_path)
+            self.functional_analysis_runner.run_prokka(bins_path)
         # if only kegg analysis is selected then the user needs to chose the path to the annotations
         if self.kegg.get() and not self.assembly.get() and not self.correction.get() and not self.binning.get() and not self.annotation.get():
             # sample_name = self.ask_sample_name()
@@ -381,9 +380,9 @@ class GUI:
                 title="Please select the path to the prokka output (folder with tsv files with annotations).")
             pipeline_out = f"{pipeline_out}/"
             # pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-            self.kegg_thread1 = Thread(target=self.func.create_keggcharter_input(pipeline_out))
+            self.kegg_thread1 = Thread(target=self.functional_analysis_runner.create_keggcharter_input(pipeline_out))
             self.kegg_thread1.start()
-            self.kegg_thread2 = Thread(self.func.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
+            self.kegg_thread2 = Thread(self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
             self.kegg_thread2.start()
             self.display_popup_message("Analysis complete. You can start monitoring now.")
 
@@ -393,9 +392,9 @@ class GUI:
             sample_name = self.ask_sample_name()
             # pipeline_out = filedialog.askdirectory(title="Please select the path to the prokka output (folder with tsv files with annotations).")
             pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-            self.kegg_thread1 = Thread(target=self.func.create_keggcharter_input(pipeline_out))
+            self.kegg_thread1 = Thread(target=self.functional_analysis_runner.create_keggcharter_input(pipeline_out))
             self.kegg_thread1.start()
-            self.kegg_thread2 = Thread(self.func.run_keggcharter(pipeline_out, f"{pipeline_out}/keggcharter.tsv"))
+            self.kegg_thread2 = Thread(self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}/keggcharter.tsv"))
             self.kegg_thread2.start()
 
     def display_popup_message(self, message):
