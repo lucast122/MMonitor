@@ -4,11 +4,11 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 
-from .dashapp.database.mmonitor_db import MMonitorDBInterface
+from .dashapp.database.mmonitor_db_mysql import MMonitorDBInterfaceMySQL
 from .dashapp.calculations.horizon_r import generate_image
+from .dashapp.index import Index
 
-
-db = MMonitorDBInterface(settings.MMONITOR_DB_PATH)
+# db = MMonitorDBInterfaceMySQL()
 
 
 @login_required
@@ -19,6 +19,7 @@ def index(request):
 @login_required
 def load_app(request, name):
     return render(request, 'dashboard/dashapp.html', context={'name': name})
+
 
 
 @login_required
@@ -39,12 +40,12 @@ def horizon(request):
     # if 'generate' button was clicked
     # or image simply doesn't exist yet
     # call the R script to generate a horizon plot
-    if request.method == 'POST' or not isfile(image_file):
-        q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
-        df = db.query_to_dataframe(q)
-        width = int(request.POST.get("width", str(width)))
-        height = int(request.POST.get("height", str(height)))
-        generate_image(df, uid, width=width, height=height)
+    # if request.method == 'POST' or not isfile(image_file):
+    #     q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
+    #     df = db.query_to_dataframe(q)
+    #     width = int(request.POST.get("width", str(width)))
+    #     height = int(request.POST.get("height", str(height)))
+    #     generate_image(df, uid, width=width, height=height)
 
-    context = {'width': width, 'height': height, 'uid': uid}
-    return render(request, 'dashboard/horizon.html', context=context)
+    # context = {'width': width, 'height': height, 'uid': uid}
+    # return render(request, 'dashboard/horizon.html', context=context)

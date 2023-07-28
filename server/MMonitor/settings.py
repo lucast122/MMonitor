@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,10 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-9v8c1b(!um4d75#+1gmrg$qunrmtmxk7g7&u)5od-^8vhpk5&^'
 
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS=["134.2.78.150","minion.sna94.uni-tuebingen.de"]
 
 
 # Application definition
@@ -42,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'bootstrap5'
 ]
 
 MIDDLEWARE = [
@@ -52,10 +55,57 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
+    'django_plotly_dash.middleware.ExternalRedirectionMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_plotly_dash.middleware.BaseMiddleware',
 ]
 
+PLOTLY_DASH = {
+
+    # Route used for the message pipe websocket connection
+    "ws_route" :   "dpd/ws/channel",
+
+    # Route used for direct http insertion of pipe messages
+    "http_route" : "dpd/views",
+
+    # Flag controlling existince of http poke endpoint
+    "http_poke_enabled" : True,
+
+    # Insert data for the demo when migrating
+    "insert_demo_migrations" : False,
+
+    # Timeout for caching of initial arguments in seconds
+    "cache_timeout_initial_arguments": 60,
+
+    # Name of view wrapping function
+    "view_decorator": None,
+
+    # Flag to control location of initial argument storage
+    "cache_arguments": True,
+
+    # Flag controlling local serving of assets
+    "serve_locally": False,
+}
+
+PLOTLY_COMPONENTS = [
+    # ... other components ...
+    'dash_core_components',
+    'dash_html_components',
+    'dash_renderer',
+    'dpd_components'
+]
+
+# Staticfiles finders for locating dash app assets and related files
+
+STATICFILES_FINDERS = [
+
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+
+    'django_plotly_dash.finders.DashAssetFinder',
+    'django_plotly_dash.finders.DashComponentFinder',
+    'django_plotly_dash.finders.DashAppDirectoryFinder',
+]
 
 ROOT_URLCONF = 'MMonitor.urls'
 
@@ -82,12 +132,6 @@ WSGI_APPLICATION = 'MMonitor.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
 
 
 # Password validation
@@ -124,11 +168,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = 'dash/static/'
 
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
@@ -148,5 +195,33 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 429916160
 # path to RScript executable
 RSCRIPT = 'RScript'
 
-# hacky db solution until mysql is implemented
-MMONITOR_DB_PATH = BASE_DIR / 'mmonitor.sqlite3'
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    },
+    'mmonitor': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'mydjangodb',
+        'USER': 'mmonitor_remote',
+        'PASSWORD': 'asdf!minion',
+        'HOST': '134.2.78.150',   # Or an IP Address that your DB is hosted on
+        'PORT': '3306',
+    }
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/home/minion-computer/mmonitor/server/django_log.txt',
+        },
+    },
+    'root': {
+        'handlers': ['file'],
+        'level': 'DEBUG',
+    },
+}

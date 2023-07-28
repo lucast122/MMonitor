@@ -3,11 +3,18 @@ ul.menu {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #333;
+  background-color: #444E57; !important;
 }
-
+li a:hover.menu {
+    background-color: #B22222 !important;
+    color: white;
+}
 li.menu {
   float: left;
+    background-color: #444E57; !important;
+    color: white;
+
+
 }
 
 li a.menu {
@@ -19,5 +26,6 @@ li a.menu {
 }
 
 li a:hover.menu {
-  background-color: #111;
+  background-color: #B22222 !important;
 }
+
