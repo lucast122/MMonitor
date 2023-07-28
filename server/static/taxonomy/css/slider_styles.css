@@ -1,0 +1,12 @@
+.Slider .rc-slider-rail {
+    background-color: #ddd;  /* This is the "track" color */
+}
+
+.Slider .rc-slider-track {
+    background-color: #888;  /* This is the "filled track" color */
+}
+
+.Slider .rc-slider-handle {
+    background-color: #888;  /* This is the handle color */
+    border: none;
+}

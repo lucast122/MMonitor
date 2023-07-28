@@ -2,9 +2,10 @@
 {% load bootstrap5 %}
   {% bootstrap_css %}
   {% bootstrap_javascript %}
-     
+        <link rel="stylesheet" type="text/css" href="{% static 'taxonomy/css/slider_styles.css' %}">
 
 {%load plotly_dash%}
+
 {% block content %}
 
 {%plotly_app name=name ratio=1 %}

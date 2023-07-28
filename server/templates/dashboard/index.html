@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% load bootstrap5 %}
+  {% bootstrap_css %}
+  {% bootstrap_javascript %}
 
     <H1>
         Dashboard
@@ -10,16 +13,19 @@
     </p>
     <ul>
         <li>
-            <a href="{% url 'dashboard:kraken' %}">Kraken</a>
+            <a class="nav-link href" href="{% url 'dashboard:kraken' %}">Kraken</a>
         </li>
         <li>
-            <a href="{% url 'dashboard:taxonomy' %}">Taxonomy</a>
+            <a class="nav-link href" href="{% url 'dashboard:taxonomy' %}">Taxonomy</a>
         </li>
         <li>
-            <a href="{% url 'dashboard:correlations' %}">Correlations</a>
+            <a class="nav-link href" href="{% url 'dashboard:correlations' %}">Correlations</a>
         </li>
         <li>
-            <a href="{% url 'dashboard:horizon' %}">Horizon</a>
+            <a class="nav-link href" href="{% url 'dashboard:horizon' %}">Horizon</a>
+        </li>
+        <li>
+            <a class="nav-link href" href="{% url 'dashboard:index' %}">Index</a>
         </li>
     </ul>
 
