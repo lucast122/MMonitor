@@ -1,4 +1,3 @@
-import sqlite3
 from typing import List, Tuple, Any
 
 import pandas as pd
@@ -17,15 +16,15 @@ class MMonitorDBInterface:
             mysql_con.commit()
 
     def query_to_dataframe(self, query: str) -> pd.DataFrame:
-        con = sqlite3.connect(self._db_path)
-        df = pd.read_sql_query(query, con)
-        con.close()
+        with connect(user='admin', password='admin', host='localhost', database='mmonitor') as mysql_con:
+            df = pd.read_sql_query(query, mysql_con)
+            # mysql_con.close()
         return df
 
     def query_to_list(self, query: str) -> List[Tuple[Any]]:
-        con = sqlite3.connect(self._db_path)
-        ls = list(con.execute(query))
-        con.close()
+        with connect(user='admin', password='admin', host='localhost', database='mmonitor') as mysql_con:
+            ls = list(mysql_con.execute(query))
+        # .close()
         return ls
 
     def get_abundance_meta_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
@@ -72,5 +71,4 @@ class MMonitorDBInterface:
         df = df.drop(columns='Rank')
         print(df)
 
-
-i = MMonitorDBInterface("/resources/mmonitor_centrifuge.db")
+# i = MMonitorDBInterface("/resources/mmonitor_centrifuge.db")

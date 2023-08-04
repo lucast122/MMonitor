@@ -27,7 +27,7 @@ class EmuRunner:
 
     def check_emu(self):
         try:
-            subprocess.call([f"{ROOT}/lib//emu-v3.4.5/emu", '-h'], stdout=open(os.devnull, 'w'),
+            subprocess.call([f"{ROOT}/lib/emu", '-h'], stdout=open(os.devnull, 'w'),
                             stderr=subprocess.STDOUT)
         except FileNotFoundError:
             self.logger.error(
@@ -44,7 +44,7 @@ class EmuRunner:
 
         if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0] or ".fastq" in sequence_list[0]\
                 or ".fq" in sequence_list[0]:
-            cmd = f"{ROOT}/lib//emu-v3.4.5/emu abundance {concat_file_name} --db {ROOT}/src/resources/emu_db/" \
+            cmd = f"{ROOT}/lib/emu abundance {concat_file_name} --db {ROOT}/src/resources/emu_db/" \
                   f" --output-dir {self.emu_out} --threads {multiprocessing.cpu_count()} --type map-ont --output-basename {sample_name}"
             print(cmd)
             os.system(cmd)

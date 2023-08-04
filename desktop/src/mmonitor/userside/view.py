@@ -2,17 +2,11 @@
 import gzip
 import os
 import tarfile
-import tkinter as tk
 import urllib.request
-from datetime import date
 from threading import Thread
 from time import sleep
 from tkinter import *
-from tkinter import messagebox
 from tkinter import simpledialog
-from tkinter import ttk
-import tkcalendar
-
 from webbrowser import open_new
 
 from PIL import Image, ImageTk
@@ -23,6 +17,8 @@ from tkcalendar import DateEntry
 from build import ROOT
 from mmonitor.dashapp.index import Index
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
+from mmonitor.database.mmonitor_db_mysql_new import MMonitorDBInterfaceMySQL
+from mmonitor.userside.DBConfigForm import DataBaseConfigForm
 from mmonitor.userside.centrifuge import CentrifugeRunner
 from mmonitor.userside.emu import EmuRunner
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
@@ -48,11 +44,20 @@ def require_project(func):
     return func_wrapper
 
 
+import tkinter as tk
+from tkinter import messagebox, ttk
+
+
+
 class GUI:
 
     def __init__(self):
+        self.db_mysql = MMonitorDBInterfaceMySQL(f"{ROOT}/src/resources/db_config.json")
+        self.db_mysql.create_db()
+
         # declare data base class variable, to be chosen by user with choose_project()
         self.db: MMonitorDBInterface = None
+        # self.db_mysql = None
         self.db_path = None
         self.centrifuge_runner = CentrifugeRunner()
         self.emu_runner = EmuRunner()
@@ -69,7 +74,6 @@ class GUI:
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
         self.sample_date = None
-
 
     def init_layout(self):
 
@@ -111,12 +115,17 @@ class GUI:
                   padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
                   activebackground=button_active_bg).pack()
 
+        tk.Button(self.root, text="Configure Database", command=self.open_db_config_form,
+                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
+                  activebackground=button_active_bg).pack()
+
         tk.Button(self.root, text="Quit",
                   padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
                   activebackground=button_active_bg,
                   command=self.stop_app).pack()
 
         # console = Console(self.root)
+
 
     def open_calendar(self):
         def save_date():
@@ -170,7 +179,7 @@ class GUI:
     #         filetypes=(("sqlite", "*.sqlite3"), ("all files", "*.*"))
     #     )
 
-    @require_project
+    # @require_project
     def append_metadata(self):
         csv_file = filedialog.askopenfilename(
             initialdir='projects/',
@@ -178,7 +187,7 @@ class GUI:
             filetypes=(("csv", "*.csv"), ("all files", "*.*"))
         )
         if csv_file is not None and len(csv_file) > 0:
-            self.db.append_metadata_from_csv(csv_file)
+            self.db_mysql.append_metadata_from_csv(csv_file)
 
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
@@ -293,6 +302,7 @@ class GUI:
 
     def taxonomy_nanopore_16s(self):
 
+
         self.check_emu_db_exists()
         folder = filedialog.askdirectory(
             initialdir='/',
@@ -311,7 +321,8 @@ class GUI:
         self.emu_runner.run_emu(files, sample_name)
         emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
 
-        self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
+        # self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
+        self.db_mysql.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
 
 
@@ -425,3 +436,7 @@ class GUI:
             post('http://localhost:8050/shutdown')
             self.monitor_thread.join()
         self.root.destroy()
+
+    def open_db_config_form(self):
+        db_config_form = DataBaseConfigForm(self.root)
+        print(db_config_form.last_config)

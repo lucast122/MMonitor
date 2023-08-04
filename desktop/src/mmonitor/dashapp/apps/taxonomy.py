@@ -2,18 +2,18 @@ import base64
 from io import StringIO
 from typing import Tuple, List, Any, Dict
 
+import dash_bootstrap_components as dbc
+import dash_core_components as dcc
 import pandas as pd
 import plotly.express as px
 from dash import dash_table
-from dash import dcc
-from dash import html
+from dash import html, dash
 from dash.dependencies import Input, Output
 from plotly.graph_objects import Figure
 
 from mmonitor.dashapp.app import app
 from mmonitor.dashapp.base_app import BaseApp
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
-
 
 
 class Taxonomy(BaseApp):
@@ -29,9 +29,15 @@ class Taxonomy(BaseApp):
               sql (MMonitorDBInterface): An interface to the SQL database.
         """
         super().__init__(sql)
+        # initialize bootstrap
+        app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
+
+
         q = f"SELECT * FROM mmonitor"
         self.df = self._sql.query_to_dataframe(q)
         self.df_sorted = self.df.sort_values(by=["sample_id", "abundance"], ascending=[True, False])
+        self.unique_sample_ids = self._sql.query_to_dataframe("SELECT DISTINCT sample_id FROM mmonitor")[
+            "sample_id"].tolist()
 
         # Get the number of unique values in each column
         # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
@@ -40,6 +46,7 @@ class Taxonomy(BaseApp):
         self._init_layout()
         self._init_callbacks()
 
+
     def _init_layout(self) -> None:
         """
         Taxonomy app layout consists of two graphs visualizing the abundances
@@ -47,48 +54,70 @@ class Taxonomy(BaseApp):
         debugging purposes.
         """
 
-        header = html.H1(children='Taxonomic composition')
+        header = dbc.Row(
+            dbc.Col(html.H1(children='Taxonomic composition'), width={'size': 12, 'offset': 0}),
+            justify="center",
+        )
+        sample_select_dropdown = dbc.Row([
+            dbc.Col(
+                dbc.Label("Samples to plot:"),
+                width={"size": 1, "offset": 0}
+            ),
+            dbc.Col(
+                dcc.Dropdown(
+                    id='sample_select_value',
+                    options=[{'label': i, 'value': i} for i in self.unique_sample_ids],
+                    multi=True  # allow multiple selections
+                ),
+                width={"size": 8, "offset": 0}
+            ),
+        ])
 
         # dropdown menu to select chart type
         # initialize as stacked bar chart
-        demo_dd = dcc.Dropdown(
-            id='dropdown',
-            options=[
-                {'label': 'Stacked Barchart', 'value': 'stackedbar'},
-                {'label': 'Grouped Barchart', 'value': 'groupedbar'},
-                {'label': 'Area plot', 'value': 'area'},
-                {'label': 'Pie chart', 'value': 'pie'},
-                {'label': 'Scatter plot', 'value': 'scatter'},
-                {'label': 'Scatter 3D', 'value': 'scatter3d'}],
-            style={"max-width": "50%", "height": "auto"},
-            value='stackedbar'
-        )
+        demo_dd = dbc.Row([
+            dbc.Col(
+                dbc.Label("Plot type:"),
+                width={"size": 1, "offset": 0}
+            ),
+            dbc.Col(
+                dcc.Dropdown(
+                    id='dropdown',
+                    options=[
+                        {'label': 'Stacked Barchart', 'value': 'stackedbar'},
+                        {'label': 'Grouped Barchart', 'value': 'groupedbar'},
+                        {'label': 'Area plot', 'value': 'area'},
+                        {'label': 'Pie chart', 'value': 'pie'},
+                        {'label': 'Scatter plot', 'value': 'scatter'},
+                        {'label': 'Scatter 3D', 'value': 'scatter3d'}],
+                    value='stackedbar'
+                ),
+                width={"size": 3, "offset": 0}
+            ),
+        ], justify="start")
 
         # graph elements
         graph1 = dcc.Graph(id='graph1', figure={'data': []})
         graph2 = dcc.Graph(id='graph2', figure={'data': []})
 
-        # pie chart options will be displayed
-        # if pie chart is selected in the dropdown menu
-        # pie_chart_input = dcc.Input(
-        #     id='number_input_piechart',
-        #     type='number',
-        #     placeholder="Sample ID",
-        #     value=1,
-        #     style={'display': 'none'}
-        # )
+        header_pie_chart_sample_select_dbc = dbc.Row(
+            dbc.Col(html.H1(children='Select a sample to display.'), width={'size': 10, 'offset': 0}),
+            justify="center", style={'display': 'none'}, id='header_pie_chart_sample_select_dbc')
 
-        header_pie_chart_sample_select = html.H1(children='Select a sample to display.')
+        slider_header = dbc.Row(
+            dbc.Col(html.H1(children='Select the number of taxa to display:'), width={'size': 12, 'offset': 0}),
+            justify="start")
 
-        slider_header = html.H1(children='Select the number of taxa to display:')
-        slider = dcc.Slider(
+        slider = dbc.Row(dbc.Col(dcc.Slider(
             id='slider',
             min=1,
-            max=self.unique_counts,  # Adjust this based on the range of values in your data
+            max=self.unique_counts,
             value=10,
-            marks={i: str(i) for i in range(1, self.unique_counts + 1)},  # Adjust marks based on your data
+            marks={i: str(i) if i in [1, self.unique_counts // 2, self.unique_counts] else "" for i in
+                   range(1, self.unique_counts + 1)},
+
             step=1
-        )
+        ), width={'size': 10, 'offset': 0}), justify='start')
 
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
@@ -99,25 +128,35 @@ class Taxonomy(BaseApp):
         )
 
         # data table for debugging
-        db_header = html.H4(children="Database")
-        data, columns = self._generate_table_data_cols()
-        data_tb = dash_table.DataTable(id='table-correlations', data=data, columns=columns)
 
-        download_button = html.Button("Download CSV", id="btn-download")
+        db_header = dbc.Row(dbc.Col(html.H4(children="Database"), width={'size': 12, 'offset': 0}),
+                            justify="center")
+        data, columns = self._generate_table_data_cols()
+        data_tb = dbc.Row(dbc.Col(dash_table.DataTable(id='table-correlations', data=data, columns=columns),
+                                  width={'size': 12, 'offset': 0}), justify="center")
+
+        download_button = dbc.Button("Download CSV", id="btn-download")
         download_component = dcc.Download(id="download-csv")
 
-        CONTENT_STYLE = {
+        container = dbc.Container(
+            [
+                header,
+                sample_select_dropdown,
+                demo_dd,
+                graph1,
+                graph2,
+                slider_header,
+                slider,
+                header_pie_chart_sample_select_dbc,
+                pie_chart_input,
+                db_header,
+                download_button,
+                download_component,
+                data_tb
+            ],
+            fluid=True
+        )
 
-            "margin-right": "2rem",
-            "padding": "2rem 1rem",
-            'margin-bottom': '200px',
-            'font-size': '25px'
-        }
-
-        container = html.Div(
-            [header, demo_dd, slider_header, slider, graph1, graph2, header_pie_chart_sample_select, pie_chart_input,
-             db_header,
-             download_button, download_component, data_tb], style=CONTENT_STYLE)
         self.layout = container
 
     def _generate_table_data_cols(self, max_rows=40) -> Tuple[List[Any], List[Any]]:
@@ -198,6 +237,8 @@ class Taxonomy(BaseApp):
         and downloading the CSV when the download button is clicked.
         """
 
+        # this updates the graph based on the samples selected
+
         @app.callback(
             Output('graph1', 'figure'),
             Output('graph2', 'figure'),
@@ -207,10 +248,12 @@ class Taxonomy(BaseApp):
             Output('graph2', 'style'),
             Input('dropdown', 'value'),
             Input('number_input_piechart', 'value'),
-            Input('slider', 'value')
+            Input('slider', 'value'),
+            Input('sample_select_value', 'value')
 
         )
-        def plot_selected_figure(value, sample_value_piechart, slider_value) -> Tuple[Figure, Figure, Dict[str, str]]:
+        def plot_selected_figure(value, sample_value_piechart, slider_value, sample_select_value) -> Tuple[
+            Figure, Figure, Dict[str, str]]:
             """
             Update the figures based on the selected value from the dropdown menu, the selected sample value for the piechart,
             and the selected number of taxa from the slider.
@@ -219,6 +262,7 @@ class Taxonomy(BaseApp):
             value (str): The selected value from the dropdown menu.
             sample_value_piechart (str): The selected sample value for the piechart.
             slider_value (int): The selected number of taxa from the slider.
+            sample_select_value: (str) output of multi select dropdown (selected samples)
 
             Returns:
                 Tuple[Figure, Figure, Dict[str, str]]: A tuple containing two figures for the graphs and a dict for the piechart style.
@@ -227,6 +271,7 @@ class Taxonomy(BaseApp):
             fig1 = {'data': []}
             fig2 = {'data': []}
             piechart_style = {'display': 'none'}
+
             fig2_style = {'display': 'block'}
             # request necessary data from database
             # q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
@@ -237,32 +282,56 @@ class Taxonomy(BaseApp):
             for name, group in df_grouped:
                 # get most abundant for slider_value number of selected taxa for each sample to display in taxonomy plots
                 sample_rows = group.head(slider_value)
-                # result_df = result_df.append(sample_rows)
                 result_df = pd.concat([result_df, sample_rows])
 
             result_df = result_df.reset_index(drop=True)
             self.result_df = result_df
+            self.df_selected = self.result_df[self.result_df['sample_id'].astype(str).isin(sample_select_value)]
 
             if value == 'stackedbar':
-                fig1, fig2 = self.plot_stacked_bar(self.result_df)
-
+                fig1, fig2 = self.plot_stacked_bar(self.df_selected)
 
             elif value == 'groupedbar':
-                fig1, fig2 = self.plot_grouped_bar(self.result_df)
+                fig1, fig2 = self.plot_grouped_bar(self.df_selected)
 
             elif value == 'scatter':
-                fig1 = self.plot_scatter(self.result_df)
+                fig1, fig2_style = self.plot_scatter(self.df_selected)
 
             elif value == 'area':
-                fig1 = self.plot_area(self.result_df)
+                fig1, fig2_style = self.plot_area(self.df_selected)
 
             elif value == 'scatter3d':
-                fig1 = self.plot_scatter_3d(self.result_df)
+                fig1, fig2 = self.plot_scatter_3d(self.df_selected)
 
             elif value == "pie":
-                fig1, piechart_style, fig2_style = self.plot_pie(self.result_df,sample_value_piechart)
+                fig1, piechart_style, fig2_style = self.plot_pie(self.result_df, sample_value_piechart)
 
             return fig1, fig2, piechart_style, fig2_style
+
+        # @self.app.callback(
+        # Output('graph1', 'figure'),
+        # Input('sample_select_dropdown', 'value')
+        # )
+        # def update_graph(selected_samples):
+        #     # Filter dataframe based on selected samples
+        #     df_selected = self.df[self.df['sample_id'].isin(selected_samples)]
+        #     print()
+
+        #     # Update graph based on selected samples
+        #     fig = self.plot_stacked_bar(df_selected)
+
+        #     return fig
+
+        # Add a new callback that updates the header's style based on the dropdown's value
+        @app.callback(
+            Output('header_pie_chart_sample_select_dbc', 'style'),
+            Input('dropdown', 'value')
+        )
+        def show_hide_element(value):
+            if value == "pie":
+                return {'display': 'block'}  # Show the header if 'pie' is selected
+            else:
+                return {'display': 'none'}  # Hide the header for other options
 
         @app.callback(
             Output("download-csv", "data"),
