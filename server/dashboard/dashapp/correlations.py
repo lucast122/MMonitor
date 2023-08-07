@@ -10,9 +10,16 @@ from dash_table import DataTable
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from pandas import DataFrame
+import pandas as pd
 from plotly.graph_objects import Figure
-
+from django.db import connections
 from .calculations.stats import scipy_correlation
+from json import loads, dumps
+def _explode_metadata(df):
+    return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
+
+def _parse_dict(x):
+    return pd.Series(loads(x))
 
 
 class Correlations:
@@ -25,10 +32,37 @@ class Correlations:
              - bootstrapping is slow
     """
 
-    def __init__(self, db):
+
+
+    def get_all_meta(self) -> pd.DataFrame:
+        q = "SELECT * FROM metadata ORDER BY sample_id"
+        return _explode_metadata(self.query_to_dataframe(q))
+
+    def query_to_dataframe(self, query: str) -> pd.DataFrame:
+        return pd.read_sql_query(query, self.conn)
+
+
+
+    def __init__(self):
         self.app = DjangoDash('correlations')
-        self._db = db
-        self._taxonomies = self._db.get_unique_taxonomies()
+        # self._db = db
+
+        with connections['mmonitor'].cursor() as cursor:
+
+            raw_connection = cursor.db
+            self.conn = cursor.db.connection
+            q = "SELECT DISTINCT taxonomy FROM nanopore"
+            self.unique_sample_ids = pd.read_sql_query("SELECT DISTINCT sample_id FROM nanopore",self.conn)["sample_id"].tolist()
+            self._taxonomies = pd.read_sql_query(q,self.conn).values.tolist()
+            
+        
+        
+        
+
+
+
+        
+
         self._methods = [
             'Pearson',
             'Spearman',
@@ -308,6 +342,9 @@ class Correlations:
                 raise PreventUpdate
             return dict(content=self._table_df.to_csv(index=False), filename='correlations.csv')
 
+    
+
+
 
 def _force_list(x: Union[Any, List]) -> List[Any]:
     """
@@ -315,3 +352,4 @@ def _force_list(x: Union[Any, List]) -> List[Any]:
     """
 
     return x if isinstance(x, list) else [x]
+
