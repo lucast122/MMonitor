@@ -53,7 +53,7 @@ class GUI:
 
     def __init__(self):
         self.db_mysql = MMonitorDBInterfaceMySQL(f"{ROOT}/src/resources/db_config.json")
-        self.db_mysql.create_db()
+        # self.db_mysql.create_db()
 
         # declare data base class variable, to be chosen by user with choose_project()
         self.db: MMonitorDBInterface = None
@@ -320,9 +320,9 @@ class GUI:
 
         self.emu_runner.run_emu(files, sample_name)
         emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-
+        # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
         # self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
-        self.db_mysql.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
+        self.db_mysql.update_django_with_emu_out(emu_out_path, "species", f'{sample_name}', "project", self.sample_date)
 
 
 
