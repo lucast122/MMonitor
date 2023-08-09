@@ -140,7 +140,7 @@ class MMonitorDBInterfaceMySQL:
     #     self._connection.commit()
 
     def update_django_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str,
-                                  project_name: str, sample_date):
+                                   project_name: str, sample_date: str, subproject_name: str):
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
 
         if user_id is None:
@@ -160,14 +160,20 @@ class MMonitorDBInterfaceMySQL:
         df = df.sort_values('Abundance', ascending=False)
         df = df.iloc[1:]
         df['Sample'] = sample_name
+
         df['Sample_date'] = sample_date
+
         for index, row in df.iterrows():
             record_data = {
                 "taxonomy": row['Species'],
                 "abundance": row['Abundance'],
                 "sample_id": sample_name,
                 "project_id": project_name,
-                "user_id": user_id
+                "user_id": user_id,
+                "subproject": subproject_name,
+                "date": sample_date
+
+
             }
             print(f"Sending record: {record_data}")
             try:
@@ -176,11 +182,12 @@ class MMonitorDBInterfaceMySQL:
                     json=record_data,
                     auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
                 )
+                if response.status_code != 200:
+                    print(f"Failed to add record: {response.content}")
+
             except Exception as e:
                 print(e)
 
-            if response.status_code != 200:
-                print(f"Failed to add record: {response.content}")
 
     # def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
     #                                  project_name: str, sample_date):

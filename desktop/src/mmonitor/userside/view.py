@@ -12,7 +12,7 @@ from webbrowser import open_new
 from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
 from requests import post
-from tkcalendar import DateEntry
+from tkcalendar import Calendar
 
 from build import ROOT
 from mmonitor.dashapp.index import Index
@@ -126,24 +126,42 @@ class GUI:
 
         # console = Console(self.root)
 
+    def ask_create_subproject(self):
+        # Create the root window but don't show it
+        top = tk.Toplevel(self.root)
+        top.geometry("700x300")
+
+        # Ask the user if they want to create a subproject
+        answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
+
+        # If the user selects 'Yes'
+        if answer:
+            subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
+            return subproject_name
+        else:
+            return None
 
     def open_calendar(self):
-        def save_date():
-            self.sample_date = calendar.get_date()
-            dialog.destroy()
+        calendar_window = tk.Toplevel()
+        calendar_window.title("Choose a Date")
 
-        dialog = tk.Toplevel(self.root)
-        dialog.transient(self.root)
-        dialog.grab_set()
+        # Use a StringVar to hold our date
+        selected_date_var = tk.StringVar()
 
-        calendar = DateEntry(dialog, width=12, background='darkblue',
-                             foreground='white', borderwidth=2)
-        calendar.pack(padx=10, pady=10)
+        calendar = Calendar(calendar_window, selectmode="day")
+        calendar.pack(pady=20)
 
-        submit_button = tk.Button(dialog, text="Submit", command=save_date)
-        submit_button.pack(padx=10, pady=10)
+        def on_date_select():
+            selected_date_var.set(calendar.get_date())
+            calendar_window.destroy()
+            calendar_window.quit()
 
-        self.root.wait_window(dialog)
+        select_button = tk.Button(calendar_window, text="Select Date", command=on_date_select)
+        select_button.pack(pady=20)
+
+        calendar_window.mainloop()
+
+        return selected_date_var.get()
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
@@ -294,11 +312,16 @@ class GUI:
             parent=self.root
         )
 
+        print("Before opening the calendar...")
+        sample_date = self.open_calendar()
+        print(f"Selected date: {sample_date}")
+        print("After the calendar is closed...")
 
-        self.open_calendar()
         self.centrifuge_runner.run_centrifuge(files, sample_name)
         self.centrifuge_runner.make_kraken_report()
-        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out","species",sample_name,"project",self.sample_date)
+
+        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
+                                             sample_name, "project", sample_date)
 
     def taxonomy_nanopore_16s(self):
 
@@ -310,19 +333,28 @@ class GUI:
         )
         files = self.emu_runner.get_files_from_folder(folder)
 
-        sample_name = simpledialog.askstring(
-            "Input sample name",
-            "What should the sample be called?",
+        sample_name = self.ask_sample_name()
+
+        project_name = simpledialog.askstring(
+            "Input project name",
+            "What should the project be called?",
             parent=self.root
         )
-        self.open_calendar()
 
+        subproject_name = self.ask_create_subproject()
+        print(sample_name)
+        print("Before opening the calendar...")
+        sample_date = self.open_calendar()
+        print(f"Selected date: {sample_date}")
+        print("After the calendar is closed...")
 
         self.emu_runner.run_emu(files, sample_name)
         emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
         # self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
-        self.db_mysql.update_django_with_emu_out(emu_out_path, "species", f'{sample_name}', "project", self.sample_date)
+        # project_name="R1"
+        self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+                                                 subproject_name)
 
 
 
