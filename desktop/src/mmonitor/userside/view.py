@@ -9,7 +9,6 @@ from tkinter import *
 from tkinter import simpledialog
 from webbrowser import open_new
 
-from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
@@ -76,55 +75,104 @@ class GUI:
         self.sample_date = None
 
     def init_layout(self):
+        self.root.geometry("350x530")
+        self.root.title("MMonitor v1.0 beta")
+        self.root.minsize(340, 530)
 
-        self.root.geometry("300x300")
-        self.root.title("MMonitor v0.1.0 alpha")
-        self.root.resizable(width=False, height=False)
-        ico = Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
-        photo = ImageTk.PhotoImage(ico)
+        # Style and theme
+        style = ttk.Style()
+        style.theme_use("clam")  # Switch to the 'clam' theme for better styling flexibility
 
-        self.root.wm_iconphoto(False, photo)
+        style.configure('TButton',
+                        font=("Helvetica", 15),
+                        foreground='black',
+                        bordercolor="black",
+                        background='#FCF6F5',
 
-        self.width = 20
-        self.height = 1
-        # create buttons
+                        padding=5,
+                        borderwidth=1,
+                        roundedrelief=True)
 
-        # uni tuebingen colours
-        # #B22222 red
-        # #444E57 grey
-        button_bg = '#444E57'
-        button_active_bg = "#444E57"
-        tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg, ).pack()
-        tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
-        # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
-        #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
-        # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
-        #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
-        tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
-        tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
+        style.map('TButton',
+                  foreground=[('pressed', 'white'), ('active', 'black')],
+                  background=[('pressed', '!disabled', '#B22222'), ('active', '#B0E0E6')]  # Light blue when active
+                  )
 
-        tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
+        # Placeholder icon
+        placeholder_icon = tk.PhotoImage(width=16, height=16)
+        placeholder_icon.put(("gray",), to=(0, 0, 15, 15))
 
-        tk.Button(self.root, text="Configure Database", command=self.open_db_config_form,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
+        # Header with app title
+        header_label = ttk.Label(self.root, text="MMonitor v1.0 beta", font=("Helvetica", 20))
+        header_label.pack(pady=10)
 
-        tk.Button(self.root, text="Quit",
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg,
-                  command=self.stop_app).pack()
+        # Categories and buttons
 
-        # console = Console(self.root)
+        categories = [
+            ("Local", [
+                ("Create Local DB", self.create_project),
+                ("Choose Local DB", self.choose_project),
+                ("Start offline monitoring", self.start_monitoring)
+            ]),
+            ("Webserver", [
+                ("User authentication", self.open_db_config_form)
+            ]),
+            ("Add Data", [
+                ("Add metadata from CSV", self.append_metadata),
+                ("Run analysis pipeline", self.checkbox_popup)
+            ])
+        ]
+
+        # Tooltips for the categories
+        category_tooltips = {
+            "Local": "Use these function to store everything in a local Database. \n Then after adding data hit 'Start offline monitoring'. ",
+            "Webserver": "Click 'User authentication' to provide your username and password for the webserver. \n After authentication"
+                         " all data you add will be uploaded to the webserver as well. \n Provide same username and password that you used"
+                         " for registration at the MMonitor webpage.",
+            "Add Data": "Use this to add data to the local database and the webserver. \n Data can only be added if either"
+                        " local database was chosen first or User Authentication was performed. \n If you did both data will be added to local DB and webserver."
+
+        }
+        # Calculate the maximum button width based on text length
+        button_texts = [btn[0] for cat in categories for btn in cat[1]]
+        button_texts.append("Quit")  # Adding Quit button text
+        max_text_length = max(map(len, button_texts))
+        btn_width = max_text_length + 5  # Adding an offset to account for padding and icon
+
+        style.configure('TLabel',
+                        background='#990011',  # red color
+                        foreground='white',  # text color
+                        font=("Helvetica", 18),
+                        width=btn_width - 5,  # set the width
+                        padding=5,
+                        anchor='Center')
+
+        for category, btns in categories:
+            cat_label = ttk.Label(self.root, text=category, font=("Helvetica", 22), anchor="center")
+            cat_label.pack(pady=10)
+
+            # Attach tooltips if available
+            if category in category_tooltips:
+                self.create_tooltip(cat_label, category_tooltips[category])
+
+            for text, cmd in btns:
+                btn = ttk.Button(self.root, text=text, command=cmd, image=placeholder_icon, compound="left",
+                                 width=btn_width)
+                btn.image = placeholder_icon  # Keep a reference
+                btn.pack(pady=2)
+
+        # Quit button
+        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=placeholder_icon, compound="left",
+                              width=btn_width)
+        quit_btn.image = placeholder_icon
+        quit_btn.pack(pady=20)
+        # create_tooltip(local_label, "This is the tooltip text for the Local category.")
+        # create_tooltip(webserver_label, "This is the tooltip text for the Webserver category.")
+
+    def create_tooltip(self, widget, text):
+        tooltip = ToolTip(widget, text)
+        widget.bind("<Enter>", tooltip.show_tip)
+        widget.bind("<Leave>", tooltip.hide_tip)
 
     def ask_create_subproject(self):
         # Create the root window but don't show it
@@ -472,3 +520,29 @@ class GUI:
     def open_db_config_form(self):
         db_config_form = DataBaseConfigForm(self.root)
         print(db_config_form.last_config)
+
+
+class ToolTip:
+    def __init__(self, widget, tip_text):
+        self.widget = widget
+        self.tip_text = tip_text
+        self.tip_window = None
+
+    def show_tip(self, event=None):
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        self.tip_window = tk.Toplevel(self.widget)
+        self.tip_window.wm_overrideredirect(True)
+        self.tip_window.wm_geometry(f"+{x}+{y}")
+
+        label = tk.Label(self.tip_window, text=self.tip_text, foreground="black", background="#ffffe0", relief="solid",
+                         borderwidth=1,
+                         font=("Helvetica", "16", "normal"))
+        label.pack(ipadx=1)
+
+    def hide_tip(self, event=None):
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
