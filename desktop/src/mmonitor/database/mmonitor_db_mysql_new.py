@@ -17,10 +17,14 @@ def _explode_metadata(df):
 
 class MMonitorDBInterfaceMySQL:
     def __init__(self, db_config: str):
-        with open(db_config, 'r') as file:
-            self._db_config = json.load(file)
-        print(self._db_config)
-        self._db_path = self._db_config['database']
+        try:
+            with open(db_config, 'r') as file:
+                self._db_config = json.load(file)
+        except FileNotFoundError as e:
+            print("DB config not found")
+            print(e)
+            # print(self._db_config)
+        # self._db_path = self._db_config['database']
         self._connection = None
         # self._connect()
 

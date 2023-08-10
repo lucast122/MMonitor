@@ -3,18 +3,17 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 
-from build import ROOT
+from build_mmonitor_pyinstaller import ROOT
 
 
 class DataBaseConfigForm(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master=master)
-        self.title("Database Configuration")
-        self.geometry("300x300")
+        self.title("User Authentication")
+        self.geometry("300x160")
 
         self.db_config = {
             "host": tk.StringVar(),
-            "database": tk.StringVar(),
             "user": tk.StringVar(),
             "password": tk.StringVar()
         }
@@ -33,7 +32,9 @@ class DataBaseConfigForm(tk.Toplevel):
             if key in self.last_config:
                 self.db_config[key].set(self.last_config[key])
 
-        self.password_censored = tk.BooleanVar(value=True)
+        self.password_censored = tk.BooleanVar(value=False)
+
+
         self.create_widgets()
 
     def create_widgets(self):
