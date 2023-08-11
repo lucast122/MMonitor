@@ -1,4 +1,3 @@
-# from tkcalendar import Calendar
 import gzip
 import os
 import tarfile
@@ -12,18 +11,25 @@ from webbrowser import open_new
 from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
 from requests import post
-from tkcalendar import DateEntry
+from tkcalendar import Calendar
 
-from build import ROOT
+from build_mmonitor_pyinstaller import ROOT, IMAGES_PATH
 from mmonitor.dashapp.index import Index
+from mmonitor.database.DBConfigForm import DataBaseConfigForm
+from mmonitor.database.django_db_interface import DjangoDBInterface
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
-from mmonitor.database.mmonitor_db_mysql_new import MMonitorDBInterfaceMySQL
-from mmonitor.userside.DBConfigForm import DataBaseConfigForm
+from mmonitor.userside.InputWindow import InputWindow
+from mmonitor.userside.PipelinePopup import PipelinePopup
 from mmonitor.userside.centrifuge import CentrifugeRunner
 from mmonitor.userside.emu import EmuRunner
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 
-# from mmonitor.userside.downloader import Downloader
+# Global constants for version and dimensions
+VERSION = "v1.0 beta"
+MAIN_WINDOW_X: int = 350
+MAIN_WINDOW_Y: int = 700
+
+# Module description
 
 """
 This file represents the basic gui for the desktop app. It is the entry point for the program and the only way 
@@ -50,10 +56,19 @@ from tkinter import messagebox, ttk
 
 
 class GUI:
+    """
+    Main GUI class for the MMonitor desktop application. It initializes the GUI layout, provides methods for
+    handling user interactions, and interfaces with other components of the application for various tasks.
+    """
+
+    """
+    Initialize the GUI with default settings, prepare the database interfaces, and set up other essential attributes.
+    """
 
     def __init__(self):
-        self.db_mysql = MMonitorDBInterfaceMySQL(f"{ROOT}/src/resources/db_config.json")
-        self.db_mysql.create_db()
+        self.db_mysql = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
+        self.progress_bar_exists = False
+        # self.db_mysql.create_db()
 
         # declare data base class variable, to be chosen by user with choose_project()
         self.db: MMonitorDBInterface = None
@@ -65,8 +80,10 @@ class GUI:
         self.dashapp = None
         self.monitor_thread = None
         self.root = Tk()
+        mmonitor_logo = tk.PhotoImage(file=f"{IMAGES_PATH}/mmonitor_logo.png")
+        self.root.iconphoto(True, mmonitor_logo)
         self.init_layout()
-        self.taxonomy_nanopore_wgs = tk.BooleanVar()
+        self.taxonomy_nanopore_wgs_bool = tk.BooleanVar()
         self.taxonomy_nanopore_16s_bool = tk.BooleanVar()
         self.assembly = tk.BooleanVar()
         self.correction = tk.BooleanVar()
@@ -77,80 +94,187 @@ class GUI:
 
     def init_layout(self):
 
-        self.root.geometry("300x300")
-        self.root.title("MMonitor v0.1.0 alpha")
-        self.root.resizable(width=False, height=False)
-        ico = Image.open(f"{ROOT}/src/resources/images/mmonitor_logo.png")
-        photo = ImageTk.PhotoImage(ico)
+        def resize_icon_to_xpx(image_path, x):
+            """Utility function to resize the image to 25px while maintaining aspect ratio."""
+            img = Image.open(image_path)
+            base_width = x
+            w_percent = base_width / float(img.width)
+            h_size = int(float(img.height) * float(w_percent))
+            img = img.resize((base_width, h_size), Image.ANTIALIAS)
+            return ImageTk.PhotoImage(img)
 
-        self.root.wm_iconphoto(False, photo)
+        self.root.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
+        self.root.title(f"MMonitor {VERSION}")
+        self.root.minsize(MAIN_WINDOW_X, MAIN_WINDOW_Y)
 
-        self.width = 20
-        self.height = 1
-        # create buttons
+        # Style and theme
+        style = ttk.Style()
+        style.theme_use("default")  # Switch to the 'clam' theme for better styling flexibility
 
-        # uni tuebingen colours
-        # #B22222 red
-        # #444E57 grey
-        button_bg = '#444E57'
-        button_active_bg = "#444E57"
-        tk.Button(self.root, text="Create Project", command=self.create_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg, ).pack()
-        tk.Button(self.root, text="Choose Project", command=self.choose_project,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
-        # tk.Button(self.root, text="Choose centrifuge index", command=self.choose_index,
-        #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
-        # # tk.Button(self.root, text="Analyze fastq in folder", command=self.analyze_fastq_in_folder,
-        #           padx=10, pady=5, width=self.width,height=self.height, fg='white', bg='#254D25').pack()
-        tk.Button(self.root, text="Add metadata from CSV", command=self.append_metadata,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
-        tk.Button(self.root, text="Run analysis pipeline", command=self.checkbox_popup,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
+        print(ttk.Style().theme_names())
 
-        tk.Button(self.root, text="Start monitoring", command=self.start_monitoring,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
+        # style.map('TButton',
+        #           foreground=[('pressed', 'white'), ('active', 'black')],
+        #           background=[('pressed', '!disabled', '#B22222'), ('active', '#B0E0E6')]  # Light blue when active
+        #           )
 
-        tk.Button(self.root, text="Configure Database", command=self.open_db_config_form,
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg).pack()
+        # Placeholder icon
+        # placeholder_icon = tk.PhotoImage(width=16, height=)
+        btn_icon_size = 35
+        create_local_db_icon = resize_icon_to_xpx(f'{IMAGES_PATH}/mmonitor_button_add_db.png', btn_icon_size)
+        add_db_icon = resize_icon_to_xpx(f'{IMAGES_PATH}/mmonitor_button_import_db.png', btn_icon_size)
+        start_offline_monitoring_icon = resize_icon_to_xpx(f'{IMAGES_PATH}/offline_monitoring.png', btn_icon_size)
+        user_authentication_icon = resize_icon_to_xpx(f"{IMAGES_PATH}/mmonitor_button4_authenticate.png", btn_icon_size)
+        add_metadata_icon = resize_icon_to_xpx(f"{IMAGES_PATH}/mmonitor_button_importcsv.png", btn_icon_size)
+        run_analysis_pipeline_icon = resize_icon_to_xpx(f"{IMAGES_PATH}/button_add_data2.png", btn_icon_size)
+        quit_icon = resize_icon_to_xpx(f"{IMAGES_PATH}/mmonitor_button_quit.png", btn_icon_size)
 
-        tk.Button(self.root, text="Quit",
-                  padx=10, pady=5, width=self.width, height=self.height, fg='black', bg=button_bg,
-                  activebackground=button_active_bg,
-                  command=self.stop_app).pack()
+        # placeholder_icon.put(("gray",), to=(0, 0, 15, 15))
 
-        # console = Console(self.root)
+        # Header with app title
+        header_label = ttk.Label(self.root, text=f"Metagenome Monitor {VERSION}", font=("Helvetica", 18))
+        header_label.pack(pady=10)
+
+        # Categories and buttons
+
+        # Define the 'categories' list
+        categories = [
+            ("Local", [
+                ("Create Local DB", self.create_project, create_local_db_icon),
+                ("Choose Local DB", self.choose_project, add_db_icon),
+                ("Start offline monitoring", self.start_monitoring, start_offline_monitoring_icon)
+            ]),
+            ("Webserver", [
+                ("User authentication", self.open_db_config_form, user_authentication_icon)
+            ]),
+            ("Add Data", [
+                ("Add metadata from CSV", self.append_metadata, add_metadata_icon),
+                ("Process sequencing files", self.checkbox_popup, run_analysis_pipeline_icon)
+            ])
+        ]
+        # Tooltips for the categories
+        category_tooltips = {
+            "Local": (
+                "Local Database Options:\n"
+                "- Create a new local database.\n"
+                "- Choose an existing local database.\n"
+                "- Begin offline monitoring.\n"
+            ),
+            "Webserver": (
+                "Webserver Authentication:\n"
+                "- Provide your username and password for the webserver.\n"
+                "- Ensure you use the same credentials as on the MMonitor webpage.\n"
+                "- Do not modify 'host' field (default 134.2.78.150).\n"
+            ),
+            "Add Data": (
+                "Data Addition Options:\n"
+                "- Append metadata using a CSV (e.g., 'meta.csv').\n"
+                "- Process sequencing files for analysis.\n"
+                "- Ensure either a local database is chosen or you're authenticated for data addition.\n"
+            )
+        }
+
+        # Calculate the maximum button width based on text length
+        button_texts = [btn[0] for cat in categories for btn in cat[1]]
+        button_texts.append("Quit")  # Adding Quit button text
+        max_text_length = max(map(len, button_texts))
+        btn_width = max_text_length  # Adding an offset to account for padding and icon
+        style = ttk.Style()
+
+        # Styling improvements for buttons
+
+        style.theme_use("clam")
+
+        # Configuring Button Style
+        style.configure('TButton',
+                        font=("Helvetica", 14),
+                        foreground='#404040',  # Dark gray text
+                        background='#FCF6F5',  # Light background
+                        relief="raised",  # Raised effect on button
+                        padding=(10, 10, 10, 10))  # Increased padding for larger button
+
+        # Configuring Label Style
+        style.configure('TLabel',
+                        background='#A0CFEC',  # A light blue shade for the label
+                        foreground='black',
+                        font=("Helvetica", 20),
+                        padding=5,
+                        anchor='center')
+
+        for category, btns in categories:
+            cat_label = ttk.Label(self.root, text=category, font=("Helvetica", 20), anchor="center")
+            cat_label.pack(pady=10)
+
+            if category in category_tooltips:
+                self.create_tooltip(cat_label, category_tooltips[category])
+
+            for text, cmd, img in btns:
+                btn = ttk.Button(self.root, text=text, command=cmd, image=img, compound="left", style="TButton")
+                btn.image = img
+                btn.pack(pady=2)
+
+            btn.pack(pady=2)
+
+        # Quit button
+        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=quit_icon, style="TButton")
+        quit_btn.image = quit_icon
+        quit_btn.pack(pady=15)
+
+    # create_tooltip(local_label, "This is the tooltip text for the Local category.")
+        # create_tooltip(webserver_label, "This is the tooltip text for the Webserver category.")
+
+    def create_tooltip(self, widget, text):
+        tooltip = ToolTip(widget, text)
+        widget.bind("<Enter>", tooltip.show_tip)
+        widget.bind("<Leave>", tooltip.hide_tip)
+
+    def ask_create_subproject(self):
+        # Create the root window but don't show it
+        top = tk.Toplevel(self.root)
+        top.geometry("300x300")
+
+        # Ask the user if they want to create a subproject
+        answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
+
+        # If the user selects 'Yes'
+        if answer:
+            subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
+            return subproject_name
+        else:
+            subproject_name = ""
+            return subproject_name
+        top.destroy()
+        top.quit()
 
 
     def open_calendar(self):
-        def save_date():
-            self.sample_date = calendar.get_date()
-            dialog.destroy()
+        calendar_window = tk.Toplevel()
+        calendar_window.title("Choose a Date")
 
-        dialog = tk.Toplevel(self.root)
-        dialog.transient(self.root)
-        dialog.grab_set()
+        # Use a StringVar to hold our date
+        selected_date_var = tk.StringVar()
 
-        calendar = DateEntry(dialog, width=12, background='darkblue',
-                             foreground='white', borderwidth=2)
-        calendar.pack(padx=10, pady=10)
+        calendar = Calendar(calendar_window, selectmode="day")
+        calendar.pack(pady=10)
 
-        submit_button = tk.Button(dialog, text="Submit", command=save_date)
-        submit_button.pack(padx=10, pady=10)
+        def on_date_select():
+            selected_date_var.set(calendar.get_date())
+            calendar_window.destroy()
+            calendar_window.quit()
 
-        self.root.wait_window(dialog)
+        select_button = ttk.Button(calendar_window, text="Select Date", command=on_date_select, style="TButton")
+        select_button.pack(pady=20)
+
+        # calendar_window.mainloop()
+
+        return selected_date_var.get()
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
-        top.geometry("700x300")
+        top.geometry("200x200")
         top.title(title)
-        tk.Label(top, text=text, font='Mistral 18 bold').place(x=150, y=80)
-        tk.Button(top, text="Okay", command=top.destroy).pack()
+        ttk.Label(top, text=text, font='Helvetica 18 bold').place(x=150, y=80)
+        ttk.Button(top, text="Okay", command=top.destroy).pack()
 
     def create_project(self):
         filename = filedialog.asksaveasfilename(
@@ -192,6 +316,13 @@ class GUI:
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
     def check_emu_db_exists(self):
+        # unzip if tar exists, but not taxonomy.tsv
+        if os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar") and not os.path.exists(
+                f"{ROOT}/src/resources/emu_db/taxonomy.tsv"):
+            self.open_popup("Unzipping tar", "Unzipping emu.tar")
+            self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar", f"{ROOT}/src/resources/emu_db/")
+
+
         if not os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar"):
             response = messagebox.askquestion("Emu database not found.",
                                               "Emu DB not found. Do you want to download it?")
@@ -205,30 +336,75 @@ class GUI:
                     self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help", "Could not find emu db")
 
 
-                
+
     def download_file_from_web(self,filepath,url):
+
         with urllib.request.urlopen(url) as response:
             # get file size from content-length header
             file_size = int(response.info().get("Content-Length"))
             # create progress bar widget
             progress = ttk.Progressbar(self.root, orient="horizontal", length=250, mode="determinate")
             progress.pack()
+            self.progress_bar_exists = True
             progress["maximum"] = file_size
             progress["value"] = 0
 
-            def update_progress(count, block_size, total_size):
-                progress["value"] = count * block_size
-                self.root.update_idletasks()
+            # Start the download in a separate thread
+            download_thread = Thread(target=self._download_file, args=(filepath, url, progress))
+            download_thread.start()
 
-            # download file and update progress bar
-            urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
-            progress.destroy()
+            # Periodically update the GUI
+            self.root.after(100, self._check_download_progress, download_thread, progress)
+
+    def _download_file(self, filepath, url, progress):
+        def update_progress(count, block_size, total_size):
+            self.download_progress = count * block_size
+
+        # Reset progress for a new download
+        self.download_progress = 0
+
+        # Download file and update progress bar
+        urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
+
+        # Once download is complete
+        self.progress_bar_exists = False
+        progress.destroy()
         messagebox.showinfo("Download complete", "Download complete. Unpacking files...")
+
+    def _check_download_progress(self, download_thread, progress):
+        # Update the progress bar with the latest progress value
+
+        if self.progress_bar_exists:
+            progress["value"] = self.download_progress
+            self.root.update_idletasks()
+
+        # If the download thread is still running, keep checking
+        if download_thread.is_alive():
+            self.root.after(100, self._check_download_progress, download_thread, progress)
+
+    #
+    # def handle_kaiju_output(self):
+    #     kaiju_runner = KaijuRunner()
+    #
+    #     # Using SampleInput window to get user input
+    #     sample_input_window = SampleInputWindow()  # Assuming you have a class named SampleInputWindow
+    #     sequence_list, sample_name = sample_input_window.get_user_input()  # Assuming this method returns a list of sequence files and a sample name
+    #
+    #     kaiju_runner.run_kaiju(sequence_list, sample_name)
+    #
+    #     # Now, we'll add the output to the DjangoDB
+    #     db = DjangoDBInterface()
+    #     db.add_kaiju_output_to_db(sample_name)
+    #
+    #
+    #     db = DjangoDBInterface()  # Assuming this class has methods to handle Kaiju output
+    #     db.add_kaiju_output_to_db(sample_name)
+
 
     def check_file_exists(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
             if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
-                response = messagebox.askquestion("Centrifuge index not decompressed",
+                response = messagebox.askquestion("Centrifuge index compressed",
                                                   "Index is compressed. Do you want to decompress it?")
                 if response == "yes":
                     try:
@@ -268,7 +444,7 @@ class GUI:
 
     # choose folder containing sequencing data
     # TODO: check if there is white space in path that causes problem
-    @require_project
+    # @require_project
     # @require_centrifuge
     def taxonomy_nanopore_wgs(self):
         # check if centrifuge index exists, if not download it using check_file_exists method
@@ -282,76 +458,60 @@ class GUI:
         self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
         self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
 
-        folder = filedialog.askdirectory(
-            initialdir='/',
-            title="Choose directory containing sequencing data"
-        )
-        files = self.centrifuge_runner.get_files_from_folder(folder)
+        # folder = filedialog.askdirectory(
+        #     initialdir='/',
+        #     title="Choose directory containing sequencing data"
+        # )
+        # files = self.centrifuge_runner.get_files_from_folder(folder)
+        #
+        # sample_name = simpledialog.askstring(
+        #     "Input sample name",
+        #     "What should the sample be called?",
+        #     parent=self.root
+        # )
+        #
+        #
+        # sample_date = self.open_calendar()
+        win = InputWindow(self.root, self.emu_runner)
+        self.root.wait_window(win.top)
+        # get entries from input window
+        sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
+        project_name = str(win.project_name_entry)
+        subproject_name = str(win.subproject_name_entry)
+        sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+        files = win.file_paths
 
-        sample_name = simpledialog.askstring(
-            "Input sample name",
-            "What should the sample be called?",
-            parent=self.root
-        )
-
-
-        self.open_calendar()
         self.centrifuge_runner.run_centrifuge(files, sample_name)
         self.centrifuge_runner.make_kraken_report()
-        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out","species",sample_name,"project",self.sample_date)
+
+        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
+                                             sample_name, project_name, sample_date)
 
     def taxonomy_nanopore_16s(self):
-
-
         self.check_emu_db_exists()
-        folder = filedialog.askdirectory(
-            initialdir='/',
-            title="Choose directory containing sequencing data"
-        )
-        files = self.emu_runner.get_files_from_folder(folder)
-
-        sample_name = simpledialog.askstring(
-            "Input sample name",
-            "What should the sample be called?",
-            parent=self.root
-        )
-        self.open_calendar()
-
+        # create input window to input all relevant sample information and sequencing files
+        win = InputWindow(self.root, self.emu_runner)
+        self.root.wait_window(win.top)
+        # get entries from input window
+        sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
+        project_name = str(win.project_name_entry)
+        subproject_name = str(win.subproject_name_entry)
+        sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+        files = win.file_paths
 
         self.emu_runner.run_emu(files, sample_name)
         emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-
+        # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
         # self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
-        self.db_mysql.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
+        self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+                                                 subproject_name)
 
 
     def checkbox_popup(self):
+        pipeline_popup = PipelinePopup(self.root,
+                                       self)  # Replace run_analysis_pipeline_function with your actual function
 
-        # open checkbox to ask what the user wants to run (in case of rerunning)
-        top = tk.Toplevel(self.root)
-        top.geometry("420x245")
-        top.title("Select analysis steps to perform.")
-        frame_taxonomy = tk.LabelFrame(top, padx=10, pady=2, text="Taxonomic analysis")
-        frame_functional = tk.LabelFrame(top, padx=10, pady=2, text="Functional analysis")
-        frame_taxonomy.pack(pady=5, padx=10)
-        frame_functional.pack(pady=5, padx=10)
-        button_width = 100
-
-        # taxonomy checkboxes
-        c6 = ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy nanopore', variable=self.taxonomy_nanopore_wgs,
-                             width=button_width).pack()
-        c8 = ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy 16s nanopore',
-                             variable=self.taxonomy_nanopore_16s_bool,
-                             width=button_width).pack()
-
-        # functional analysis checkboxes
-        c1 = ttk.Checkbutton(frame_functional, text='Assembly', variable=self.assembly, width=button_width).pack()
-        c2 = ttk.Checkbutton(frame_functional, text='Correction', variable=self.correction, width=button_width).pack()
-        c3 = ttk.Checkbutton(frame_functional, text='Binning', variable=self.binning, width=button_width).pack()
-        c4 = ttk.Checkbutton(frame_functional, text='Annotation', variable=self.annotation, width=button_width).pack()
-        c5 = ttk.Checkbutton(frame_functional, text='KEGG', variable=self.kegg, width=button_width).pack()
-        c7 = tk.Button(top, text="Continue", command=lambda: [self.run_analysis_pipeline(), top.destroy()]).pack()
 
     def ask_sample_name(self):
         sample_name = simpledialog.askstring(
@@ -362,51 +522,6 @@ class GUI:
         return sample_name
 
     # @require_project
-    def run_analysis_pipeline(self):
-        if self.assembly.get() or self.correction.get():
-            seq_file = filedialog.askopenfilename(title="Please select a sequencing file")
-        if self.assembly.get() or self.correction.get() or self.annotation.get() or self.binning.get():
-            sample_name = self.ask_sample_name()
-            self.functional_analysis_runner.check_software_avail()
-        if self.taxonomy_nanopore_wgs.get():
-            self.taxonomy_nanopore_wgs()
-
-        if self.taxonomy_nanopore_16s_bool.get():
-            self.taxonomy_nanopore_16s()
-            self.display_popup_message("Analysis complete. You can start monitoring now.")
-        if self.assembly.get():
-            self.functional_analysis_runner.run_flye(seq_file, sample_name)
-        if self.correction.get():
-            self.functional_analysis_runner.run_racon(seq_file, sample_name)
-            # self.func.run_medaka(seq_file, sample_name) TODO: FIX MEDAKA
-        if self.binning.get():
-            self.functional_analysis_runner.run_binning(sample_name)
-        if self.annotation.get():
-            bins_path = f"{ROOT}/src/resources/{sample_name}/bins/"
-            self.functional_analysis_runner.run_prokka(bins_path)
-        # if only kegg analysis is selected then the user needs to chose the path to the annotations
-        if self.kegg.get() and not self.assembly.get() and not self.correction.get() and not self.binning.get() and not self.annotation.get():
-            # sample_name = self.ask_sample_name()
-            pipeline_out = filedialog.askdirectory(
-                title="Please select the path to the prokka output (folder with tsv files with annotations).")
-            pipeline_out = f"{pipeline_out}/"
-            # pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-            self.kegg_thread1 = Thread(target=self.functional_analysis_runner.create_keggcharter_input(pipeline_out))
-            self.kegg_thread1.start()
-            self.kegg_thread2 = Thread(self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
-            self.kegg_thread2.start()
-            self.display_popup_message("Analysis complete. You can start monitoring now.")
-
-            # if kegg and annotation is chosen then the user only needs to select the sample name, then the tsv files from the results
-            # of the annotations will be used as input for creating keggcharter input and creating kegg maps
-        if self.kegg.get() and self.annotation.get():
-            sample_name = self.ask_sample_name()
-            # pipeline_out = filedialog.askdirectory(title="Please select the path to the prokka output (folder with tsv files with annotations).")
-            pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-            self.kegg_thread1 = Thread(target=self.functional_analysis_runner.create_keggcharter_input(pipeline_out))
-            self.kegg_thread1.start()
-            self.kegg_thread2 = Thread(self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}/keggcharter.tsv"))
-            self.kegg_thread2.start()
 
     def display_popup_message(self, message):
         root = tk.Tk()
@@ -440,3 +555,29 @@ class GUI:
     def open_db_config_form(self):
         db_config_form = DataBaseConfigForm(self.root)
         print(db_config_form.last_config)
+
+
+class ToolTip:
+    def __init__(self, widget, tip_text):
+        self.widget = widget
+        self.tip_text = tip_text
+        self.tip_window = None
+
+    def show_tip(self, event=None):
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        self.tip_window = tk.Toplevel(self.widget)
+        self.tip_window.wm_overrideredirect(True)
+        self.tip_window.wm_geometry(f"+{x}+{y}")
+
+        label = tk.Label(self.tip_window, text=self.tip_text, foreground="black", background="white", relief="solid",
+                         borderwidth=1,
+                         font=("Helvetica", "12", "normal"))
+        label.pack(ipadx=1)
+
+    def hide_tip(self, event=None):
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None

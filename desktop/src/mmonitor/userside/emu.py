@@ -4,7 +4,7 @@ import multiprocessing
 import os
 import subprocess
 
-from build import ROOT
+from build_mmonitor_pyinstaller import ROOT
 
 
 # TODO complete implementation of this class for 16s analysis to work

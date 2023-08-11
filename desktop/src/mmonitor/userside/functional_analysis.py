@@ -9,7 +9,7 @@ from os import path
 import pandas as pd
 import requests
 
-from build import ROOT
+from build_mmonitor_pyinstaller import ROOT
 
 """
 This is a runner for a functional annotation pipeline. As input it takes raw nanopore reads, then assembles them with

@@ -22,7 +22,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from flatten_dict import unflatten
 
-from build import ROOT
+from build_mmonitor_pyinstaller import ROOT
 
 # static global variables
 CIGAR_OPS = [1, 2, 4, 10]

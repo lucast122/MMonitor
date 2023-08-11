@@ -3,10 +3,10 @@ from io import StringIO
 from typing import Tuple, List, Any, Dict
 
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
 import pandas as pd
 import plotly.express as px
 from dash import dash_table
+from dash import dcc
 from dash import html, dash
 from dash.dependencies import Input, Output
 from plotly.graph_objects import Figure
