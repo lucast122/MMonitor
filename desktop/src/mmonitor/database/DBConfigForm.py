@@ -5,7 +5,19 @@ from tkinter import messagebox
 
 from build_mmonitor_pyinstaller import ROOT
 
+"""
+Class DatabaseConfigForm
 
+Window that lets user chose Host, User and Password to authenticate with the mmonitor webserver
+
+Host: Public IP adress of the mmonitor webserver instance (server part of software)
+User: Username on mmonitor webserver (used for registration)
+Password: Password on mmonitor webserver (used for registration)
+
+save_config(): saves the config as a json file under f"{ROOT}/src/resources/db_config.json" 
+
+NOTE: After registration an admin has to unlock account first
+"""
 class DataBaseConfigForm(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master=master)

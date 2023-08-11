@@ -15,7 +15,13 @@ def _explode_metadata(df):
     return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
 
 
-class MMonitorDBInterfaceMySQL:
+"""
+This class gets the path to a db_config file. The db_config is has the host ip 'host', the username 'user' and the password 'password'
+ 
+"""
+
+
+class DjangoDBInterface:
     def __init__(self, db_config: str):
         try:
             with open(db_config, 'r') as file:
@@ -54,6 +60,20 @@ class MMonitorDBInterfaceMySQL:
     def query_to_list(self, query: str) -> List[Tuple[Any]]:
         self.cursor.execute(query)
         return self.cursor.fetchall()
+
+    def add_kaiju_output_to_db(self, sample_name):
+        output_dir = os.path.join("kaiju_output", sample_name)
+
+        for output_file in os.listdir(output_dir):
+            with open(os.path.join(output_dir, output_file), 'r') as f:
+                data = f.readlines()  # Parse the Kaiju output as needed
+
+                # Now, add the parsed data to your DjangoDB.
+                # Assuming the structure of the NanoporeRecords, we'll create records and save them
+                for record_data in data:
+                    record = NanoporeRecords(sample_name=sample_name,
+                                             data=record_data)  # Assuming a structure for NanoporeRecords
+                    record.save()
 
     # def get_abundance_meta_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
     #     q = "SELECT nanopore.sample_id, mmonitor.abundance, metadata.* " \

@@ -1,6 +1,5 @@
 import gzip
 import os
-import sys
 import tarfile
 import urllib.request
 from threading import Thread
@@ -16,19 +15,21 @@ from tkcalendar import Calendar
 
 from build_mmonitor_pyinstaller import ROOT, IMAGES_PATH
 from mmonitor.dashapp.index import Index
+from mmonitor.database.DBConfigForm import DataBaseConfigForm
+from mmonitor.database.django_db_interface import DjangoDBInterface
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
-from mmonitor.database.mmonitor_db_mysql_new import MMonitorDBInterfaceMySQL
-from mmonitor.userside.DBConfigForm import DataBaseConfigForm
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelinePopup import PipelinePopup
 from mmonitor.userside.centrifuge import CentrifugeRunner
 from mmonitor.userside.emu import EmuRunner
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 
-# Some basic variables that might need frequent change
+# Global constants for version and dimensions
 VERSION = "v1.0 beta"
 MAIN_WINDOW_X: int = 350
-MAIN_WINDOW_Y: int = 630
+MAIN_WINDOW_Y: int = 700
+
+# Module description
 
 """
 This file represents the basic gui for the desktop app. It is the entry point for the program and the only way 
@@ -55,11 +56,18 @@ from tkinter import messagebox, ttk
 
 
 class GUI:
+    """
+    Main GUI class for the MMonitor desktop application. It initializes the GUI layout, provides methods for
+    handling user interactions, and interfaces with other components of the application for various tasks.
+    """
+
+    """
+    Initialize the GUI with default settings, prepare the database interfaces, and set up other essential attributes.
+    """
 
     def __init__(self):
-
-        sys.path.append('/Users/timolucas/PycharmProjects/MMonitor/desktop/')
-        self.db_mysql = MMonitorDBInterfaceMySQL(f"{ROOT}/src/resources/db_config.json")
+        self.db_mysql = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
+        self.progress_bar_exists = False
         # self.db_mysql.create_db()
 
         # declare data base class variable, to be chosen by user with choose_project()
@@ -105,10 +113,10 @@ class GUI:
 
         print(ttk.Style().theme_names())
 
-        style.map('TButton',
-                  foreground=[('pressed', 'white'), ('active', 'black')],
-                  background=[('pressed', '!disabled', '#B22222'), ('active', '#B0E0E6')]  # Light blue when active
-                  )
+        # style.map('TButton',
+        #           foreground=[('pressed', 'white'), ('active', 'black')],
+        #           background=[('pressed', '!disabled', '#B22222'), ('active', '#B0E0E6')]  # Light blue when active
+        #           )
 
         # Placeholder icon
         # placeholder_icon = tk.PhotoImage(width=16, height=)
@@ -129,6 +137,7 @@ class GUI:
 
         # Categories and buttons
 
+        # Define the 'categories' list
         categories = [
             ("Local", [
                 ("Create Local DB", self.create_project, create_local_db_icon),
@@ -143,19 +152,28 @@ class GUI:
                 ("Process sequencing files", self.checkbox_popup, run_analysis_pipeline_icon)
             ])
         ]
-
         # Tooltips for the categories
         category_tooltips = {
-            "Local": "Use these function to store everything in a local Database. \n Then after adding data hit 'Start offline monitoring'. ",
-            "Webserver": "Click 'User authentication' to provide your username and password for the webserver. \n After authentication"
-                         " all data you add will be uploaded to the webserver as well. \n Provide same username and password that you used"
-                         " for registration at the MMonitor webpage. Do not change 'host' or 'database'.",
-            "Add Data": "Use this to add data to the local database and the webserver. \n Data can only be added if either"
-                        " local database was chosen first or User Authentication was performed. \n If you did both data will be added to local DB and webserver.\n"
-                        "'Add data from CSV' lets you add a CSV file with metadata. For an example file check out 'meta.csv' in the MMonitor root folder \n"
-                        "'Process sequencing files' opens the analysis selection window. In this window select the analysis you want to perform and then click 'Continue'. For taxonomic analysis select only one please."
-
+            "Local": (
+                "Local Database Options:\n"
+                "- Create a new local database.\n"
+                "- Choose an existing local database.\n"
+                "- Begin offline monitoring.\n"
+            ),
+            "Webserver": (
+                "Webserver Authentication:\n"
+                "- Provide your username and password for the webserver.\n"
+                "- Ensure you use the same credentials as on the MMonitor webpage.\n"
+                "- Do not modify 'host' field (default 134.2.78.150).\n"
+            ),
+            "Add Data": (
+                "Data Addition Options:\n"
+                "- Append metadata using a CSV (e.g., 'meta.csv').\n"
+                "- Process sequencing files for analysis.\n"
+                "- Ensure either a local database is chosen or you're authenticated for data addition.\n"
+            )
         }
+
         # Calculate the maximum button width based on text length
         button_texts = [btn[0] for cat in categories for btn in cat[1]]
         button_texts.append("Quit")  # Adding Quit button text
@@ -163,21 +181,23 @@ class GUI:
         btn_width = max_text_length  # Adding an offset to account for padding and icon
         style = ttk.Style()
 
+        # Styling improvements for buttons
+
+        style.theme_use("clam")
+
+        # Configuring Button Style
         style.configure('TButton',
                         font=("Helvetica", 14),
-                        foreground='black',
-                        bordercolor="black",
-                        background='#FCF6F5',
-                        padding=(3, 3, 3, 3),  # left, top, right, bottom padding
-                        borderwidth=0,
+                        foreground='#404040',  # Dark gray text
+                        background='#FCF6F5',  # Light background
+                        relief="raised",  # Raised effect on button
+                        padding=(10, 10, 10, 10))  # Increased padding for larger button
 
-                        roundedrelief=True)
-
+        # Configuring Label Style
         style.configure('TLabel',
-                        background='#990011',
-                        foreground='white',
-                        font=("Helvetica", 18),
-                        width=btn_width - 5,
+                        background='#A0CFEC',  # A light blue shade for the label
+                        foreground='black',
+                        font=("Helvetica", 20),
                         padding=5,
                         anchor='center')
 
@@ -251,7 +271,7 @@ class GUI:
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
-        top.geometry("400x400")
+        top.geometry("200x200")
         top.title(title)
         ttk.Label(top, text=text, font='Helvetica 18 bold').place(x=150, y=80)
         ttk.Button(top, text="Okay", command=top.destroy).pack()
@@ -296,6 +316,13 @@ class GUI:
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
     def check_emu_db_exists(self):
+        # unzip if tar exists, but not taxonomy.tsv
+        if os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar") and not os.path.exists(
+                f"{ROOT}/src/resources/emu_db/taxonomy.tsv"):
+            self.open_popup("Unzipping tar", "Unzipping emu.tar")
+            self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar", f"{ROOT}/src/resources/emu_db/")
+
+
         if not os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar"):
             response = messagebox.askquestion("Emu database not found.",
                                               "Emu DB not found. Do you want to download it?")
@@ -309,30 +336,75 @@ class GUI:
                     self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help", "Could not find emu db")
 
 
-                
+
     def download_file_from_web(self,filepath,url):
+
         with urllib.request.urlopen(url) as response:
             # get file size from content-length header
             file_size = int(response.info().get("Content-Length"))
             # create progress bar widget
             progress = ttk.Progressbar(self.root, orient="horizontal", length=250, mode="determinate")
             progress.pack()
+            self.progress_bar_exists = True
             progress["maximum"] = file_size
             progress["value"] = 0
 
-            def update_progress(count, block_size, total_size):
-                progress["value"] = count * block_size
-                self.root.update_idletasks()
+            # Start the download in a separate thread
+            download_thread = Thread(target=self._download_file, args=(filepath, url, progress))
+            download_thread.start()
 
-            # download file and update progress bar
-            urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
-            progress.destroy()
+            # Periodically update the GUI
+            self.root.after(100, self._check_download_progress, download_thread, progress)
+
+    def _download_file(self, filepath, url, progress):
+        def update_progress(count, block_size, total_size):
+            self.download_progress = count * block_size
+
+        # Reset progress for a new download
+        self.download_progress = 0
+
+        # Download file and update progress bar
+        urllib.request.urlretrieve(url, filepath, reporthook=update_progress)
+
+        # Once download is complete
+        self.progress_bar_exists = False
+        progress.destroy()
         messagebox.showinfo("Download complete", "Download complete. Unpacking files...")
+
+    def _check_download_progress(self, download_thread, progress):
+        # Update the progress bar with the latest progress value
+
+        if self.progress_bar_exists:
+            progress["value"] = self.download_progress
+            self.root.update_idletasks()
+
+        # If the download thread is still running, keep checking
+        if download_thread.is_alive():
+            self.root.after(100, self._check_download_progress, download_thread, progress)
+
+    #
+    # def handle_kaiju_output(self):
+    #     kaiju_runner = KaijuRunner()
+    #
+    #     # Using SampleInput window to get user input
+    #     sample_input_window = SampleInputWindow()  # Assuming you have a class named SampleInputWindow
+    #     sequence_list, sample_name = sample_input_window.get_user_input()  # Assuming this method returns a list of sequence files and a sample name
+    #
+    #     kaiju_runner.run_kaiju(sequence_list, sample_name)
+    #
+    #     # Now, we'll add the output to the DjangoDB
+    #     db = DjangoDBInterface()
+    #     db.add_kaiju_output_to_db(sample_name)
+    #
+    #
+    #     db = DjangoDBInterface()  # Assuming this class has methods to handle Kaiju output
+    #     db.add_kaiju_output_to_db(sample_name)
+
 
     def check_file_exists(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
             if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
-                response = messagebox.askquestion("Centrifuge index not decompressed",
+                response = messagebox.askquestion("Centrifuge index compressed",
                                                   "Index is compressed. Do you want to decompress it?")
                 if response == "yes":
                     try:
@@ -500,9 +572,9 @@ class ToolTip:
         self.tip_window.wm_overrideredirect(True)
         self.tip_window.wm_geometry(f"+{x}+{y}")
 
-        label = tk.Label(self.tip_window, text=self.tip_text, foreground="black", background="#ffffe0", relief="solid",
+        label = tk.Label(self.tip_window, text=self.tip_text, foreground="black", background="white", relief="solid",
                          borderwidth=1,
-                         font=("Helvetica", "16", "normal"))
+                         font=("Helvetica", "12", "normal"))
         label.pack(ipadx=1)
 
     def hide_tip(self, event=None):

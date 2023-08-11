@@ -1,0 +1,2 @@
+def usersideview():
+    return None

@@ -48,6 +48,13 @@ class PipelinePopup:
         ttk.Button(self.top, text="Continue", width=10, command=self.run_analysis_pipeline).pack(pady=padding_y)
         ttk.Button(self.top, text="Quit", command=self.top.destroy, width=10).pack(pady=padding_y)
 
+    def on_kaiju_selected(self):
+        # Assuming you have a way to get the sample_name, e.g., from a GUI component
+        sample_name = self.get_selected_sample_name()
+
+        self.gui.handle_kaiju_output(sample_name)
+
+
     def run_analysis_pipeline(self):
         # Assuming `self.pipeline_popup` is your instance of `PipelinePopup`
         if self.assembly.get() or self.correction.get():
@@ -59,10 +66,13 @@ class PipelinePopup:
             self.gui.functional_analysis_runner.check_software_avail()
 
         if self.taxonomy_nanopore_wgs.get():
-            self.gui.taxonomy_nanopore_wgs()
+            thread_wgs = Thread(target=self.gui.taxonomy_nanopore_wgs)
+            thread_wgs.start()
+
         if self.taxonomy_nanopore_16s_bool.get():
-            self.gui.taxonomy_nanopore_16s()
-            self.gui.display_popup_message("Analysis complete. You can start monitoring now.")
+            thread_16s = Thread(target=self.gui.taxonomy_nanopore_16s)
+            thread_16s.start()
+        self.gui.display_popup_message("Analysis complete. You can start monitoring now.")
 
         if self.assembly.get():
             self.gui.functional_analysis_runner.run_flye(seq_file, sample_name)
