@@ -20,7 +20,7 @@ class PipelinePopup:
 
         # Create Toplevel popup
         self.top = tk.Toplevel(parent)
-        self.top.geometry("440x300")
+        self.top.geometry("440x350")
         self.top.title("Select analysis steps to perform.")
 
         frame_taxonomy = tk.LabelFrame(self.top, padx=10, pady=2, text="Taxonomic analysis")
@@ -72,7 +72,7 @@ class PipelinePopup:
         if self.taxonomy_nanopore_16s_bool.get():
             thread_16s = Thread(target=self.gui.taxonomy_nanopore_16s)
             thread_16s.start()
-        self.gui.display_popup_message("Analysis complete. You can start monitoring now.")
+
 
         if self.assembly.get():
             self.gui.functional_analysis_runner.run_flye(seq_file, sample_name)
@@ -97,8 +97,6 @@ class PipelinePopup:
             self.kegg_thread2 = Thread(
                 self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
             self.kegg_thread2.start()
-
-            self.gui.display_popup_message("Analysis complete. You can start monitoring now.")
 
         self.top.destroy()
 

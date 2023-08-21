@@ -40,7 +40,7 @@ class EmuRunner:
         sequence_list = [s for s in sequence_list if "concatenated" not in s]
         concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
         if not os.path.exists(concat_file_name):
-            concatenate_fastq_files(sequence_list,concat_file_name)
+            self.concatenate_fastq_files(sequence_list, concat_file_name)
 
         if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0] or ".fastq" in sequence_list[0]\
                 or ".fq" in sequence_list[0]:
@@ -72,9 +72,9 @@ class EmuRunner:
         except FileNotFoundError:
             self.logger.error(f"Invalid folder path")
 
-def concatenate_fastq_files(input_files, output_file):
-    with gzip.open(output_file, 'wt') as output:
-        for input_file in input_files:
-            with gzip.open(input_file, 'rt') as input:
-                for line in input:
-                    output.write(line)
+    def concatenate_fastq_files(self, input_files, output_file):
+        with gzip.open(output_file, 'wt') as output:
+            for input_file in input_files:
+                with gzip.open(input_file, 'rt') as input:
+                    for line in input:
+                        output.write(line)

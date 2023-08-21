@@ -1,15 +1,14 @@
 import os
 import shutil
-import sys
-from os.path import join
+from os.path import join, dirname, realpath
 from subprocess import call
 
-# ROOT = dirname(realpath(__file__))
-if getattr(sys, 'frozen', False):
-    # If it's bundled, adjust the root path to the directory where the executable resides
-    ROOT = sys._MEIPASS
-else:
-    ROOT = os.path.dirname(os.path.realpath(__file__))
+ROOT = dirname(realpath(__file__))
+# if getattr(sys, 'frozen', False):
+#     # If it's bundled, adjust the root path to the directory where the executable resides
+#     ROOT = sys._MEIPASS
+# else:
+#     ROOT = os.path.dirname(os.path.realpath(__file__))
 
 # Base path for images
 IMAGES_PATH = os.path.join(ROOT, "src", "resources", "images")

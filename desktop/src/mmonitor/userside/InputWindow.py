@@ -8,6 +8,9 @@ from tkcalendar import Calendar
 class InputWindow:
     def __init__(self, parent, emu_runner):
         self.selected_date = None
+        self.sample_name = None
+        self.project_name = None
+        self.subproject_name = None
         self.parent = parent
         self.emu_runner = emu_runner
         self.file_paths = []  # Store full paths of selected files
@@ -15,8 +18,8 @@ class InputWindow:
         # Toplevel window
         self.top = tk.Toplevel(parent)
         self.top.title("Sample Data Input")
-        self.top.geometry("500x850")
-        self.top.minsize(500, 850)
+        self.top.geometry("500x920")
+        self.top.minsize(500, 920)
 
         padding_y = 5
         label_width = 30
@@ -80,9 +83,10 @@ class InputWindow:
         self.file_display.config(state=tk.DISABLED)  # Set the Text widget back to read-only mode
 
     def submit(self):
-        sample_name = self.sample_name_entry.get()
-        project_name = self.project_name_entry.get()
-        subproject_name = self.subproject_name_entry.get()
+        self.sample_name = self.sample_name_entry.get()
+        self.project_name = self.project_name_entry.get()
+        self.subproject_name = self.subproject_name_entry.get()
+
         self.top.destroy()
 
     def quit(self):

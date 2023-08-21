@@ -46,7 +46,7 @@ class DjangoDBInterface:
     #         self._cursor = self._connection.cursor()
 
     def get_user_id(self, username: str, password: str):
-        django_url = f"http://{self._db_config['host']}:8011/users/get_user_id/"
+        django_url = f"http://{self._db_config['host']}:8020/users/get_user_id/"
         response = pyrequests.post(django_url, data={'username': username, 'password': password})
         if response.status_code == 200:
             return response.json()['user_id']
@@ -202,7 +202,7 @@ class DjangoDBInterface:
             print(f"Sending record: {record_data}")
             try:
                 response = pyrequests.post(
-                    f"http://{self._db_config['host']}:8011/users/add_nanopore_record/",
+                    f"http://{self._db_config['host']}:8020/users/add_nanopore_record/",
                     json=record_data,
                     auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
                 )

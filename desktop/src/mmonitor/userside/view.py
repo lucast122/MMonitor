@@ -1,7 +1,8 @@
-import gzip
+import hashlib
 import os
 import tarfile
 import urllib.request
+from gzip import open
 from threading import Thread
 from time import sleep
 from tkinter import *
@@ -19,7 +20,7 @@ from mmonitor.database.DBConfigForm import DataBaseConfigForm
 from mmonitor.database.django_db_interface import DjangoDBInterface
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
 from mmonitor.userside.InputWindow import InputWindow
-from mmonitor.userside.PipelinePopup import PipelinePopup
+from mmonitor.userside.PipelineWindow import PipelinePopup
 from mmonitor.userside.centrifuge import CentrifugeRunner
 from mmonitor.userside.emu import EmuRunner
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
@@ -27,7 +28,7 @@ from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 # Global constants for version and dimensions
 VERSION = "v1.0 beta"
 MAIN_WINDOW_X: int = 350
-MAIN_WINDOW_Y: int = 700
+MAIN_WINDOW_Y: int = 750
 
 # Module description
 
@@ -53,6 +54,15 @@ def require_project(func):
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+
+def compute_sha256(file_path):
+    """Compute the sha256 checksum of a file. Used to check if index files like emu_db index have been downloaded correctly"""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        # Read and update hash string value in blocks of 4K
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 
 class GUI:
@@ -329,13 +339,17 @@ class GUI:
             if response == "yes":
                 try:
                     # download emu db from web if it doesn't exist
-                    self.download_file_from_web(f"{ROOT}/src/resources/emu_db/emu.tar","https://software-ab.cs.uni-tuebingen.de/download/MMonitor/emu.tar")
+                    emu_db_path = f"{ROOT}/src/resources/emu_db/emu.tar"
+                    self.download_file_from_web(emu_db_path,
+                                                "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/emu.tar")
+                    computed_checksum = compute_sha256(emu_db_path)
+                    print(f"Checksum of the downloaded file: {computed_checksum}")
+
+
                     self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar",f"{ROOT}/src/resources/emu_db/")
 
                 except FileNotFoundError as e:
                     self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help", "Could not find emu db")
-
-
 
     def download_file_from_web(self,filepath,url):
 
@@ -353,8 +367,10 @@ class GUI:
             download_thread = Thread(target=self._download_file, args=(filepath, url, progress))
             download_thread.start()
 
+
             # Periodically update the GUI
             self.root.after(100, self._check_download_progress, download_thread, progress)
+            download_thread.join()
 
     def _download_file(self, filepath, url, progress):
         def update_progress(count, block_size, total_size):
@@ -452,6 +468,8 @@ class GUI:
         download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
                                                                "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
         download_thread.start()
+        download_thread.join()
+
         self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
         self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
         self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
@@ -487,25 +505,29 @@ class GUI:
         self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
                                              sample_name, project_name, sample_date)
 
+
     def taxonomy_nanopore_16s(self):
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
         win = InputWindow(self.root, self.emu_runner)
         self.root.wait_window(win.top)
         # get entries from input window
-        sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
-        project_name = str(win.project_name_entry)
-        subproject_name = str(win.subproject_name_entry)
+        sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
+        project_name = str(win.project_name)
+        subproject_name = str(win.subproject_name)
         sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
         files = win.file_paths
 
         self.emu_runner.run_emu(files, sample_name)
         emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
-        # self.db.update_table_with_emu_out(emu_out_path,"species",sample_name,"project",self.sample_date)
+        if self.db is not None:
+            self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
         self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
                                                  subproject_name)
+
+        self.display_popup_message("Analysis complete. You can start monitoring now.")
 
 
     def checkbox_popup(self):
