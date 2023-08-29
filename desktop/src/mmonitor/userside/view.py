@@ -46,7 +46,7 @@ def require_project(func):
         if obj.db_path is not None and len(obj.db_path) > 0:
             return func(*args)
         else:
-            obj.open_popup("Please first create or choose a project data base.", "No data base chosen")
+            obj.open_popup("Please first create or choose a local DB.", "No data base chosen")
 
     return func_wrapper
 
@@ -106,12 +106,12 @@ class GUI:
 
         def resize_icon_to_xpx(image_path, x):
             """Utility function to resize the image to 25px while maintaining aspect ratio."""
-            img = Image.open(image_path)
+            icon = Image.open(image_path)
             base_width = x
-            w_percent = base_width / float(img.width)
-            h_size = int(float(img.height) * float(w_percent))
-            img = img.resize((base_width, h_size), Image.ANTIALIAS)
-            return ImageTk.PhotoImage(img)
+            w_percent = base_width / float(icon.width)
+            h_size = int(float(icon.height) * float(w_percent))
+            icon = icon.resize((base_width, h_size), Image.ANTIALIAS)
+            return ImageTk.PhotoImage(icon)
 
         self.root.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
         self.root.title(f"MMonitor {VERSION}")
@@ -121,7 +121,7 @@ class GUI:
         style = ttk.Style()
         style.theme_use("default")  # Switch to the 'clam' theme for better styling flexibility
 
-        print(ttk.Style().theme_names())
+
 
         # style.map('TButton',
         #           foreground=[('pressed', 'white'), ('active', 'black')],
@@ -152,7 +152,7 @@ class GUI:
             ("Local", [
                 ("Create Local DB", self.create_project, create_local_db_icon),
                 ("Choose Local DB", self.choose_project, add_db_icon),
-                ("Start offline monitoring", self.start_monitoring, start_offline_monitoring_icon)
+                ("Start dashboard", self.start_monitoring, start_offline_monitoring_icon)
             ]),
             ("Webserver", [
                 ("User authentication", self.open_db_config_form, user_authentication_icon)
@@ -223,10 +223,11 @@ class GUI:
                 btn.image = img
                 btn.pack(pady=2)
 
-            btn.pack(pady=2)
+
 
         # Quit button
-        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=quit_icon, style="TButton")
+        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=quit_icon, style="TButton",
+                              compound="left")
         quit_btn.image = quit_icon
         quit_btn.pack(pady=15)
 
@@ -238,23 +239,23 @@ class GUI:
         widget.bind("<Enter>", tooltip.show_tip)
         widget.bind("<Leave>", tooltip.hide_tip)
 
-    def ask_create_subproject(self):
-        # Create the root window but don't show it
-        top = tk.Toplevel(self.root)
-        top.geometry("300x300")
-
-        # Ask the user if they want to create a subproject
-        answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
-
-        # If the user selects 'Yes'
-        if answer:
-            subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
-            return subproject_name
-        else:
-            subproject_name = ""
-            return subproject_name
-        top.destroy()
-        top.quit()
+    # def ask_create_subproject(self):
+    #     # Create the root window but don't show it
+    #     top = tk.Toplevel(self.root)
+    #     top.geometry("300x300")
+    #
+    #     # Ask the user if they want to create a subproject
+    #     answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
+    #
+    #     # If the user selects 'Yes'
+    #     if answer:
+    #         subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
+    #         return subproject_name
+    #     else:
+    #         subproject_name = ""
+    #         return subproject_name
+    #     top.destroy()
+    #     top.quit()
 
 
     def open_calendar(self):
@@ -281,10 +282,10 @@ class GUI:
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
-        top.geometry("200x200")
+        top.geometry("300x120")
         top.title(title)
-        ttk.Label(top, text=text, font='Helvetica 18 bold').place(x=150, y=80)
-        ttk.Button(top, text="Okay", command=top.destroy).pack()
+        ttk.Label(top, text=text, font='Helvetica 12').place(x=40, y=10)
+        ttk.Button(top, text="Okay", command=top.destroy).place(x=85, y=50)
 
     def create_project(self):
         filename = filedialog.asksaveasfilename(
@@ -497,7 +498,7 @@ class GUI:
         project_name = str(win.project_name_entry)
         subproject_name = str(win.subproject_name_entry)
         sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
-        files = win.file_paths
+        files = win.file_paths_single_sample
 
         self.centrifuge_runner.run_centrifuge(files, sample_name)
         self.centrifuge_runner.make_kraken_report()
@@ -507,25 +508,54 @@ class GUI:
 
 
     def taxonomy_nanopore_16s(self):
+
+        global sample_name
+
+        def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
+            emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+            if self.db is not None:
+                self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
+
+            self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+                                                     subproject_name)
+
+            self.display_popup_message("Analysis complete. You can start monitoring now.")
+
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
         win = InputWindow(self.root, self.emu_runner)
         self.root.wait_window(win.top)
+        print(win.process_multiple_samples)
         # get entries from input window
-        sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
-        project_name = str(win.project_name)
-        subproject_name = str(win.subproject_name)
-        sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
-        files = win.file_paths
+        if not win.process_multiple_samples:
+            sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
+            project_name = str(win.project_name)
+            subproject_name = str(win.subproject_name)
+            sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+            files = win.file_paths_single_sample
+            self.emu_runner.run_emu(files, sample_name)
+            add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+        else:
+            print("Processing multiple samples")
+            for index, file_path_list in enumerate(win.multi_sample_input["file_paths_lists"]):
+                files = file_path_list
+                sample_name = win.multi_sample_input["sample_names"][index]
+                project_name = win.multi_sample_input["project_names"][index]
+                subproject_name = win.multi_sample_input["subproject_names"][index]
+                sample_date = win.multi_sample_input["dates"][index]
+                self.emu_runner.run_emu(files, sample_name)
 
-        self.emu_runner.run_emu(files, sample_name)
-        emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+
+
+
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
-        if self.db is not None:
-            self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
-        self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
-                                                 subproject_name)
+        # if self.db is not None:
+        #     self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
+        #
+        # self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+        #                                          subproject_name)
 
         self.display_popup_message("Analysis complete. You can start monitoring now.")
 
@@ -603,3 +633,4 @@ class ToolTip:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
+
