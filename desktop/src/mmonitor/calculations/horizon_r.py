@@ -14,7 +14,7 @@ from mmonitor.config import images_path, r_path
 # static paths
 # check config.py for file locations
 _CSV_FILE = join(r_path, 'abundances.csv')
-_IMAGE_FILE = join(images_path, 'horizon.png')
+# _IMAGE_FILE = join(images_path, 'horizon.png')
 _HORIZON_R_SCRIPT = join(r_path, 'horizon.r')
 
 
