@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import tarfile
 import urllib.request
@@ -9,6 +10,7 @@ from tkinter import *
 from tkinter import simpledialog
 from webbrowser import open_new
 
+import numpy as np
 from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
 from requests import post
@@ -19,6 +21,7 @@ from mmonitor.dashapp.index import Index
 from mmonitor.database.DBConfigForm import DataBaseConfigForm
 from mmonitor.database.django_db_interface import DjangoDBInterface
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
+from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
 from mmonitor.userside.centrifuge import CentrifugeRunner
@@ -76,7 +79,8 @@ class GUI:
     """
 
     def __init__(self):
-        self.db_mysql = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
+        self.pipeline_popup = None
+        self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
         self.progress_bar_exists = False
         # self.db_mysql.create_db()
 
@@ -322,7 +326,7 @@ class GUI:
             filetypes=(("csv", "*.csv"), ("all files", "*.*"))
         )
         if csv_file is not None and len(csv_file) > 0:
-            self.db_mysql.append_metadata_from_csv(csv_file)
+            self.django_db.append_metadata_from_csv(csv_file)
 
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
@@ -506,9 +510,41 @@ class GUI:
         self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
                                              sample_name, project_name, sample_date)
 
+    def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date):
+        fastq_stats = FastqStatistics(fastq_file)
+
+        # Calculate statistics
+        fastq_stats.quality_statistics()
+        fastq_stats.read_lengths_statistics()
+        quality_vs_lengths_data = fastq_stats.qualities_vs_lengths()
+
+        data = {
+            'sample_name': sample_name,
+            'project_id': project_name,
+            'subproject_id': subproject_name,
+            'date': sample_date,
+            'mean_gc_content': fastq_stats.gc_content(),
+            'mean_read_length': np.mean(fastq_stats.lengths),
+            'median_read_length': np.median(fastq_stats.lengths),
+            'mean_quality_score': np.mean([np.mean(q) for q in fastq_stats.qualities]),
+            'read_lengths': json.dumps(quality_vs_lengths_data['read_lengths']),
+            'avg_qualities': json.dumps(quality_vs_lengths_data['avg_qualities']),
+            'number_of_reads': fastq_stats.number_of_reads(),
+            'total_bases_sequenced': fastq_stats.total_bases_sequenced(),
+            'q20_score': fastq_stats.q20_q30_scores()[0],
+            'q30_score': fastq_stats.q20_q30_scores()[1],
+            'avg_quality_per_read': fastq_stats.quality_score_distribution()[0],
+            'base_quality_avg': fastq_stats.quality_score_distribution()[1]
+
+        }
+
+        self.django_db.send_sequencing_statistics(data)
+
+
+
+
 
     def taxonomy_nanopore_16s(self):
-
         global sample_name
 
         def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
@@ -516,23 +552,32 @@ class GUI:
             if self.db is not None:
                 self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
-            self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
-                                                     subproject_name)
+            self.django_db.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+                                                      subproject_name)
 
 
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
         win = InputWindow(self.root, self.emu_runner)
         self.root.wait_window(win.top)
-        print(win.process_multiple_samples)
         # get entries from input window
         if not win.process_multiple_samples:
             sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
             project_name = str(win.project_name)
             subproject_name = str(win.subproject_name)
-            sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+            try:
+                sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+            except AttributeError as e:
+                sample_date = datetime.date.today()
+                self.open_popup(f"{e}", f"AttributeError did you forget ot select a date?")
+                print(e)
             files = win.file_paths_single_sample
             self.emu_runner.run_emu(files, sample_name)
+            print("add statistics")
+            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                sample_date)
+
+
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
             print("Processing multiple samples")
@@ -543,6 +588,8 @@ class GUI:
                 subproject_name = win.multi_sample_input["subproject_names"][index]
                 sample_date = win.multi_sample_input["dates"][index]
                 self.emu_runner.run_emu(files, sample_name)
+                self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                    sample_date)
 
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         self.display_popup_message("Analysis complete. You can start monitoring now.")
@@ -559,8 +606,8 @@ class GUI:
 
 
     def checkbox_popup(self):
-        pipeline_popup = PipelinePopup(self.root,
-                                       self)  # Replace run_analysis_pipeline_function with your actual function
+        self.pipeline_popup = PipelinePopup(self.root,
+                                            self)  # Replace run_analysis_pipeline_function with your actual function
 
 
     def ask_sample_name(self):
