@@ -1,3 +1,6 @@
+body {
+    background-color: #808080 !important;   /* A shade of gray */
+}
 # Metagenome Monitor Django Server
 
 ## Set up server:

@@ -20,7 +20,7 @@ class Horizon():
         # super().__init__(sql)
         # self.app = dash.Dash(__name__)
         q = 'SELECT sample_id, taxonomy, abundance FROM mmonitor'
-        # self.df = self._sql.query_to_dataframe(q)
+
         self._init_layout()
         self._init_callbacks()
 
@@ -50,7 +50,7 @@ class Horizon():
         )
         def update_graph_live(n):
             q = 'SELECT sample_id, taxonomy, abundance FROM mmonitor'
-            self.df = self._sql.query_to_dataframe(q)
+            self.df = self._sql.query_to_dataframe(q,self._engine)
 
             fig = make_subplots(rows=1, cols=1)
 

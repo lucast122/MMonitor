@@ -2,6 +2,8 @@ from django.urls import path
 from django.conf import settings
 
 # from .dashapp import kraken, taxonomy, correlations
+# .dashapp.urls import path
+
 
 from . import views
 from .dashapp.database.mmonitor_db_mysql import MMonitorDBInterfaceMySQL
@@ -12,7 +14,7 @@ from .dashapp.taxonomy import Taxonomy
 
 
 # db = MMonitorDBInterfaceMySQL
-index_app = Index()
+# index_app = Index()
 # Kraken()
 # Taxonomy(db)
 
@@ -21,7 +23,8 @@ index_app = Index()
 app_name = 'dashboard'
 
 urlpatterns = [
-    path('', views.load_app, {'name': 'Index'}, name='index')
+    path('', views.load_app, {'name': 'Index'}, name='index'),
+    path('get_user_id/', views.get_user_id, name='get_user_id')
     # path('kraken/', views.load_app, {'name': 'kraken'}, name='kraken'),
     # path('taxonomy/', views.load_app, {'name': 'taxonomy'}, name='taxonomy')
     # path('correlations/', views.load_app, {'name': 'correlations'}, name='correlations'),
@@ -29,3 +32,5 @@ urlpatterns = [
     # path('kegg/', views.load_app, {'name': 'kegg'}, name='kegg'),
     # path('genome_browser/', views.load_app, {'name': 'genome_browser'}, name='genome_browser'),
 ]
+
+
