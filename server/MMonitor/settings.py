@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-9v8c1b(!um4d75#+1gmrg$qunrmtmxk7g7&u)5od-^8vhpk5&^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS=["134.2.78.150","minion.sna94.uni-tuebingen.de"]
+ALLOWED_HOSTS=["134.2.78.150","minion.sna94.uni-tuebingen.de","46.5.254.177", "mmonitor.de:8011", "mmonitor","mmonitor.de"]
 
 
 # Application definition
@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'bootstrap5'
+    'bootstrap5',
+    'django_bootstrap5'
 ]
 
 MIDDLEWARE = [
@@ -108,6 +109,7 @@ STATICFILES_FINDERS = [
 ]
 
 ROOT_URLCONF = 'MMonitor.urls'
+DASH_APP_URL = 'http://134.2.78.150:8020/dash/'
 
 TEMPLATES = [
     {
@@ -133,7 +135,7 @@ WSGI_APPLICATION = 'MMonitor.wsgi.application'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 
-
+SECURE_SSL_REDIRECT = False
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
 
@@ -168,7 +170,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
-STATIC_URL = 'dash/static/'
+STATIC_URL = 'static/'
 
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
@@ -225,3 +227,5 @@ LOGGING = {
         'level': 'DEBUG',
     },
 }
+
+DATABASE_ROUTERS = ['MMonitor.routers.AppDataRouter']

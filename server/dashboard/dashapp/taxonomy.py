@@ -1,56 +1,68 @@
 from typing import Tuple, List, Any, Dict
-
+from sqlalchemy import create_engine
 import base64
 from io import StringIO
 import pandas as pd
 from django_plotly_dash import DjangoDash
-
+from sqlalchemy import create_engine
+from django.conf import settings
 import plotly.express as px
 import dash_core_components as dcc
 from dash import html
 from dash.dependencies import Input, Output
 from plotly.graph_objects import Figure
+from dash.dependencies import Input, Output, State
+import io
+import tempfile
+
+import sqlite3
+import pandas as pd
+import base64
+
 from dash import dash_table
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dash import callback_context
 from django.db import connections
-
-
+from django.conf import settings
+from users.models import NanoporeRecord
 class Taxonomy:
     """
     App to display the abundances of taxonomies in various formats.
     """
 
-    def __init__(self):
-        
-        self.app = DjangoDash('taxonomy')
-        
-        
+    def get_data(self):
+        records = NanoporeRecord.objects.filter(user_id=self.user_id)
+        self.records = records
+        if not records.exists():
+            return pd.DataFrame()  # Return an empty DataFrame if no records are found
+        return pd.DataFrame.from_records(records.values())
+    def __init__(self,user_id):
+        self.records = None
+        self.user_id = user_id
+        self.app = DjangoDash('taxonomy', add_bootstrap_links=True)
+        # self._init_mysql()
+        self.unique_sample_ids = None
+        self.unique_samples = None
+        self.unique_counts = None
+        # Convert the QuerySet to a DataFrame
+        self.df = self.get_data()
+        if not self.df.empty:
+            self.unique_sample_ids = self.records.values('sample_id').distinct()
+            # Convert QuerySet to a list
+            self.unique_sample_ids = [item['sample_id'] for item in self.unique_sample_ids]
+            self.unique_samples = NanoporeRecord.objects.values('sample_id').distinct()
+            # print(f"Unique samples{self.unique_samples}")
 
-        with connections['mmonitor'].cursor() as cursor:
-
-            raw_connection = cursor.db
-            conn = cursor.db.connection
-            self.unique_sample_ids = pd.read_sql_query("SELECT DISTINCT sample_id FROM nanopore",conn)["sample_id"].tolist()
-            print(f"Unique sample ids{self.unique_sample_ids}")
-
-            # Define your query
-            q = "SELECT * FROM nanopore"
-
-            # Use pandas to execute the query and store the result in a DataFrame
-            self.df = pd.read_sql_query(q, conn)
-            self.unique_samples = pd.read_sql_query("SELECT DISTINCT sample_id FROM nanopore",conn)
-            print(f"Unique samples{self.unique_samples}")
 
 
-        
-        
-        self.df_sorted = self.df.sort_values(by=["sample_id", "abundance"], ascending=[True, False])
 
-        # Get the number of unique values in each column
-        # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
-        self.unique_counts = min(self.df.nunique()[1], 100)
+            self.df_sorted = self.df.sort_values(by=["sample_id", "abundance"], ascending=[True, False])
+
+
+            # Get the number of unique values in each column
+            # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
+            self.unique_counts = min(self.df.nunique()[1], 500)
 
         self._init_layout()
         self._init_callbacks()
@@ -64,128 +76,178 @@ class Taxonomy:
         """
         selected_taxa = html.Div(id='selected-data')
 
-
-        header = dbc.Row(
-        dbc.Col(html.H1(children='Taxonomic composition'), width={'size': 12, 'offset': 0}),
-        justify="center",
-            )
-
-        
-
-        sample_select_dropdown= dbc.Col(
-        dcc.Dropdown(
-            id='sample_select_value',
-            options=[{'label': i, 'value': i} for i in self.unique_sample_ids],
-            multi=True  # allow multiple selections
-        ),
-        width={"size": 8, "offset": 0}
+        # Inside your layout
+        upload_component = dcc.Upload(
+            id='upload-sqlite',
+            children=html.Button('Upload SQLite File'),
+            multiple=False  # Allow single file upload
         )
-        
 
-        sample_select_dropdown_text = dbc.Row([
+        dropdown_container = dbc.Container([
+    dbc.Row([
         dbc.Col(
-        dbc.Label("Samples to plot:",html_for='sample_select_value',id='sample_select_text'),
-        width={"size": 1, "offset": 0}
-        )])
-
-
-
-
-        # dropdown menu to select chart type
-        # initialize as stacked bar chart
-        demo_dd = dbc.Row([
-        dbc.Col(
-        dbc.Label("Plot type:",html_for='dropdown'),
-        width={"size": 1, "offset": 0}
-            ),
-        dbc.Col(
-        dcc.Dropdown(
-            id='dropdown',
-            options=[
-                {'label': 'Stacked Barchart', 'value': 'stackedbar'},
-                {'label': 'Grouped Barchart', 'value': 'groupedbar'},
-                {'label': 'Area plot', 'value': 'area'},
-                {'label': 'Pie chart', 'value': 'pie'},
-                {'label': 'Scatter plot', 'value': 'scatter'},
-                {'label': 'Scatter 3D', 'value': 'scatter3d'},
-                {'label': 'Horizon plot', 'value': 'horizon'}],
-            value='stackedbar'
+            [
+                dbc.Label("Samples to plot:", html_for='sample_select_value', id='sample_select_text'),
+                dcc.Dropdown(
+                    id='sample_select_value',
+                    options=[{'label': i, 'value': i} for i in self.unique_sample_ids] if self.unique_sample_ids else [
+                        {'label': 'Default', 'value': 'Default'}],
+                    multi=True,
+                    style={'width': '90%'},
+                    value=self.unique_sample_ids
                 ),
-                width={"size": 3, "offset": 0}
-            ),
-        ], justify="start")
+            ],
+            width=6
+        ),
+        dbc.Col(
+            [
+                dbc.Label("Plot type:", html_for='dropdown'),
+                dcc.Dropdown(
+                    id='dropdown',
+                    options=[
+                        {'label': 'Stacked Barchart', 'value': 'stackedbar'},
+                        {'label': 'Grouped Barchart', 'value': 'groupedbar'},
+                        {'label': 'Area plot', 'value': 'area'},
+                        {'label': 'Pie chart', 'value': 'pie'},
+                        {'label': 'Scatter plot', 'value': 'scatter'},
+                        {'label': 'Scatter 3D', 'value': 'scatter3d'},
+                        {'label': 'Horizon plot', 'value': 'horizon'}
+                    ],
+                    value='stackedbar',
+                    style={'width': '90%'}
+                ),
+                dbc.Checklist(id='use_date_value',
+                options=[{'label':'Use Date for plotting','value': True}],
+                value=[],
+                inline=True)
 
 
-        group_select = html.Div([
+
+
+            ],
+            width=6
+        ),
+    ])
+], fluid=True)
+
+
+
+
+
+        group_select = dbc.Row( dbc.Col(html.Div([
+        dbc.Row(
         dcc.Checklist(
             id='enable-group-selection',
             options=[{'label': 'Enable Group Selection', 'value': 'enabled'}],
             value=[]
-        ),
-        dcc.Input(
+        ),style={'padding':'20px'}),
+        dbc.Input(
             id='group-name-input',
             type='text',
             placeholder='Enter group name',
             style={'display': 'none'}
-        ),
-        html.Button(
+        ),dbc.Col(
+        dbc.Button(
             'Create Group',
             id='create-group-button',
-            style={'display': 'none'}
-        ),
+            style={'display': 'none'})
+        ,style={'padding':'5px'}),
         dcc.Dropdown(
             id='group-selection-dropdown',
             placeholder='Select a group',
             style={'display': 'none'}
         ),
         dcc.Store(id='group-storage', storage_type='local')
-        ])
+        ])),style={'padding':'10px'})
+
+        graph_container = html.Div(
+    [
+        # graph elements
+        html.Div(
+            [
+                dcc.Graph(
+                    id='graph1',
+                    figure={
+                        'data': [],  # Replace with your data
+                        'layout': {
+                            'clickmode': 'event+select',
+                            'dragmode':'lasso',
+                            # Add the rest of your layout properties here...
+                        }
+                    },
+                    style={"border":"2px solid black"}  # Add a border here
+                ),
+                html.Div(
+                    dcc.Markdown("**Figure 1**: Abundance of each sample"),
+                    style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
+                )
+            ], style={'width': '100%', "padding":"5px"}
+        ),
+
+        # html.Div(
+        #     [
+        #         dcc.Graph(
+        #             id='graph2',
+        #             figure={
+        #                 'data': []  # Replace with your data
+        #             },
+        #             style={"border":"2px solid black"}  # Add a border here
+        #         ),
+        #         html.Div(
+        #             dcc.Markdown("**Figure 2**: Abundance of each species"),
+        #             style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
+        #         ,id='markdown-caption')
+        #     ], style={'width': '0%', "padding":"5px"}
+        # ),
+    ],
+    style={'display': 'flex'}
+)
 
 
 
 
-            # graph elements
-        graph1 = dcc.Graph(id='graph1',  figure={
-        'data': [],  # Replace with your data
-        'layout': {
-            'clickmode': 'event+select',
-            # Add the rest of your layout properties here...
-        }}
-            )
-        graph2 = dcc.Graph(id='graph2', figure={'data': []})
+
+
+        graph3 = dcc.Graph(
+            id='graph3',
+            figure={
+                'data': []  # Replace with your data
+            },
+            style={'width': '50%'}
+        )
+        
 
         header_pie_chart_sample_select_dbc = dbc.Row(
-            dbc.Col(html.H1(children='Select a sample to display.'), width={'size': 10, 'offset': 0}),justify="center",style = {'display': 'none'},id='header_pie_chart_sample_select_dbc')
+            dbc.Col(dbc.Label(children='Select a sample to display.'), width={'size': 10, 'offset': 0}),justify="center",style = {'display': 'none'},id='header_pie_chart_sample_select_dbc')
 
         slider_header = dbc.Row(
-            dbc.Col(        html.H1(children='Select the number of taxa to display:'), width={'size': 12, 'offset': 0}),justify="start")
+            dbc.Col(dbc.Label(children='Number of taxa to display:'), width={'size': 12, 'offset': 0}),justify="start")
 
-
+        unique_counts_value = self.unique_counts if self.unique_counts else 10
         slider = html.Div([
-    dbc.Row(
-        dbc.Col(
-            dcc.Slider(
-                id='slider',
-                min=1,
-                max=self.unique_counts,
-                value=10,
-                marks={
-                    i: str(i) if i in [1, self.unique_counts // 2, self.unique_counts] else "" 
-                    for i in range(1, self.unique_counts + 1)
-                },
-                step=1
-            ), 
-            width={'size': 10, 'offset': 0}
-        ),
-        justify='start'
-    ),
-      
-])
+            dbc.Row(
+                dbc.Col(
+                    dcc.Slider(
+                        id='slider',
+                        min=1,
 
-
+                        max=unique_counts_value,
+                        value=10,
+                        marks={
+                            i: str(i) if i in [1, unique_counts_value // 2, unique_counts_value] else ""
+                            for i in range(1, unique_counts_value + 1)
+                        },
+                        step=1
+                    ), 
+                    width={'size': 4, 'offset': 0}  # centering the slider by offsetting it 3 units
+                ),
+                justify='start'
+            ),
+        ])
+        unique_samples_value = self.unique_samples if self.unique_samples else ['Default Sample']
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
-            options=[{'label': t, 'value': t} for t in self.unique_samples],
+            options=[{'label': t, 'value': t} for t in unique_samples_value],
             
             style={'display': 'none'},
             clearable=False,
@@ -195,22 +257,23 @@ class Taxonomy:
 
         db_header = dbc.Row(dbc.Col(html.H4(children="Database"), width={'size': 12, 'offset': 0}),justify="center")
         data, columns = self._generate_table_data_cols()
+
         data_tb = dbc.Row(dbc.Col(dash_table.DataTable(id='table-correlations', data=data, columns=columns), width={'size': 12, 'offset': 0}),justify="center")
 
-        download_button = dbc.Button("Download CSV", id="btn-download")
+        download_button = dbc.Row(dbc.Button("Download CSV", id="btn-download"))
         download_component = dcc.Download(id="download-csv")
 
 
         container = dbc.Container(
-    [   selected_taxa,
-        header, 
-        sample_select_dropdown_text,
-        sample_select_dropdown,
-        demo_dd, group_select, 
-        graph1,
-        graph2,
-        slider_header, 
-        slider, 
+
+    [
+        dropdown_container,
+        graph_container,
+
+          # new definition including both dropdowns
+        group_select #,upload_component,
+        ,slider_header,
+        slider,  # new definition with smaller width
         header_pie_chart_sample_select_dbc, 
         pie_chart_input,
         db_header,
@@ -218,8 +281,16 @@ class Taxonomy:
         download_component, 
         data_tb
     ], 
-    fluid=True
+    fluid=True,style={'backgroundColor':'#F5F5F5'}
 )
+
+
+
+
+
+
+
+
 
         self.app.layout = container
 
@@ -234,19 +305,8 @@ class Taxonomy:
         Returns:
         Tuple[List[Any], List[Any]]: A tuple containing the data for the table in dict format and a collection of mapped column names.
         """
-        with connections['mmonitor'].cursor() as cursor:
-
-            raw_connection = cursor.db
-            conn = cursor.db.connection
-            
-        
-
-            # Use pandas to execute the query and store the result in a DataFrame
-            q = f"SELECT * FROM nanopore LIMIT {max_rows}"
-            self.df = self.df = pd.read_sql_query(q, conn)
-            print(self.df)
-        
-                
+        # q = f"SELECT * FROM nanopore LIMIT {max_rows}"
+        # self.df = self.df = pd.read_sql_query(q, self._engine)
         return self.df.to_dict('records'), [{'name': i, 'id': i} for i in self.df.columns]
 
     # def plot_stacked_bar(self, df):w 
@@ -273,27 +333,28 @@ class Taxonomy:
     def plot_grouped_bar(self, df):
         # Plotting code for grouped bar goes here...
         fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="group")
-        fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="group")
 
-        return fig1, fig2
+
+        return fig1
 
     def plot_scatter(self, df):
         fig1 = px.scatter(df, x="sample_id", y="abundance", size="abundance", color="sample_id")
         fig2 = px.scatter(df, x="taxonomy", y="sample_id", size="abundance", color="sample_id")
         fig2_style = {'display': 'none'}
-        return fig1,fig2,fig2_style
+
+        return fig1
 
     def plot_area(self, df):
         # Plotting code for area plot goes here...
         fig1 = px.area(df, x="sample_id", y="abundance", color="taxonomy", line_group="taxonomy")
-        fig2_style = {'display': 'none'}
-        return fig1,fig2_style
+
+        return fig1
 
     def plot_scatter_3d(self, df):
         # Plotting code for scatter 3D goes here...
         fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy')
-        fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='abundance')
-        return fig1, fig2
+
+        return fig1
 
     def plot_pie(self, df,sample_value_piechart):
         # Plotting code for pie chart goes here...
@@ -304,7 +365,7 @@ class Taxonomy:
         piechart_style = {'display': 'block'}
         
         fig2_style = {'display': 'none'}
-        return fig1, piechart_style, fig2_style
+        return fig1, piechart_style
 
     def _init_callbacks(self) -> None:
         """
@@ -324,6 +385,7 @@ class Taxonomy:
             Output('number_input_piechart', 'style'),
             # hides 2nd plot for pie chart
             Output('graph2', 'style'),
+            Output('markdown-caption','style'),
             Input('dropdown', 'value'),
             Input('number_input_piechart', 'value'),
             Input('slider', 'value'),
@@ -356,7 +418,8 @@ class Taxonomy:
             fig2 = {'data': []}
             piechart_style = {'display': 'none'}
 
-            fig2_style = {'display': 'block'}
+            fig2_style = {'display': 'block',
+                        'border':'2px solid black'}
             # request necessary data from database
             # q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
             # df = self._sql.query_to_dataframe(q)
@@ -375,10 +438,10 @@ class Taxonomy:
 
 
             if value == 'stackedbar':
-                fig1, fig2 = self.plot_stacked_bar(self.df_selected)
+                fig1 = self.plot_stacked_bar(self.df_selected)
 
             elif value == 'groupedbar':
-                fig1, fig2 = self.plot_grouped_bar(self.df_selected)
+                fig1 = self.plot_grouped_bar(self.df_selected)
 
             elif value == 'scatter':
                 fig1,fig2,fig2_style = self.plot_scatter(self.df_selected)
@@ -392,7 +455,8 @@ class Taxonomy:
             elif value == "pie":
                 fig1, piechart_style, fig2_style = self.plot_pie(self.result_df,sample_value_piechart)
 
-            return fig1, fig2, piechart_style, fig2_style
+            return fig1, fig2, piechart_style, fig2_style,fig2_style
+            #fig2_style,fig2_style 2nd fi2_style used for hiding markdown caption
 
 
         # Add a new callback that updates the header's style based on the dropdown's value
@@ -437,5 +501,17 @@ class Taxonomy:
 
                 # Return the download link and filename
                 return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
+
+    def _init_mysql(self):
+        self.app = DjangoDash('taxonomy', add_bootstrap_links=True)
+        conn_settings = settings.DATABASES['mmonitor']
+        dialect = 'mysql'
+        user = conn_settings['USER']
+        password = conn_settings['PASSWORD']
+        host = conn_settings['HOST']
+        port = conn_settings['PORT']
+        db_name = conn_settings['NAME']
+        db_url = f'{dialect}://{user}:{password}@{host}:{port}/{db_name}'
+        self._engine = create_engine(db_url)
 
 

@@ -1,8 +1,9 @@
 from typing import Tuple, Any, List, Iterable, Dict, Union
-
 from django_plotly_dash import DjangoDash
-
+import dash_bootstrap_components as dbc
 import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -15,6 +16,8 @@ from plotly.graph_objects import Figure
 from django.db import connections
 from .calculations.stats import scipy_correlation
 from json import loads, dumps
+
+
 def _explode_metadata(df):
     return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
 
@@ -44,8 +47,8 @@ class Correlations:
 
 
     def __init__(self):
-        self.app = DjangoDash('correlations')
-        # self._db = db
+        self.app = DjangoDash('correlations',add_bootstrap_links=True)
+
 
         with connections['mmonitor'].cursor() as cursor:
 
@@ -89,7 +92,7 @@ class Correlations:
         taxonomy_dd = dcc.Dropdown(
             id='taxonomy-dd',
             options=[{'label': t, 'value': t} for t in self._taxonomies],
-            value=self._taxonomies[0],
+            value=self._taxonomies,
             style={'flex-grow': '1'},
             clearable=False,
         )
@@ -113,8 +116,70 @@ class Correlations:
         )
 
         # graphs
-        graph_score = dcc.Graph(id='graph-score', figure={'data': []})
-        graph_test = dcc.Graph(id='graph-test', figure={'data': []})
+
+        graph_container = html.Div(
+            [
+                # First row with two graphs
+                html.Div(
+                    [
+                        # Score graph
+                        html.Div(
+                            [
+                                dcc.Graph(
+                                    id='graph-score',
+                                    figure={
+                                        'data': [],  # Replace with your data
+                                        'layout': {
+                                            'clickmode': 'event+select',
+                                            # Add the rest of your layout properties here...
+                                        }
+                                    },
+                                    style={"border": "2px solid black"}  # Add a border here
+                                ),
+                                html.Div(
+                                    dcc.Markdown("**Figure 1**: Correlation score of the selected taxon"),
+                                    style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
+                                )
+                            ], style={'width': '50%', "padding": "5px"}
+                        ),
+
+                        # Test graph
+                        html.Div(
+                            [
+                                dcc.Graph(
+                                    id='graph-test',
+                                    figure={
+                                        'data': []  # Replace with your data
+                                    },
+                                    style={"border": "2px solid black"}  # Add a border here
+                                ),
+                                html.Div(
+                                    dcc.Markdown("**Figure 2**: P-value of the test scores of the selected taxon"),
+                                    style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
+                                )
+                            ], style={'width': '50%', "padding": "5px"}
+                        ),
+                    ],
+                    style={'display': 'flex'}
+                ),
+
+                # Heatmap graph with padding and margin like the other plots
+                html.Div(
+                    [
+                        dcc.Graph(
+                            id='heatmap-graph',
+                            figure={'data': []},  # Replace with your heatmap data
+                            style={"border": "2px solid black"}
+                        ),
+                        html.Div(
+                            dcc.Markdown("**Figure 3**: Heatmap showing the selected correlation method of all taxa"),
+                            style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
+                        )
+                    ],
+                    style={"padding": "5px"}
+                )
+            ]
+        )
 
         # data table dropdown menus in a flexbox
         header_tb = html.H2('Select correlation data and export')
@@ -148,22 +213,22 @@ class Correlations:
         )
 
         # table interaction buttons in flexbox
-        apply_btn_tb = html.Button(
+        apply_btn_tb = dbc.Button(
             'Apply',
             id='apply-btn-tb',
             style={'margin': '5px'}
         )
-        select_all_btn_tb = html.Button(
+        select_all_btn_tb = dbc.Button(
             'Select All',
             id='select-all-btn-tb',
             style={'margin': '5px'}
         )
-        clear_selection_btn_tb = html.Button(
+        clear_selection_btn_tb = dbc.Button(
             'Clear Selection',
             id='clear-selection-btn-tb',
             style={'margin': '5px'}
         )
-        export_btn_tb = html.Button(
+        export_btn_tb = dbc.Button(
             'Export',
             id='export-btn-tb',
             style={'margin': '5px'}
@@ -178,9 +243,9 @@ class Correlations:
         download_tb = dcc.Download(id='download-tb')
 
         container = html.Div(
-            [header, dropdowns, graph_score, graph_test, header_tb, dropdowns_tb,
+            [header, dropdowns, graph_container, header_tb, dropdowns_tb,
              selections_tb, correlations_tb, download_tb],
-            style={'margin-bottom': '200px'}
+            style={'margin-bottom': '200px','backgroundColor':'#F5F5F5'}
         )
         self.app.layout = container
 
@@ -282,7 +347,7 @@ class Correlations:
                 raise PreventUpdate
 
             # request data from database and filter for metadata columns
-            meta_df = self._db.get_all_meta()
+            meta_df = self.get_all_meta()
             meta_cols = [meta for meta in meta_df.columns if meta not in ['sample_id', 'meta_id', 'project_id']]
 
             # prepare the resulting dataframe/table
@@ -342,7 +407,10 @@ class Correlations:
                 raise PreventUpdate
             return dict(content=self._table_df.to_csv(index=False), filename='correlations.csv')
 
-    
+
+
+
+
 
 
 

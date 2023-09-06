@@ -1,9 +1,68 @@
 {%  extends "base.html" %}
 
+<li>A web-based dashboard (django-dash) for result visualization.</li>
 {% block content %}
 
-<p>
-    This is the homepage.
-</p>
+
+    <h1 id="mmonitor-user-guide">MMonitor User Guide</h1>
+
+<!-- Highlighted download link section -->
+<div style="background-color: #f7f7f9; padding: 10px 0; text-align: center; margin-bottom: 20px; border-radius: 5px;">
+    <h2>Download MMonitor v1.0-beta</h2>
+    <a href="https://software-ab.cs.uni-tuebingen.de/download/MMonitor/mmonitor_v1.0-b.zip" target="_blank" style="font-size: 20px; color: #007bff; text-decoration: underline;">Get the Latest Release for MacOS</a>
+</div>
+
+
+
+<h1 id="mmonitor-user-guide">MMonitor User Guide</h1>
+<h2 id="introduction-">Introduction:</h2>
+<p>MMonitor is a comprehensive metagenome monitoring software designed to process, visualize, and analyze nanopore sequencing data. The software consists of two main components: </p>
+<ol>
+<li>A desktop application with a graphical user interface (GUI) for data selection, pipeline execution, and database management.</li>
+<li>A web-based dashboard (django-dash) for result visualization.</li>
+</ol>
+<h2 id="getting-started-">Getting Started:</h2>
+<h3 id="launching-the-application-">Launching the Application:</h3>
+<ul>
+<li>Navigate to the MMonitor root directory and run the <code>__main__.py</code> file.</li>
+<li>The main GUI window will appear, offering several functionalities.</li>
+</ul>
+<h3 id="local-database-management-">Local Database Management:</h3>
+<ul>
+<li><strong>Create Local DB</strong>: Set up a new local database for your project.</li>
+<li><strong>Choose Local DB</strong>: Select an existing local database.</li>
+<li><strong>Start Offline Monitoring</strong>: Begin the offline monitoring process.</li>
+</ul>
+<h3 id="webserver-authentication-">Webserver Authentication:</h3>
+<ul>
+<li>Click on the <code>User Authentication</code> button.</li>
+<li>Provide your username and password registered on the MMonitor webpage.</li>
+<li>Ensure the 'host' and 'database' fields remain unchanged.</li>
+</ul>
+<h3 id="data-addition-">Data Addition:</h3>
+<ul>
+<li><strong>Add Metadata from CSV</strong>: Append metadata by uploading a CSV file. A sample file, 'meta.csv', is available in the root directory for reference.</li>
+<li><strong>Process Sequencing Files</strong>: Process and analyze your sequencing files. Select the desired analysis type and proceed.</li>
+</ul>
+<h2 id="web-dashboard-">Web Dashboard:</h2>
+<ul>
+<li>Access the MMonitor web dashboard through your web browser.</li>
+<li>The dashboard provides various visualization options:
+<ul>
+<li><strong>Taxonomy</strong>: View the taxonomic profile of your samples.</li>
+<li><strong>Correlations</strong>: Analyze correlations between taxonomies and metadata.</li>
+<li>Other visualizations, including horizon plots, statistics, etc.</li>
+</ul>
+</li>
+</ul>
+<h3 id="tooltips-">Tooltips:</h3>
+<p>Hover over interface elements to view tooltips, which provide additional context and instructions for each function.</p>
+<h3 id="closing-the-application-">Closing the Application:</h3>
+<p>Click on the <code>Quit</code> button to safely close the application.</p>
+<hr>
+<p><strong>Note</strong>: Always ensure your data is backed up before starting any analysis. MMonitor is a powerful tool, but as with all software, understanding its functions and regularly saving your work will help ensure the best experience.</p>
+
+<!-- Added GitHub and latest release links -->
+<p>For more details and updates, visit the MMonitor repository on <a href="https://www.github.com/lucast122/mmonitor/" target="_blank">GitHub</a> or check out the <a href="#latest-release-placeholder" target="_blank">latest release</a>.</p>
 
 {% endblock content %}
