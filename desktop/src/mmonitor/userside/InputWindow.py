@@ -60,12 +60,12 @@ class InputWindow:
         # Toplevel window
         self.top = tk.Toplevel(parent)
         self.top.title("Sample Data Input")
-        self.top.geometry("500x920")
-        self.top.minsize(500, 920)
+        self.top.geometry("500x800")
+        self.top.minsize(500, 800)
         self.process_multiple_samples = False
 
-        padding_y = 5
-        label_width = 30
+        padding_y = 2
+        label_width = 25
         ttk.Label(self.top, text="Sample Name", font='Helvetica 10 bold').pack(pady=padding_y)
         self.sample_name_entry = ttk.Entry(self.top, width=label_width)
         self.sample_name_entry.pack(pady=padding_y)
@@ -85,16 +85,16 @@ class InputWindow:
         self.date_btn.pack(pady=padding_y)
 
         ttk.Label(self.top, text="Files", font='Helvetica 10 bold').pack(pady=padding_y)
-        self.file_display = tk.Text(self.top, width=500, height=30, wrap="word",
+        self.file_display = tk.Text(self.top, width=400, height=15, wrap="word",
                                     state=tk.DISABLED)  # Adjusted size and made read-only
         self.file_display.pack(pady=padding_y)
 
         self.use_multiplexing = tk.BooleanVar(value=False)  # BooleanVar to store the checkbox value
-        self.multiplexing_checkbox = ttk.Checkbutton(self.top, text="Use Multiplexing", variable=self.use_multiplexing)
-        self.multiplexing_checkbox.pack(pady=padding_y)
 
         ttk.Button(self.top, text="Add one sample", command=self.add_data_single_sample).pack(pady=padding_y)
         ttk.Button(self.top, text="Add multiples samples from CSV", command=self.load_from_csv).pack(pady=padding_y)
+        self.multiplexing_checkbox = ttk.Checkbutton(self.top, text="Use Multiplexing", variable=self.use_multiplexing)
+        self.multiplexing_checkbox.pack(pady=padding_y)
 
         ttk.Button(self.top, text="Submit", command=self.submit).pack(pady=padding_y)
         ttk.Button(self.top, text="Quit", command=self.quit).pack(pady=padding_y)
@@ -162,21 +162,21 @@ class InputWindow:
 
             for row in reader:
                 # Check if provided path exists
-                if not os.path.exists(row["sample folder"]):
-                    error_message = f"Invalid path from CSV: {row['sample folder']}"
+                if not os.path.exists(row["sample folder"].strip()):
+                    error_message = f"Invalid path from CSV: {row['sample folder'].strip()}"
                     print(error_message)
                     error_messages.append(error_message)
                     continue
 
                 # Look for the fastq_pass folder in the provided path and its child directories
                 folder_path = None
-                for root, dirs, files in os.walk(row["sample folder"]):
+                for root, dirs, files in os.walk(row["sample folder"].strip()):
                     if "fastq_pass" in dirs:
                         folder_path = os.path.join(root, "fastq_pass")
                         break
 
                 if not folder_path:
-                    error_message = f"'fastq_pass' directory not found for path: {row['sample folder']}"
+                    error_message = f"'fastq_pass' directory not found for path: {row['sample folder'].strip()}"
                     print(error_message)
                     error_messages.append(error_message)
                     continue

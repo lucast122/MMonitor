@@ -519,7 +519,6 @@ class GUI:
             self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
                                                      subproject_name)
 
-            self.display_popup_message("Analysis complete. You can start monitoring now.")
 
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
@@ -546,8 +545,7 @@ class GUI:
                 self.emu_runner.run_emu(files, sample_name)
 
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
-
-
+        self.display_popup_message("Analysis complete. You can start monitoring now.")
 
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
 

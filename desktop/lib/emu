@@ -418,8 +418,8 @@ def generate_alignments(in_file_list, out_basename, database):
     sam_align_file = "{}_emu_alignments.sam".format(out_basename)
     db_sequence_file = os.path.join(database, 'species_taxid.fasta')
 
-    subprocess.check_output("{}/lib/minimap2/minimap2 -ax {} -t {} -N {} -p .9 -K {} {} {} -o {}".
-                            format(ROOT, args.type, args.threads, args.N, args.K,
+    subprocess.check_output("minimap2 -ax {} -t {} -N {} -p .9 -K {} {} {} -o {}".
+                            format(args.type, args.threads, args.N, args.K,
                                    db_sequence_file, input_file, sam_align_file),
                             shell=True)
 
