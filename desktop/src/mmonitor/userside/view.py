@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import tarfile
 import urllib.request
@@ -9,6 +10,7 @@ from tkinter import *
 from tkinter import simpledialog
 from webbrowser import open_new
 
+import numpy as np
 from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
 from requests import post
@@ -19,6 +21,7 @@ from mmonitor.dashapp.index import Index
 from mmonitor.database.DBConfigForm import DataBaseConfigForm
 from mmonitor.database.django_db_interface import DjangoDBInterface
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
+from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
 from mmonitor.userside.centrifuge import CentrifugeRunner
@@ -46,7 +49,7 @@ def require_project(func):
         if obj.db_path is not None and len(obj.db_path) > 0:
             return func(*args)
         else:
-            obj.open_popup("Please first create or choose a project data base.", "No data base chosen")
+            obj.open_popup("Please first create or choose a local DB.", "No data base chosen")
 
     return func_wrapper
 
@@ -76,7 +79,8 @@ class GUI:
     """
 
     def __init__(self):
-        self.db_mysql = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
+        self.pipeline_popup = None
+        self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
         self.progress_bar_exists = False
         # self.db_mysql.create_db()
 
@@ -106,12 +110,12 @@ class GUI:
 
         def resize_icon_to_xpx(image_path, x):
             """Utility function to resize the image to 25px while maintaining aspect ratio."""
-            img = Image.open(image_path)
+            icon = Image.open(image_path)
             base_width = x
-            w_percent = base_width / float(img.width)
-            h_size = int(float(img.height) * float(w_percent))
-            img = img.resize((base_width, h_size), Image.ANTIALIAS)
-            return ImageTk.PhotoImage(img)
+            w_percent = base_width / float(icon.width)
+            h_size = int(float(icon.height) * float(w_percent))
+            icon = icon.resize((base_width, h_size), Image.ANTIALIAS)
+            return ImageTk.PhotoImage(icon)
 
         self.root.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
         self.root.title(f"MMonitor {VERSION}")
@@ -121,7 +125,7 @@ class GUI:
         style = ttk.Style()
         style.theme_use("default")  # Switch to the 'clam' theme for better styling flexibility
 
-        print(ttk.Style().theme_names())
+
 
         # style.map('TButton',
         #           foreground=[('pressed', 'white'), ('active', 'black')],
@@ -152,7 +156,7 @@ class GUI:
             ("Local", [
                 ("Create Local DB", self.create_project, create_local_db_icon),
                 ("Choose Local DB", self.choose_project, add_db_icon),
-                ("Start offline monitoring", self.start_monitoring, start_offline_monitoring_icon)
+                ("Start dashboard", self.start_monitoring, start_offline_monitoring_icon)
             ]),
             ("Webserver", [
                 ("User authentication", self.open_db_config_form, user_authentication_icon)
@@ -223,10 +227,11 @@ class GUI:
                 btn.image = img
                 btn.pack(pady=2)
 
-            btn.pack(pady=2)
+
 
         # Quit button
-        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=quit_icon, style="TButton")
+        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=quit_icon, style="TButton",
+                              compound="left")
         quit_btn.image = quit_icon
         quit_btn.pack(pady=15)
 
@@ -238,23 +243,23 @@ class GUI:
         widget.bind("<Enter>", tooltip.show_tip)
         widget.bind("<Leave>", tooltip.hide_tip)
 
-    def ask_create_subproject(self):
-        # Create the root window but don't show it
-        top = tk.Toplevel(self.root)
-        top.geometry("300x300")
-
-        # Ask the user if they want to create a subproject
-        answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
-
-        # If the user selects 'Yes'
-        if answer:
-            subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
-            return subproject_name
-        else:
-            subproject_name = ""
-            return subproject_name
-        top.destroy()
-        top.quit()
+    # def ask_create_subproject(self):
+    #     # Create the root window but don't show it
+    #     top = tk.Toplevel(self.root)
+    #     top.geometry("300x300")
+    #
+    #     # Ask the user if they want to create a subproject
+    #     answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
+    #
+    #     # If the user selects 'Yes'
+    #     if answer:
+    #         subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
+    #         return subproject_name
+    #     else:
+    #         subproject_name = ""
+    #         return subproject_name
+    #     top.destroy()
+    #     top.quit()
 
 
     def open_calendar(self):
@@ -281,10 +286,10 @@ class GUI:
 
     def open_popup(self, text, title):
         top = tk.Toplevel(self.root)
-        top.geometry("200x200")
+        top.geometry("300x120")
         top.title(title)
-        ttk.Label(top, text=text, font='Helvetica 18 bold').place(x=150, y=80)
-        ttk.Button(top, text="Okay", command=top.destroy).pack()
+        ttk.Label(top, text=text, font='Helvetica 12').place(x=40, y=10)
+        ttk.Button(top, text="Okay", command=top.destroy).place(x=85, y=50)
 
     def create_project(self):
         filename = filedialog.asksaveasfilename(
@@ -321,7 +326,7 @@ class GUI:
             filetypes=(("csv", "*.csv"), ("all files", "*.*"))
         )
         if csv_file is not None and len(csv_file) > 0:
-            self.db_mysql.append_metadata_from_csv(csv_file)
+            self.django_db.append_metadata_from_csv(csv_file)
 
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
@@ -497,7 +502,7 @@ class GUI:
         project_name = str(win.project_name_entry)
         subproject_name = str(win.subproject_name_entry)
         sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
-        files = win.file_paths
+        files = win.file_paths_single_sample
 
         self.centrifuge_runner.run_centrifuge(files, sample_name)
         self.centrifuge_runner.make_kraken_report()
@@ -505,34 +510,104 @@ class GUI:
         self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
                                              sample_name, project_name, sample_date)
 
+    def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date):
+        fastq_stats = FastqStatistics(fastq_file)
+
+        # Calculate statistics
+        fastq_stats.quality_statistics()
+        fastq_stats.read_lengths_statistics()
+        quality_vs_lengths_data = fastq_stats.qualities_vs_lengths()
+
+        data = {
+            'sample_name': sample_name,
+            'project_id': project_name,
+            'subproject_id': subproject_name,
+            'date': sample_date,
+            'mean_gc_content': fastq_stats.gc_content(),
+            'mean_read_length': np.mean(fastq_stats.lengths),
+            'median_read_length': np.median(fastq_stats.lengths),
+            'mean_quality_score': np.mean([np.mean(q) for q in fastq_stats.qualities]),
+            'read_lengths': json.dumps(quality_vs_lengths_data['read_lengths']),
+            'avg_qualities': json.dumps(quality_vs_lengths_data['avg_qualities']),
+            'number_of_reads': fastq_stats.number_of_reads(),
+            'total_bases_sequenced': fastq_stats.total_bases_sequenced(),
+            'q20_score': fastq_stats.q20_q30_scores()[0],
+            'q30_score': fastq_stats.q20_q30_scores()[1],
+            'avg_quality_per_read': fastq_stats.quality_score_distribution()[0],
+            'base_quality_avg': fastq_stats.quality_score_distribution()[1]
+
+        }
+
+        self.django_db.send_sequencing_statistics(data)
+
+
+
+
 
     def taxonomy_nanopore_16s(self):
+        global sample_name
+
+        def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
+            emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+            if self.db is not None:
+                self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
+
+            self.django_db.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+                                                      subproject_name)
+
+
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
         win = InputWindow(self.root, self.emu_runner)
         self.root.wait_window(win.top)
         # get entries from input window
-        sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
-        project_name = str(win.project_name)
-        subproject_name = str(win.subproject_name)
-        sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
-        files = win.file_paths
+        if not win.process_multiple_samples:
+            sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
+            project_name = str(win.project_name)
+            subproject_name = str(win.subproject_name)
+            try:
+                sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+            except AttributeError as e:
+                sample_date = datetime.date.today()
+                self.open_popup(f"{e}", f"AttributeError did you forget ot select a date?")
+                print(e)
+            files = win.file_paths_single_sample
+            self.emu_runner.run_emu(files, sample_name)
+            print("add statistics")
+            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                sample_date)
 
-        self.emu_runner.run_emu(files, sample_name)
-        emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+
+            add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+        else:
+            print("Processing multiple samples")
+            for index, file_path_list in enumerate(win.multi_sample_input["file_paths_lists"]):
+                files = file_path_list
+                sample_name = win.multi_sample_input["sample_names"][index]
+                project_name = win.multi_sample_input["project_names"][index]
+                subproject_name = win.multi_sample_input["subproject_names"][index]
+                sample_date = win.multi_sample_input["dates"][index]
+                self.emu_runner.run_emu(files, sample_name)
+                self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                    sample_date)
+
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+        self.display_popup_message("Analysis complete. You can start monitoring now.")
+
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
-        if self.db is not None:
-            self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
-        self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
-                                                 subproject_name)
+        # if self.db is not None:
+        #     self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
+        #
+        # self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
+        #                                          subproject_name)
 
         self.display_popup_message("Analysis complete. You can start monitoring now.")
 
 
     def checkbox_popup(self):
-        pipeline_popup = PipelinePopup(self.root,
-                                       self)  # Replace run_analysis_pipeline_function with your actual function
+        self.pipeline_popup = PipelinePopup(self.root,
+                                            self)  # Replace run_analysis_pipeline_function with your actual function
 
 
     def ask_sample_name(self):
@@ -603,3 +678,4 @@ class ToolTip:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
+

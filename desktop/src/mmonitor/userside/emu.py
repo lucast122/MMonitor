@@ -11,6 +11,7 @@ from build_mmonitor_pyinstaller import ROOT
 class EmuRunner:
 
     def __init__(self):
+        self.concat_file_name = None
         self.logger = logging.getLogger('timestamp')
         self.check_emu()
         self.emu_out = ""
@@ -39,6 +40,7 @@ class EmuRunner:
         #remove concatenated files from sequence list to avoid concatenating twice
         sequence_list = [s for s in sequence_list if "concatenated" not in s]
         concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
+        self.concat_file_name = concat_file_name
         if not os.path.exists(concat_file_name):
             self.concatenate_fastq_files(sequence_list, concat_file_name)
 
@@ -75,6 +77,10 @@ class EmuRunner:
     def concatenate_fastq_files(self, input_files, output_file):
         with gzip.open(output_file, 'wt') as output:
             for input_file in input_files:
-                with gzip.open(input_file, 'rt') as input:
+                is_gzipped = input_file.endswith(".gz")
+                open_func = gzip.open if is_gzipped else open
+                mode = 'rt' if is_gzipped else 'r'
+
+                with open_func(input_file, mode) as input:
                     for line in input:
                         output.write(line)

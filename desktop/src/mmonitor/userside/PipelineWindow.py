@@ -10,6 +10,7 @@ class PipelinePopup:
         self.gui = gui_ref
 
         # Variables for checkboxes
+
         self.taxonomy_nanopore_wgs = tk.BooleanVar()
         self.taxonomy_nanopore_16s_bool = tk.BooleanVar()
         self.assembly = tk.BooleanVar()
@@ -32,6 +33,7 @@ class PipelinePopup:
         padding_y = 5
 
         # Taxonomy checkboxes
+
         ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy nanopore', variable=self.taxonomy_nanopore_wgs,
                         width=button_width).pack()
         ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy 16s nanopore', variable=self.taxonomy_nanopore_16s_bool,
@@ -56,7 +58,6 @@ class PipelinePopup:
 
 
     def run_analysis_pipeline(self):
-        # Assuming `self.pipeline_popup` is your instance of `PipelinePopup`
         if self.assembly.get() or self.correction.get():
             seq_file = filedialog.askopenfilename(title="Please select a sequencing file")
 

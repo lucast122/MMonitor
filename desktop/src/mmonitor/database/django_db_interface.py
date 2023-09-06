@@ -29,21 +29,7 @@ class DjangoDBInterface:
         except FileNotFoundError as e:
             print("DB config not found")
             print(e)
-            # print(self._db_config)
-        # self._db_path = self._db_config['database']
         self._connection = None
-        # self._connect()
-
-    # def _connect(self):
-    #     if self._connection is None or not self._connection.is_connected():
-    #         self._connection = mysql.connector.connect(
-    #             host=self._db_config['host'],
-    #             user=self._db_config['user'],
-    #             password=self._db_config['password'],
-    #             database=self._db_config['database'],
-    #             port=3306
-    #         )
-    #         self._cursor = self._connection.cursor()
 
     def get_user_id(self, username: str, password: str):
         django_url = f"http://{self._db_config['host']}:8020/users/get_user_id/"
@@ -212,6 +198,57 @@ class DjangoDBInterface:
             except Exception as e:
                 print(e)
 
+    def send_nanopore_record_centrifuge(self, kraken_out: dict, sample_name: str, project_id: str, subproject_id: str,
+                                        date: str):
+        import requests as pyrequests
+        from requests.auth import HTTPBasicAuth
+
+        records = []
+        for hit in kraken_out:
+            record_data = {
+                "sample_name": sample_name,
+                "project_id": project_id,
+                "subproject_id": subproject_id,
+                "date": date,
+                "tax_id": hit["tax_id"],
+                "species": hit["taxonomy"]  # Assuming species for now; might need adjustments based on taxonomic rank
+            }
+            records.append(record_data)
+
+        for record_data in records:
+            print(f"Sending record: {record_data}")
+            try:
+                auth = HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
+                response = pyrequests.post(
+                    f"http://{self._db_config['host']}:8020/users/add_nanopore_record/",
+                    json=record_data,
+                    auth=auth
+                )
+                if response.status_code != 200:
+                    print(f"Failed to add record: {response.content}")
+            except Exception as e:
+                print(e)
+
+    def send_sequencing_statistics(self, record_data):
+        import requests as pyrequests
+        from requests.auth import HTTPBasicAuth
+
+        # Fetch the user_id using the provided method
+        user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
+        record_data["user_id"] = user_id
+
+        print(f"Sending record: {record_data}")
+        try:
+            response = pyrequests.post(
+                f"http://{self._db_config['host']}:8020/users/add_sequencing_statistics/",
+                json=record_data,
+                auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
+            )
+            if response.status_code != 200:
+                print(f"Failed to add record: {response.content}")
+
+        except Exception as e:
+            print(e)
 
     # def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
     #                                  project_name: str, sample_date):
