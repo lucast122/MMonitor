@@ -1,15 +1,17 @@
 import tkinter as tk
 from threading import Thread
-from tkinter import ttk, filedialog
+from tkinter import filedialog
+
+import customtkinter as ctk
 
 
 class PipelinePopup:
 
     def __init__(self, parent, gui_ref):
+        ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+
         self.parent = parent
         self.gui = gui_ref
-
-        # Variables for checkboxes
 
         self.taxonomy_nanopore_wgs = tk.BooleanVar()
         self.taxonomy_nanopore_16s_bool = tk.BooleanVar()
@@ -21,34 +23,38 @@ class PipelinePopup:
 
         # Create Toplevel popup
         self.top = tk.Toplevel(parent)
-        self.top.geometry("440x350")
+        self.top.geometry("440x390")
+        self.top.minsize(440, 390)
         self.top.title("Select analysis steps to perform.")
 
-        frame_taxonomy = tk.LabelFrame(self.top, padx=10, pady=2, text="Taxonomic analysis")
-        frame_functional = tk.LabelFrame(self.top, padx=10, pady=2, text="Functional analysis")
-        frame_taxonomy.pack(pady=5, padx=10)
-        frame_functional.pack(pady=5, padx=10)
+        frame_taxonomy = ctk.CTkFrame(self.top, corner_radius=10)
+        frame_functional = ctk.CTkFrame(self.top, corner_radius=10)
+        frame_taxonomy.pack(pady=5, padx=10, fill="both", expand=True)
+        frame_functional.pack(pady=5, padx=10, fill="both", expand=True)
 
-        button_width = 30
-        padding_y = 5
+        label_taxonomy = ctk.CTkLabel(frame_taxonomy, text="Taxonomic analysis")
+        label_functional = ctk.CTkLabel(frame_functional, text="Functional analysis")
+        label_taxonomy.pack(pady=10)
+        label_functional.pack(pady=10)
 
         # Taxonomy checkboxes
-
-        ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy nanopore', variable=self.taxonomy_nanopore_wgs,
-                        width=button_width).pack()
-        ttk.Checkbutton(frame_taxonomy, text='Quick taxonomy 16s nanopore', variable=self.taxonomy_nanopore_16s_bool,
-                        width=button_width).pack()
+        ctk.CTkCheckBox(frame_taxonomy, text='Quick taxonomy nanopore', variable=self.taxonomy_nanopore_wgs).pack(
+            pady=2)
+        ctk.CTkCheckBox(frame_taxonomy, text='Quick taxonomy 16s nanopore',
+                        variable=self.taxonomy_nanopore_16s_bool).pack(pady=2)
 
         # Functional analysis checkboxes
-        ttk.Checkbutton(frame_functional, text='Assembly', variable=self.assembly, width=button_width).pack()
-        ttk.Checkbutton(frame_functional, text='Correction', variable=self.correction, width=button_width).pack()
-        ttk.Checkbutton(frame_functional, text='Binning', variable=self.binning, width=button_width).pack()
-        ttk.Checkbutton(frame_functional, text='Annotation', variable=self.annotation, width=button_width).pack()
-        ttk.Checkbutton(frame_functional, text='KEGG', variable=self.kegg, width=button_width).pack()
+        ctk.CTkCheckBox(frame_functional, text='Assembly', variable=self.assembly).pack(pady=2)
+        ctk.CTkCheckBox(frame_functional, text='Correction', variable=self.correction).pack(pady=2)
+        ctk.CTkCheckBox(frame_functional, text='Binning', variable=self.binning).pack(pady=2)
+        ctk.CTkCheckBox(frame_functional, text='Annotation', variable=self.annotation).pack(pady=2)
+        ctk.CTkCheckBox(frame_functional, text='KEGG', variable=self.kegg).pack(pady=2)
 
         # Continue and Quit buttons
-        ttk.Button(self.top, text="Continue", width=10, command=self.run_analysis_pipeline).pack(pady=padding_y)
-        ttk.Button(self.top, text="Quit", command=self.top.destroy, width=10).pack(pady=padding_y)
+        continue_btn = ctk.CTkButton(self.top, text="Continue", command=self.run_analysis_pipeline, corner_radius=10)
+        continue_btn.pack(pady=5)
+        quit_btn = ctk.CTkButton(self.top, text="Quit", command=self.top.destroy, corner_radius=10)
+        quit_btn.pack(pady=5)
 
     def on_kaiju_selected(self):
         # Assuming you have a way to get the sample_name, e.g., from a GUI component

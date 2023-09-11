@@ -56,7 +56,11 @@ class FastqStatistics:
             for i, q in enumerate(quality):
                 base_quality_distribution[i].append(q)
 
-        base_quality_avg = {position: np.mean(qualities) for position, qualities in base_quality_distribution.items()}
+        threshold = len(self.qualities) * 0.5  # only distribution for bases that are covered at least by 50% of reads
+        base_quality_avg = {position: np.mean(qualities)
+                            for position, qualities in base_quality_distribution.items()
+                            if len(qualities) >= threshold}
+
 
         return avg_quality_per_read, base_quality_avg
 
@@ -95,3 +99,4 @@ class FastqStatistics:
             'read_lengths': self.lengths,
             'avg_qualities': avg_qualities
         }
+

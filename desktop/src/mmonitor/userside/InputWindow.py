@@ -1,29 +1,10 @@
 import csv
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import filedialog
 
+import customtkinter as ctk
 from tkcalendar import Calendar
-
-
-def get_files_from_folder(folder_path):
-    """
-    Gets a path to a folder, checks if path contains sequencing files with specified endings and returns list
-    containing paths to sequencing files.
-    """
-    files = []
-
-    # We will use os.walk for recursive search
-    for dirpath, dirnames, filenames in os.walk(folder_path):
-        for file in filenames:
-            if file.endswith((".fastq", ".fq", ".fasta", ".fastq.gz")):
-                files.append(os.path.join(dirpath, file))
-
-    # If no files were found, log an error
-    if not files:
-        print(f"No sequencing files (.fastq, .fq found at {folder_path}")
-
-    return files
 
 
 def get_files_from_folder(folder_path):
@@ -59,6 +40,8 @@ class InputWindow:
 
         # Toplevel window
         self.top = tk.Toplevel(parent)
+        font = ctk.CTkFont(family="Helvetica", size=12)
+
         self.top.title("Sample Data Input")
         self.top.geometry("500x800")
         self.top.minsize(500, 800)
@@ -66,38 +49,38 @@ class InputWindow:
 
         padding_y = 2
         label_width = 25
-        ttk.Label(self.top, text="Sample Name", font='Helvetica 10 bold').pack(pady=padding_y)
-        self.sample_name_entry = ttk.Entry(self.top, width=label_width)
-        self.sample_name_entry.pack(pady=padding_y)
+        ctk.CTkLabel(self.top, text="Sample Name", font=font).pack(pady=padding_y)
+        self.sample_name_entry = ctk.CTkEntry(self.top)
+        self.sample_name_entry.pack(pady=2)
 
-        ttk.Label(self.top, text="Project Name", font='Helvetica 10 bold').pack(pady=padding_y)
-        self.project_name_entry = ttk.Entry(self.top, width=label_width)
+        ctk.CTkLabel(self.top, text="Project Name", font=font).pack(pady=padding_y)
+        self.project_name_entry = ctk.CTkEntry(self.top)
         self.project_name_entry.pack(pady=padding_y)
         # Trace change in project_name_entry to mirror its content into subproject_name_entry
         self.project_name_entry.bind("<KeyRelease>", self.mirror_project_name)
 
-        ttk.Label(self.top, text="Subproject Name", font='Helvetica 10 bold').pack(pady=padding_y)
-        self.subproject_name_entry = ttk.Entry(self.top, width=label_width)
+        ctk.CTkLabel(self.top, text="Subproject Name", font=font).pack(pady=padding_y)
+        self.subproject_name_entry = ctk.CTkEntry(self.top)
         self.subproject_name_entry.pack(pady=padding_y)
 
-        ttk.Label(self.top, text="Sample Date", font='Helvetica 10 bold').pack(pady=padding_y)
-        self.date_btn = ttk.Button(self.top, text="Select Date", command=self.open_calendar)
+        ctk.CTkLabel(self.top, text="Sample Date", font=font).pack(pady=padding_y)
+        self.date_btn = ctk.CTkButton(self.top, text="Select Date", command=self.open_calendar)
         self.date_btn.pack(pady=padding_y)
 
-        ttk.Label(self.top, text="Files", font='Helvetica 10 bold').pack(pady=padding_y)
+        ctk.CTkLabel(self.top, text="Files", font=font).pack(pady=padding_y)
         self.file_display = tk.Text(self.top, width=400, height=15, wrap="word",
                                     state=tk.DISABLED)  # Adjusted size and made read-only
         self.file_display.pack(pady=padding_y)
 
         self.use_multiplexing = tk.BooleanVar(value=False)  # BooleanVar to store the checkbox value
 
-        ttk.Button(self.top, text="Add one sample", command=self.add_data_single_sample).pack(pady=padding_y)
-        ttk.Button(self.top, text="Add multiples samples from CSV", command=self.load_from_csv).pack(pady=padding_y)
-        self.multiplexing_checkbox = ttk.Checkbutton(self.top, text="Use Multiplexing", variable=self.use_multiplexing)
+        ctk.CTkButton(self.top, text="Add one sample", command=self.add_data_single_sample).pack(pady=padding_y)
+        ctk.CTkButton(self.top, text="Add multiples samples from CSV", command=self.load_from_csv).pack(pady=padding_y)
+        self.multiplexing_checkbox = ctk.CTkCheckBox(self.top, text="Use Multiplexing", variable=self.use_multiplexing)
         self.multiplexing_checkbox.pack(pady=padding_y)
 
-        ttk.Button(self.top, text="Submit", command=self.submit).pack(pady=padding_y)
-        ttk.Button(self.top, text="Quit", command=self.quit).pack(pady=padding_y)
+        ctk.CTkButton(self.top, text="Submit", command=self.submit).pack(pady=padding_y)
+        ctk.CTkButton(self.top, text="Quit", command=self.quit).pack(pady=padding_y)
 
     def mirror_project_name(self, event):
         # Get the current value of project name entry and set it to subproject name entry
@@ -108,7 +91,7 @@ class InputWindow:
     def open_calendar(self):
         def on_close():
             selected_date = cal.selection_get()
-            self.date_btn.config(text=selected_date.strftime("%Y-%m-%d"))
+            self.date_btn.configure(text=selected_date.strftime("%Y-%m-%d"))
             self.selected_date = selected_date
             date_win.destroy()
 
@@ -118,7 +101,7 @@ class InputWindow:
         cal = Calendar(date_win, selectmode='day')
         cal.pack(pady=20, padx=20)
 
-        ttk.Button(date_win, text="OK", command=on_close).pack(pady=20)
+        ctk.CTkButton(date_win, text="OK", command=on_close).pack(pady=20)
 
     def add_data_single_sample(self):
         self.process_multiple_samples = False
@@ -246,11 +229,12 @@ class InputWindow:
         self.file_display.config(state=tk.DISABLED)
 
     def open_popup(self, text, title):
+        font = ctk.CTkFont(family="Helvetica", size=12)
         top = tk.Toplevel(self.parent)
         top.geometry("300x120")
         top.title(title)
-        ttk.Label(top, text=text, font='Helvetica 12').place(x=40, y=10)
-        ttk.Button(top, text="Okay", command=top.destroy).place(x=85, y=50)
+        ctk.CTkLabel(top, text=text, font=font).place(x=40, y=10)
+        ctk.CTkButton(top, text="Okay", command=top.destroy).place(x=85, y=50)
 
     def quit(self):
         self.top.destroy()
