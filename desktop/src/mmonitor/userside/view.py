@@ -10,6 +10,7 @@ from tkinter import *
 from tkinter import simpledialog
 from webbrowser import open_new
 
+import customtkinter as ctk
 import numpy as np
 from PIL import Image, ImageTk
 from future.moves.tkinter import filedialog
@@ -30,8 +31,8 @@ from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 
 # Global constants for version and dimensions
 VERSION = "v1.0 beta"
-MAIN_WINDOW_X: int = 350
-MAIN_WINDOW_Y: int = 750
+MAIN_WINDOW_X: int = 300
+MAIN_WINDOW_Y: int = 600
 
 # Module description
 
@@ -93,7 +94,8 @@ class GUI:
         self.functional_analysis_runner = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
-        self.root = Tk()
+        self.root = ctk.CTk()
+        # self.root = TK()
         mmonitor_logo = tk.PhotoImage(file=f"{IMAGES_PATH}/mmonitor_logo.png")
         self.root.iconphoto(True, mmonitor_logo)
         self.init_layout()
@@ -107,6 +109,13 @@ class GUI:
         self.sample_date = None
 
     def init_layout(self):
+        ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+
+        # PRIMARY_COLOR = "#2C3E50"  # Dark blue for primary elements and backgrounds
+        # SECONDARY_COLOR = "#EAECEE"  # Light gray for secondary backgrounds
+        # TEXT_COLOR = "#FFFFFF"  # White text for better contrast on dark backgrounds
+        # BUTTON_COLOR = "#ff8906"  # Bright blue for buttons
+        # BUTTON_TEXT_COLOR = "#FFFFFF"
 
         def resize_icon_to_xpx(image_path, x):
             """Utility function to resize the image to 25px while maintaining aspect ratio."""
@@ -120,10 +129,10 @@ class GUI:
         self.root.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
         self.root.title(f"MMonitor {VERSION}")
         self.root.minsize(MAIN_WINDOW_X, MAIN_WINDOW_Y)
+        self.root.configure()  # Set primary color as window background
+
 
         # Style and theme
-        style = ttk.Style()
-        style.theme_use("default")  # Switch to the 'clam' theme for better styling flexibility
 
 
 
@@ -146,7 +155,10 @@ class GUI:
         # placeholder_icon.put(("gray",), to=(0, 0, 15, 15))
 
         # Header with app title
-        header_label = ttk.Label(self.root, text=f"Metagenome Monitor {VERSION}", font=("Helvetica", 18))
+
+        header_label = ctk.CTkLabel(self.root, text=f"Metagenome Monitor {VERSION}", font=("Helvetica", 18))
+        # header_label.bg_color = PRIMARY_COLOR
+        # header_label.fg_color = TEXT_COLOR
         header_label.pack(pady=10)
 
         # Categories and buttons
@@ -197,42 +209,35 @@ class GUI:
 
         # Styling improvements for buttons
 
-        style.theme_use("clam")
+        # style.theme_use("clam")
 
         # Configuring Button Style
-        style.configure('TButton',
-                        font=("Helvetica", 14),
-                        foreground='#404040',  # Dark gray text
-                        background='#FCF6F5',  # Light background
-                        relief="raised",  # Raised effect on button
-                        padding=(10, 10, 10, 10))  # Increased padding for larger button
-
-        # Configuring Label Style
-        style.configure('TLabel',
-                        background='#A0CFEC',  # A light blue shade for the label
-                        foreground='black',
-                        font=("Helvetica", 20),
-                        padding=5,
-                        anchor='center')
 
         for category, btns in categories:
-            cat_label = ttk.Label(self.root, text=category, font=("Helvetica", 20), anchor="center")
+            cat_label = ctk.CTkLabel(self.root, text=category, font=("Helvetica", 20), anchor="center")
+            # cat_label.bg_color = PRIMARY_COLOR
+            # cat_label.fg_color = TEXT_COLOR
             cat_label.pack(pady=10)
 
-            if category in category_tooltips:
-                self.create_tooltip(cat_label, category_tooltips[category])
-
             for text, cmd, img in btns:
-                btn = ttk.Button(self.root, text=text, command=cmd, image=img, compound="left", style="TButton")
-                btn.image = img
+                btn = ctk.CTkButton(self.root, text=text, command=cmd, image=img)
+
+                # btn.bg_color = BUTTON_COLOR
+                # btn.fg_color = BUTTON_TEXT_COLOR
+                # btn.hover_bg_color = BUTTON_COLOR  # Set the hover background color
+                # btn.hover_fg_color = TEXT_COLOR  # Set the hover foreground color
+                # btn.active_bg_color = BUTTON_COLOR  # Set the active background color
+                # btn.active_fg_color = TEXT_COLOR  # Set the active foreground color
                 btn.pack(pady=2)
 
-
-
         # Quit button
-        quit_btn = ttk.Button(self.root, text="Quit", command=self.stop_app, image=quit_icon, style="TButton",
-                              compound="left")
-        quit_btn.image = quit_icon
+        quit_btn = ctk.CTkButton(self.root, text="Quit", command=self.stop_app, image=quit_icon)
+        # quit_btn.bg_color = BUTTON_COLOR
+        # quit_btn.fg_color = BUTTON_TEXT_COLOR
+        # quit_btn.hover_bg_color = BUTTON_COLOR  # Set the hover background color
+        # quit_btn.hover_fg_color = TEXT_COLOR  # Set the hover foreground color
+        # quit_btn.active_bg_color = BUTTON_COLOR  # Set the active background color
+        # quit_btn.active_fg_color = TEXT_COLOR  # Set the active foreground color
         quit_btn.pack(pady=15)
 
     # create_tooltip(local_label, "This is the tooltip text for the Local category.")
