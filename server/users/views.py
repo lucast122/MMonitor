@@ -54,6 +54,8 @@ def add_sequencing_statistics(request):
                 q30_score=data.get('q30_score'),
                 avg_quality_per_read=json.dumps(data.get('avg_quality_per_read', [])),
                 base_quality_avg=json.dumps(data.get('base_quality_avg', {})),
+                gc_contents_per_sequence=data.get('gc_contents_per_sequence', "[]"),  # Default to empty list if not provided
+
                 user=user
             )
             return JsonResponse({"status": "success"}, status=201)
