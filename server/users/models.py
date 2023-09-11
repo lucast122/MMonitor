@@ -64,6 +64,8 @@ class SequencingStatistics(models.Model):
     avg_quality_per_read = models.TextField(null=True, blank=True)  # Serialized list
     base_quality_avg = models.TextField(null=True, blank=True)  # Serialized dictionary
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    gc_contents_per_sequence = models.TextField(null=True, blank=True)
+
     class Meta:
         verbose_name_plural = "Sequencing Statistics"
 

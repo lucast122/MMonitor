@@ -1,13 +1,16 @@
+import json
 import sqlite3
 import tempfile
 import re
+
+import numpy as np
 from natsort import natsorted
 
 
 
 
 import users.models
-from . import taxonomy, correlations,horizon
+from . import taxonomy, correlations,qc
 import pandas as pd
 import plotly.express as px
 from typing import Tuple, List, Any, Dict
@@ -22,6 +25,10 @@ from io import StringIO
 import base64
 from typing import Tuple, Any, List, Iterable, Dict, Union
 from scipy.ndimage.filters import gaussian_filter
+import numpy as np
+from scipy.stats import zscore
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
 from django_plotly_dash import DjangoDash
 import plotly.express as px
 import dash
@@ -35,6 +42,7 @@ import plotly.graph_objects as go
 from .calculations.stats import scipy_correlation
 
 from users.models import NanoporeRecord
+from users.models import SequencingStatistics
 import flask
 from django.contrib.sessions.models import Session
 
@@ -48,19 +56,6 @@ def _explode_metadata(df):
 def _parse_dict(x):
     return pd.Series(loads(x))
 
-def fetch_user_id_from_session_id(session_id):
-    # Send a GET request to the Django app with the session ID
-    DJANGO_APP_URL = os.environ.get('DJANGO_APP_URL', 'http://localhost:8000')  # default to 'http://localhost:8000' if not set
-    response = requests.get(f'{DJANGO_APP_URL}/get_user_id/', params={'session_id': session_id})
-
-
-    if response.status_code == 200:
-        # If the request was successful, return the user ID
-        user_id = response.json().get('user_id')
-        return user_id
-    else:
-        # If the request was not successful, return None
-        return None
 
 
 class Index:
@@ -76,6 +71,7 @@ class Index:
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
         # self.horizon_app = horizon.Horizon()
         self.correlations_app = correlations.Correlations()
+        self.qc_app = qc.QC(user_id)
 
         pd.set_option('display.max_columns', None)
         pd.set_option('display.max_rows', None)
@@ -93,6 +89,8 @@ class Index:
         self._heatmap_df = None
         self._table_df = None
         records = NanoporeRecord.objects.filter(user_id=user_id)
+
+
         self.df = pd.DataFrame.from_records(records.values())
 
         self.meta_df = self.correlations_app.get_all_meta()
@@ -105,11 +103,6 @@ class Index:
 
         self.hover_data = {column: True for column in self.metadata_columns}
         self.metadata_columns.pop(0)
-
-
-
-
-
 
 
         # Initialize apps
@@ -135,7 +128,14 @@ class Index:
                 'name': 'Correlations',
                 'app': self.correlations_app.app,
                 'instance': self.correlations_app
+            },
+            '/dashapp/qc': {
+                'name': 'QC',
+                'app': self.qc_app.app,
+                'instance': self.qc_app
             }
+
+
             # '/dashapp/kegg': {
             #     'name': 'Metabolic Maps',
             #     'app': correlations_app.app,
@@ -164,18 +164,6 @@ class Index:
         print("Initialized Index callbacks")
 
 
-        
-
-        for app_info in self._apps.values():
-            # print("appinfo instance")
-            # print(app_info['instance'])
-            app_info['instance']._init_layout()
-            # app_info['instance']._init_callbacks()
-
-
-
-
-        # print(f"After init {self.app}")
 
     # def _init_apps(self) -> None:
     #     """
@@ -344,9 +332,9 @@ class Index:
             # attempt to change to selected app
             if pathname in self._apps:
                 app = self._apps[pathname]['instance']
-                
+
                 app._init_layout()  # ensure layout is initialized
-                app._init_callbacks()  # ensure callbacks are registered
+                # app._init_callbacks()  # ensure callbacks are registered
                 return app.app.layout
             # otherwise it's page not found
             else:
@@ -412,7 +400,7 @@ class Index:
                 return f"File {filename} processed successfully."
 
         """
-        Taxonomy callbacks
+Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- 
         """
 
 
@@ -1008,28 +996,341 @@ class Index:
             if n_clicks is None:
                 raise PreventUpdate
             return dict(content=self._table_df.to_csv(index=False), filename='correlations.csv')
-        # CALLBACK TO GET DJANGO INDEX, FOR DISPLAYING USER DB ONLY
-        # @self.app.callback(
-        #     Output('bla', 'children'),  # Replace with your Dash component id and property
-        #     [Input('url-django', 'pathname')]  # Replace with your Dash component id and property
-        # )
-        # def update_output(input_value):
-        #     # Here you would call your function to get the user_id from the session_id
-        #     user_id = fetch_user_id_from_session_id(input_value)
-        #
-        #     # Use the user_id to initialise SQLAlchemy
-        #     session = _init_mysql(user_id)
-        #
-        #     # Use the session to query your database
-        #     data = session.query(YourTableModel).filter_by(
-        #         user_id=user_id).all()  # Replace 'YourTableModel' with your SQLAlchemy table model
-        #
-        #     # Convert your data to a format suitable for your Dash components (for example, a DataFrame if you're using a DataTable)
-        #     df = pd.DataFrame([datum.__dict__ for datum in data])
-        #
-        #     # Return the data to be displayed in your Dash app
-        #     return df.to_dict('records')
 
+
+        """
+    
+          QC CALLBACKS ----- QC CALLBACKS ----- QC CALLBACKS ----- QC CALLBACKS ----- QC CALLBACKS ----- QC CALLBACKS ------
+    
+        """
+        """
+         configuration variables
+        """
+        stat_indicator_plots_margin = dict(t=0, b=0, l=0, r=0)
+        stat_indicator_plots_fontsize = 30
+        stat_indicator_plots_title_fontsize = 15
+
+        stat_indicator_plots_height = 200
+        stat_indicator_plots_width = 120
+
+        ...
+        # MEAN QUALITY PER BASE PLOT
+        @self.app.callback(
+            Output('mean-quality-per-base-plot', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_mean_quality_per_base_plot(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Deserialize the avg_qualities field
+            avg_qualities = json.loads(stats_for_sample.avg_qualities)
+
+            # Filter out the tail values based on z-score
+            z_scores = zscore(avg_qualities)
+            threshold = 0.5 # restrict to only show bases within 0.1 sd of mean of all base positions (increase to show more bases)
+            valid_indices = np.where(np.abs(z_scores) < threshold)[0]
+            truncated_avg_qualities = [avg_qualities[i] for i in valid_indices]
+
+            # Calculate the smoothed values using LOWESS
+            x_values = np.arange(len(truncated_avg_qualities))
+            smoothed = lowess(truncated_avg_qualities, x_values, frac=0.1)
+
+            fig = go.Figure()
+
+            # Mean Quality as a solid line
+            fig.add_trace(go.Scatter(
+                x=list(range(1, len(truncated_avg_qualities) + 1)),  # 1-based index for base position
+                y=truncated_avg_qualities,
+                mode='lines',
+                name='Mean Quality',
+                line=dict(color='black')
+            ))
+
+            # Lowess smoothed line as a dashed line
+            smoothed = lowess(truncated_avg_qualities, range(len(truncated_avg_qualities)), frac=0.1)
+            fig.add_trace(go.Scatter(
+                x=list(range(1, len(smoothed) + 1)),  # 1-based index for base position
+                y=smoothed[:, 1],
+                mode='lines',
+                name='Smoothed Mean Quality',
+                line=dict(dash='dash', color='yellow')
+            ))
+
+            fig.update_layout(
+                title='Mean Quality per Base',
+                xaxis_title='Base Position',
+                yaxis_title='Mean Quality',
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridcolor='rgba(230,230,230,0.5)'),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
+            )
+
+            return fig
+
+
+        @self.app.callback(
+            Output('mean_read_length-graph', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_mean_read_length_plot(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id, sample_name=selected_sample).first()
+
+            # Extract mean read length
+            mean_read_length = stats_for_sample.mean_read_length
+
+            # Generate the plot
+            fig = go.Figure()
+            fig.add_trace(go.Indicator(
+                mode = "number",
+                value = mean_read_length,
+                title={"text": "Mean Read Length", "font": {"size": stat_indicator_plots_title_fontsize}},
+                number={"font": {"size": stat_indicator_plots_fontsize}}
+            ))
+            fig.update_layout(
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+            margin=stat_indicator_plots_margin  # Reduce left margin
+                # Adjust the height as desired
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('mean_quality_score-graph', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_mean_quality_score_plot(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Extract mean quality score
+            mean_quality_score = stats_for_sample.mean_quality_score
+
+            # Generate the plot
+            fig = go.Figure()
+            fig.add_trace(go.Indicator(
+                mode="number",
+                value=mean_quality_score,
+                title={"text": "Mean Quality Score", "font": {"size": stat_indicator_plots_title_fontsize}},
+                number={"font": {"size": stat_indicator_plots_fontsize}}
+
+            ))
+            fig.update_layout(
+                # ... (other layout settings)
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+                margin=stat_indicator_plots_margin  # Reduce left margin
+
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('number_of_reads-graph', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_number_of_reads_graph(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Create an indicator plot
+            fig = go.Figure(go.Indicator(
+                mode="number",
+                value=stats_for_sample.number_of_reads,
+                title={"text": "Number of Reads", "font": {"size": stat_indicator_plots_title_fontsize}},
+                number={"font": {"size": stat_indicator_plots_fontsize}}
+
+            ))
+
+            # Remove the plot's axis for a cleaner look
+            fig.update_layout(
+                # ... (other layout settings)
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+                margin= stat_indicator_plots_margin
+
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('total_bases_sequenced-graph', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_total_bases_sequenced_graph(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Create an indicator plot
+            fig = go.Figure(go.Indicator(
+                mode="number",
+                value=stats_for_sample.total_bases_sequenced,
+                title={"text": "Total Bases Sequenced", "font": {"size": stat_indicator_plots_title_fontsize}},
+
+            number={"font": {"size": stat_indicator_plots_fontsize}}
+
+            ))
+
+            # Remove the plot's axis for a cleaner look
+            fig.update_layout(
+                # ... (other layout settings)
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+                margin=stat_indicator_plots_margin
+
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('q20_score-graph', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_q20_score_graph(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Create an indicator plot
+            fig = go.Figure(go.Indicator(
+                mode="number",
+                value=stats_for_sample.q20_score,
+                title={"text": "Q20 Score", "font": {"size": stat_indicator_plots_title_fontsize}},
+                number={"font": {"size": stat_indicator_plots_fontsize}}
+
+            ))
+
+            # Remove the plot's axis for a cleaner look
+            fig.update_layout(
+                # ... (other layout settings)
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+                margin=stat_indicator_plots_margin
+
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('q30_score-graph', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_q30_score_graph(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Create an indicator plot
+            fig = go.Figure(go.Indicator(
+                mode="number",
+                value=stats_for_sample.q30_score,
+                title={"text": "Q30 Score", "font": {"size": stat_indicator_plots_title_fontsize}},
+                number={"font": {"size": stat_indicator_plots_fontsize}}
+
+            ))
+
+            # Remove the plot's axis for a cleaner look
+            fig.update_layout(
+                # ... (other layout settings)
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+                margin=stat_indicator_plots_margin
+
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('mean-gc-indicator-plot', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_mean_gc_indicator_plot(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id, sample_name=selected_sample).first()
+
+            # Extract mean GC content
+            mean_gc = stats_for_sample.mean_gc_content
+
+            # Generate the plot
+            fig = go.Figure()
+            fig.add_trace(go.Indicator(
+                mode="number",
+                value=mean_gc,
+                title={"text": "Mean GC Content", "font": {"size": stat_indicator_plots_title_fontsize}},
+                number={"font": {"size": stat_indicator_plots_fontsize}}
+            ))
+            fig.update_layout(
+                autosize=False,
+                width=stat_indicator_plots_height,  # Adjust the width as desired
+                height=stat_indicator_plots_width,
+                margin=stat_indicator_plots_margin  # Reduce left margin
+            )
+
+            return fig
+
+        @self.app.callback(
+            Output('read-length-distribution-plot', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_read_length_distribution_plot(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Deserialize the read_lengths field
+            lengths = json.loads(stats_for_sample.read_lengths)
+
+            # Create the histogram
+            fig = go.Figure(data=[go.Histogram(x=lengths)])
+            fig.update_layout(title="Read Length Distribution",
+                              xaxis_title="Read Length",
+                              yaxis_title="Frequency",
+                              xaxis=dict(showgrid=False),
+                              yaxis=dict(showgrid=True, gridcolor='rgba(230,230,230,0.5)'),
+                              plot_bgcolor='rgba(0,0,0,0)',
+                              paper_bgcolor='rgba(0,0,0,0)')
+
+            return fig
+
+        @self.app.callback(
+            Output('gc-content-distribution-plot', 'figure'),
+            [Input('sample-dropdown-qc', 'value')]
+        )
+        def update_gc_content_distribution_plot(selected_sample):
+            # Fetch the SequencingStatistics for the selected sample
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
+
+            # Deserialize the sequences field
+
+
+            # Compute GC content for each sequence
+            gc_contents = json.loads(stats_for_sample.gc_contents_per_sequence)
+
+            # Create the histogram
+            fig = go.Figure(data=[go.Histogram(x=gc_contents)])
+            fig.update_layout(title="GC Content Distribution",
+                              xaxis_title="GC Content (%)",
+                              yaxis_title="Frequency",
+                              xaxis=dict(showgrid=False),
+                              yaxis=dict(showgrid=True, gridcolor='rgba(230,230,230,0.5)'),
+                              plot_bgcolor='rgba(0,0,0,0)',
+                              paper_bgcolor='rgba(0,0,0,0)')
+
+            return fig
 
     def get_abundance_meta_by_taxonomy(self, tax) -> pd.DataFrame:
         if not tax:  # add this condition to handle empty list
@@ -1061,8 +1362,6 @@ class Index:
 
     def query_to_dataframe(self,query: str) -> pd.DataFrame:
         return pd.read_sql_query(query, self._engine)
-
-
 
 
 def replace_brackets(input_data):
