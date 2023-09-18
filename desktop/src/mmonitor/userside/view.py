@@ -3,6 +3,7 @@ import json
 import os
 import tarfile
 import urllib.request
+from datetime import datetime
 from gzip import open
 from threading import Thread
 from time import sleep
@@ -12,7 +13,8 @@ from webbrowser import open_new
 
 import customtkinter as ctk
 import numpy as np
-from PIL import Image, ImageTk
+from PIL import Image
+from customtkinter import CTkImage
 from future.moves.tkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
@@ -94,8 +96,8 @@ class GUI:
         self.functional_analysis_runner = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
-        self.root = ctk.CTk()
-        # self.root = TK()
+        # self.root = ctk.CTk()
+        self.root = Tk()
         mmonitor_logo = tk.PhotoImage(file=f"{IMAGES_PATH}/mmonitor_logo.png")
         self.root.iconphoto(True, mmonitor_logo)
         self.init_layout()
@@ -124,7 +126,11 @@ class GUI:
             w_percent = base_width / float(icon.width)
             h_size = int(float(icon.height) * float(w_percent))
             icon = icon.resize((base_width, h_size), Image.ANTIALIAS)
-            return ImageTk.PhotoImage(icon)
+
+            # Convert the PIL image to a CTkImage
+            ctk_image = CTkImage(icon, size=(x, x))
+
+            return ctk_image
 
         self.root.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
         self.root.title(f"MMonitor {VERSION}")
@@ -169,9 +175,11 @@ class GUI:
                 ("Create Local DB", self.create_project, create_local_db_icon),
                 ("Choose Local DB", self.choose_project, add_db_icon),
                 ("Start dashboard", self.start_monitoring, start_offline_monitoring_icon)
+
             ]),
             ("Webserver", [
                 ("User authentication", self.open_db_config_form, user_authentication_icon)
+
             ]),
             ("Add Data", [
                 ("Add metadata from CSV", self.append_metadata, add_metadata_icon),
@@ -220,7 +228,8 @@ class GUI:
             cat_label.pack(pady=10)
 
             for text, cmd, img in btns:
-                btn = ctk.CTkButton(self.root, text=text, command=cmd, image=img)
+                btn = ctk.CTkButton(self.root, text=text, command=cmd, image=img, width=210, height=40
+                                    )
 
                 # btn.bg_color = BUTTON_COLOR
                 # btn.fg_color = BUTTON_TEXT_COLOR
@@ -231,7 +240,7 @@ class GUI:
                 btn.pack(pady=2)
 
         # Quit button
-        quit_btn = ctk.CTkButton(self.root, text="Quit", command=self.stop_app, image=quit_icon)
+        quit_btn = ctk.CTkButton(self.root, width=210, height=40, text="Quit", command=self.stop_app, image=quit_icon)
         # quit_btn.bg_color = BUTTON_COLOR
         # quit_btn.fg_color = BUTTON_TEXT_COLOR
         # quit_btn.hover_bg_color = BUTTON_COLOR  # Set the hover background color
@@ -501,6 +510,7 @@ class GUI:
         #
         # sample_date = self.open_calendar()
         win = InputWindow(self.root, self.emu_runner)
+        print("Created input window")
         self.root.wait_window(win.top)
         # get entries from input window
         sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
@@ -522,6 +532,7 @@ class GUI:
         fastq_stats.quality_statistics()
         fastq_stats.read_lengths_statistics()
         quality_vs_lengths_data = fastq_stats.qualities_vs_lengths()
+        gc_contents = fastq_stats.gc_content_per_sequence()
 
         data = {
             'sample_name': sample_name,
@@ -539,7 +550,9 @@ class GUI:
             'q20_score': fastq_stats.q20_q30_scores()[0],
             'q30_score': fastq_stats.q20_q30_scores()[1],
             'avg_quality_per_read': fastq_stats.quality_score_distribution()[0],
-            'base_quality_avg': fastq_stats.quality_score_distribution()[1]
+            'base_quality_avg': fastq_stats.quality_score_distribution()[1],
+            'gc_contents_per_sequence': json.dumps(gc_contents)
+
 
         }
 
@@ -564,7 +577,11 @@ class GUI:
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
         win = InputWindow(self.root, self.emu_runner)
+        print("Created input window")
         self.root.wait_window(win.top)
+        # quit the method when quit button is pressed instead of running the pipeline
+        if win.do_quit:
+            return
         # get entries from input window
         if not win.process_multiple_samples:
             sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
@@ -573,7 +590,7 @@ class GUI:
             try:
                 sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
             except AttributeError as e:
-                sample_date = datetime.date.today()
+                sample_date = datetime.today()
                 self.open_popup(f"{e}", f"AttributeError did you forget ot select a date?")
                 print(e)
             files = win.file_paths_single_sample
@@ -597,7 +614,6 @@ class GUI:
                                     sample_date)
 
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
-        self.display_popup_message("Analysis complete. You can start monitoring now.")
 
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
 
@@ -658,6 +674,35 @@ class GUI:
         db_config_form = DataBaseConfigForm(self.root)
         print(db_config_form.last_config)
 
+    def on_open(self, ws):
+        print("WebSocket connection opened.")
+        # Now that the connection is open, you can send your message
+        send_message(ws, "Your message here")
+
+        print(f"WebSocket error: {error}")
+
+    def on_error(self, ws, error):
+        print(f"WebSocket error: {error}")
+
+    def on_close(self, ws, close_status_code, close_msg):
+        print(f"WebSocket closed. Code: {close_status_code}, Message: {close_msg}")
+
+    def send_message(self, ws, message):
+        if ws.sock and ws.sock.connected:
+            ws.send(message)
+        else:
+            print("WebSocket is not connected. Attempting to reconnect...")
+            # Here you can attempt to reconnect if you wish
+
+    # Later in your code, when you want to send a message:
+    # def send_server_notification(self):
+    #     ws = websocket.WebSocketApp("ws://134.2.78.150:8020/ws/notifications/",
+    #                                 on_open=self.on_open,
+    #                                 on_error=self.on_error,
+    #                                 on_close=self.on_close)
+    #     self.send_message(ws, "TEST")
+    #     ws.run_forever()
+
 
 class ToolTip:
     def __init__(self, widget, tip_text):
@@ -683,4 +728,3 @@ class ToolTip:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
-
