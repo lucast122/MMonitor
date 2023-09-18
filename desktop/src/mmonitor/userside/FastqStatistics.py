@@ -13,6 +13,7 @@ class FastqStatistics:
         self.sequences = []
         self.qualities = []
         self.lengths = []
+        self.gc_contents = []
         # Detect if it's a gzipped file based on the file extension
 
         self.load_file()
@@ -27,9 +28,6 @@ class FastqStatistics:
                 self.qualities.append(record.letter_annotations["phred_quality"])
                 self.lengths.append(len(record.seq))
 
-        print(self.sequences)
-        print(self.qualities)
-        print(self.lengths)
 
         if not self.qualities:
             raise ValueError("Quality scores list is empty!")
@@ -100,3 +98,7 @@ class FastqStatistics:
             'avg_qualities': avg_qualities
         }
 
+    def gc_content_per_sequence(self):
+        """Compute the GC content for each sequence."""
+        self.gc_contents = [(seq.count('G') + seq.count('C')) / len(seq) for seq in self.sequences]
+        return self.gc_contents

@@ -37,7 +37,7 @@ class InputWindow:
         self.emu_runner = emu_runner
         self.file_paths_single_sample = []  # Store full paths of selected files
         self.multi_sample_input = {}  # dictionary that will contain file path lists and all other relevant information
-
+        self.do_quit = False
         # Toplevel window
         self.top = tk.Toplevel(parent)
         font = ctk.CTkFont(family="Helvetica", size=12)
@@ -237,4 +237,5 @@ class InputWindow:
         ctk.CTkButton(top, text="Okay", command=top.destroy).place(x=85, y=50)
 
     def quit(self):
+        self.do_quit = True
         self.top.destroy()
