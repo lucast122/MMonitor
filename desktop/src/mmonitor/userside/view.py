@@ -261,25 +261,6 @@ class GUI(ctk.CTk):
         widget.bind("<Enter>", tooltip.show_tip)
         widget.bind("<Leave>", tooltip.hide_tip)
 
-    # def ask_create_subproject(self):
-    #     # Create the root window but don't show it
-    #     top = tk.Toplevel(self)
-    #     top.geometry("300x300")
-    #
-    #     # Ask the user if they want to create a subproject
-    #     answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
-    #
-    #     # If the user selects 'Yes'
-    #     if answer:
-    #         subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
-    #         return subproject_name
-    #     else:
-    #         subproject_name = ""
-    #         return subproject_name
-    #     top.destroy()
-    #     top.quit()
-
-
     def open_calendar(self):
         calendar_window = tk.Toplevel()
         calendar_window.title("Choose a Date")
@@ -306,7 +287,7 @@ class GUI(ctk.CTk):
 
         CTkMessagebox(message=text, title=title, icon=icon, option_1="Okay")
 
-\
+
 
     def create_project(self):
         filename = filedialog.asksaveasfilename(
@@ -632,13 +613,12 @@ class GUI(ctk.CTk):
 
         self.show_info("Analysis complete. You can start monitoring now.")
 
-
-def open_input_window_and_wait(self):
-    self.input_window = InputWindow(self, self.emu_runner)
-    time.sleep(1)
-    print("Before wait_window")
-    self.wait_window(self.input_window)
-    print("After wait_window")
+    def open_input_window_and_wait(self):
+        self.input_window = InputWindow(self, self.emu_runner)
+        time.sleep(1)
+        print("Before wait_window")
+        self.wait_window(self.input_window)
+        print("After wait_window")
 
     def checkbox_popup(self):
         self.pipeline_popup = PipelinePopup(self,
@@ -655,8 +635,8 @@ def open_input_window_and_wait(self):
 
     # @require_project
 
-def show_info(self, message):
-    CTkMessagebox(message=message, icon="check", title="Info")
+    def show_info(self, message):
+        CTkMessagebox(message=message, icon="check", title="Info")
 
 
     @require_project
