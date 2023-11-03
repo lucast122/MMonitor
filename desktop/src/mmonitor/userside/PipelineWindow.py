@@ -1,13 +1,13 @@
 import tkinter as tk
 from threading import Thread
-from tkinter import filedialog
 
 import customtkinter as ctk
 
 
-class PipelinePopup:
+class PipelinePopup(ctk.CTkToplevel):
 
     def __init__(self, parent, gui_ref):
+        super().__init__()
         ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
 
         self.parent = parent
@@ -21,14 +21,12 @@ class PipelinePopup:
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
 
-        # Create Toplevel popup
-        self.top = tk.Toplevel(parent)
-        self.top.geometry("440x390")
-        self.top.minsize(440, 390)
-        self.top.title("Select analysis steps to perform.")
+        self.geometry("440x390")
+        self.minsize(440, 390)
+        self.title("Select analysis steps to perform.")
 
-        frame_taxonomy = ctk.CTkFrame(self.top, corner_radius=10)
-        frame_functional = ctk.CTkFrame(self.top, corner_radius=10)
+        frame_taxonomy = ctk.CTkFrame(self, corner_radius=10)
+        frame_functional = ctk.CTkFrame(self, corner_radius=10)
         frame_taxonomy.pack(pady=5, padx=10, fill="both", expand=True)
         frame_functional.pack(pady=5, padx=10, fill="both", expand=True)
 
@@ -51,9 +49,9 @@ class PipelinePopup:
         ctk.CTkCheckBox(frame_functional, text='KEGG', variable=self.kegg).pack(pady=2)
 
         # Continue and Quit buttons
-        continue_btn = ctk.CTkButton(self.top, text="Continue", command=self.run_analysis_pipeline, corner_radius=10)
+        continue_btn = ctk.CTkButton(self, text="Continue", command=self.run_analysis_pipeline, corner_radius=10)
         continue_btn.pack(pady=5)
-        quit_btn = ctk.CTkButton(self.top, text="Quit", command=self.top.destroy, corner_radius=10)
+        quit_btn = ctk.CTkButton(self, text="Quit", command=self.destroy, corner_radius=10)
         quit_btn.pack(pady=5)
 
     def on_kaiju_selected(self):
@@ -64,48 +62,50 @@ class PipelinePopup:
 
 
     def run_analysis_pipeline(self):
-        if self.assembly.get() or self.correction.get():
-            seq_file = filedialog.askopenfilename(title="Please select a sequencing file")
+        # if self.assembly.get() or self.correction.get():
+        #     seq_file = filedialog.askopenfilename(title="Please select a sequencing file")
 
-        if (self.assembly.get() or self.correction.get() or
-                self.annotation.get() or self.binning.get()):
-            sample_name = self.gui.ask_sample_name()
-            self.gui.functional_analysis_runner.check_software_avail()
+        # if (self.assembly.get() or self.correction.get() or
+        #         self.annotation.get() or self.binning.get()):
+        #     sample_name = self.gui.ask_sample_name()
+        #     self.gui.functional_analysis_runner.check_software_avail()
 
-        if self.taxonomy_nanopore_wgs.get():
-            thread_wgs = Thread(target=self.gui.taxonomy_nanopore_wgs)
-            thread_wgs.start()
+        # if self.taxonomy_nanopore_wgs.get():
+        #     thread_wgs = Thread(target=self.gui.taxonomy_nanopore_wgs)
+        #     thread_wgs.start()
 
         if self.taxonomy_nanopore_16s_bool.get():
             thread_16s = Thread(target=self.gui.taxonomy_nanopore_16s)
             thread_16s.start()
 
+        # if self.assembly.get():
+        #     Wrapped in a lambda to defer execution
+        # thread_assembly = Thread(target=lambda: self.gui.functional_analysis_runner.run_flye(seq_file, sample_name))
+        # thread_assembly.start()
 
-        if self.assembly.get():
-            self.gui.functional_analysis_runner.run_flye(seq_file, sample_name)
-        if self.correction.get():
-            self.gui.functional_analysis_runner.run_racon(seq_file, sample_name)
+        # if self.correction.get():
+        #     self.gui.functional_analysis_runner.run_racon(seq_file, sample_name)
 
-        if self.binning.get():
-            self.gui.functional_analysis_runner.run_binning(sample_name)
-        if self.annotation.get():
-            bins_path = f"{ROOT}/src/resources/{sample_name}/bins/"
-            self.gui.functional_analysis_runner.run_prokka(bins_path)
+        # if self.binning.get():
+        #     self.gui.functional_analysis_runner.run_binning(sample_name)
+        # if self.annotation.get():
+        #     bins_path = f"{ROOT}/src/resources/{sample_name}/bins/"
+        #     self.gui.functional_analysis_runner.run_prokka(bins_path)
 
         # if only kegg analysis is selected then the user needs to chose the path to the annotations
-        if self.kegg.get() and not self.assembly.get() and not self.correction.get() and not self.binning.get() and not self.annotation.get():
-            sample_name = self.gui.ask_sample_name()
-            pipeline_out = filedialog.askdirectory(
-                title="Please select the path to the prokka output (folder with tsv files with annotations).")
-            pipeline_out = f"{pipeline_out}/"
-            pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-            self.kegg_thread1 = Thread(target=self.functional_analysis_runner.create_keggcharter_input(pipeline_out))
-            self.kegg_thread1.start()
-            self.kegg_thread2 = Thread(
-                self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
-            self.kegg_thread2.start()
-
-        self.top.destroy()
+        # if self.kegg.get() and not self.assembly.get() and not self.correction.get() and not self.binning.get() and not self.annotation.get():
+        #     sample_name = self.gui.ask_sample_name()
+        #     pipeline_out = filedialog.askdirectory(
+        #         title="Please select the path to the prokka output (folder with tsv files with annotations).")
+        #     pipeline_out = f"{pipeline_out}/"
+        #     pipeline_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+        #     self.kegg_thread1 = Thread(target=self.functional_analysis_runner.create_keggcharter_input(pipeline_out))
+        #     self.kegg_thread1.start()
+        #     self.kegg_thread2 = Thread(
+        #         self.functional_analysis_runner.run_keggcharter(pipeline_out, f"{pipeline_out}keggcharter.tsv"))
+        #     self.kegg_thread2.start()
+        #
+        # self.destroy()
 
         # if kegg and annotation is chosen then the user only needs to select the sample name, then the tsv files from the results
         # of the annotations will be used as input for creating keggcharter input and creating kegg maps
