@@ -1,5 +1,4 @@
 import sqlite3
-from datetime import date
 from json import loads, dumps
 from typing import List, Tuple, Any
 
@@ -116,7 +115,7 @@ class MMonitorDBInterface:
     def update_table_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str,
                                   project_name: str, sample_date):
         """
-        Update MMonitor data from a file containing emu output
+        Update MMonitor data from a file containing emu.py output
         """
         con = sqlite3.connect(self._db_path)
         cursor = con.cursor()
@@ -135,7 +134,7 @@ class MMonitorDBInterface:
 
         # df['Name'] = df['Name'].apply(lambda s: s.strip())
         # add sample name
-        #emu uses different columns for species and genus, so combine them to get the full species name
+        # emu.py uses different columns for species and genus, so combine them to get the full species name
         #full_name = f"{df['species']} {df['genus']}"
         df['Sample'] = sample_name
         df['Sample_date'] = sample_date

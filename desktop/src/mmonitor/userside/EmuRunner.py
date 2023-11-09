@@ -4,10 +4,12 @@ import multiprocessing
 import os
 import subprocess
 
+import pandas as pd
+
 from build_mmonitor_pyinstaller import ROOT
+from lib import emu
 
 
-# TODO complete implementation of this class for 16s analysis to work
 class EmuRunner:
 
     def __init__(self):
@@ -19,7 +21,7 @@ class EmuRunner:
     @staticmethod
     def unpack_fastq_list(ls):
         """
-        Gets a list of paths and outputs a comma seperated string containing the paths used as input for emu
+        Gets a list of paths and outputs a comma seperated string containing the paths used as input for emu.py
         """
         if len(ls) == 1:
             return f"{ls[0]}"
@@ -28,13 +30,13 @@ class EmuRunner:
 
     def check_emu(self):
         try:
-            subprocess.call([f"{ROOT}/lib/emu", '-h'], stdout=open(os.devnull, 'w'),
+            subprocess.run([f"{ROOT}/lib/emu.py", '-h'], stdout=open(os.devnull, 'w'),
                             stderr=subprocess.STDOUT)
         except FileNotFoundError:
             self.logger.error(
-                "Make sure that emu is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
+                "Make sure that emu.py is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
-    def run_emu(self, sequence_list, sample_name):
+    def run_emu(self, sequence_list, sample_name, min_abundace):
         self.emu_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
         print(sequence_list)
         #remove concatenated files from sequence list to avoid concatenating twice
@@ -46,11 +48,36 @@ class EmuRunner:
 
         if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0] or ".fastq" in sequence_list[0]\
                 or ".fq" in sequence_list[0]:
-            cmd = f"{ROOT}/lib/emu abundance {concat_file_name} --db {ROOT}/src/resources/emu_db/" \
-                  f" --output-dir {self.emu_out} --threads {multiprocessing.cpu_count()} --type map-ont --output-basename {sample_name}"
-            print(cmd)
-            os.system(cmd)
-        return
+            # alternative way to call emu. this doesn't work with frozen build from pyinstaller so comment out for now
+            # cmd = f"python {ROOT}/lib/emu.py abundance {concat_file_name} --db {ROOT}/src/resources/emu_db/" \
+            #       f" --output-dir {self.emu_out} --threads {multiprocessing.cpu_count()} --type map-ont --output-basename {sample_name}"
+            # print(cmd)
+            # os.system(cmd)
+            emu_db = f"{ROOT}/src/resources/emu_db/"
+
+            df_taxonomy = pd.read_csv(os.path.join(emu_db, "taxonomy.tsv"), sep='\t',
+                                      index_col='tax_id', dtype=str)
+            db_species_tids = df_taxonomy.index
+            print(f"Emu out: {self.emu_out}")
+            if not os.path.exists(self.emu_out):
+                os.makedirs(self.emu_out)
+
+            out_file_base = self.emu_out
+            sam_out = f"{out_file_base}/emu_alignments.sam"
+            tsv_out = f"{out_file_base}/{sample_name}_rel-abundance"
+            # print(f"Out file: {out_file_base}")
+            SAM_FILE = emu.generate_alignments(concat_file_name, sam_out, emu_db, "map-ont",
+                                               f"{multiprocessing.cpu_count()}", 50, 500000000)
+            log_prob_cigar_op, locs_p_cigar_zero, longest_align_dict = \
+                emu.get_cigar_op_log_probabilities(SAM_FILE)
+            log_prob_rgs, counts_unassigned, counts_assigned = emu.log_prob_rgs_dict(
+                SAM_FILE, log_prob_cigar_op, longest_align_dict, locs_p_cigar_zero)
+            f_full, f_set_thresh, read_dist = emu.expectation_maximization_iterations(log_prob_rgs,
+                                                                                      db_species_tids,
+                                                                                      .01, min_abundace)
+            emu.freq_to_lineage_df(f_full, tsv_out, df_taxonomy,
+                                   counts_assigned, counts_unassigned, True)
+
 
 
 

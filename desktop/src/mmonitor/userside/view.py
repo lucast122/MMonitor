@@ -1,18 +1,22 @@
+import gzip
 import hashlib
 import json
 import os
 import tarfile
+import time
+import tkinter as tk
 import urllib.request
 from datetime import datetime
-from gzip import open
 from threading import Thread
 from time import sleep
 from tkinter import *
 from tkinter import simpledialog
+from tkinter import ttk
 from webbrowser import open_new
 
 import customtkinter as ctk
 import numpy as np
+from CTkMessagebox import CTkMessagebox
 from PIL import Image
 from customtkinter import CTkImage
 from future.moves.tkinter import filedialog
@@ -24,15 +28,15 @@ from mmonitor.dashapp.index import Index
 from mmonitor.database.DBConfigForm import DataBaseConfigForm
 from mmonitor.database.django_db_interface import DjangoDBInterface
 from mmonitor.database.mmonitor_db import MMonitorDBInterface
+from mmonitor.userside.CentrifugeRunner import CentrifugeRunner
+from mmonitor.userside.EmuRunner import EmuRunner
 from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
-from mmonitor.userside.centrifuge import CentrifugeRunner
-from mmonitor.userside.emu import EmuRunner
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 
 # Global constants for version and dimensions
-VERSION = "v1.0 beta"
+VERSION = "v1.0.1 beta"
 MAIN_WINDOW_X: int = 300
 MAIN_WINDOW_Y: int = 600
 
@@ -52,13 +56,11 @@ def require_project(func):
         if obj.db_path is not None and len(obj.db_path) > 0:
             return func(*args)
         else:
-            obj.open_popup("Please first create or choose a local DB.", "No data base chosen")
+            obj.open_popup("Please first create or choose a local DB.", "No data base chosen", icon="cancel")
 
     return func_wrapper
 
 
-import tkinter as tk
-from tkinter import messagebox, ttk
 
 
 def compute_sha256(file_path):
@@ -71,7 +73,7 @@ def compute_sha256(file_path):
     return sha256_hash.hexdigest()
 
 
-class GUI:
+class GUI(ctk.CTk):
     """
     Main GUI class for the MMonitor desktop application. It initializes the GUI layout, provides methods for
     handling user interactions, and interfaces with other components of the application for various tasks.
@@ -82,9 +84,11 @@ class GUI:
     """
 
     def __init__(self):
+        super().__init__()
         self.pipeline_popup = None
         self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
         self.progress_bar_exists = False
+        self.input_window = None
         # self.db_mysql.create_db()
 
         # declare data base class variable, to be chosen by user with choose_project()
@@ -96,10 +100,10 @@ class GUI:
         self.functional_analysis_runner = FunctionalAnalysisRunner()
         self.dashapp = None
         self.monitor_thread = None
-        # self.root = ctk.CTk()
-        self.root = Tk()
+
+        # self = ctk.CTk()
         mmonitor_logo = tk.PhotoImage(file=f"{IMAGES_PATH}/mmonitor_logo.png")
-        self.root.iconphoto(True, mmonitor_logo)
+        self.iconphoto(True, mmonitor_logo)
         self.init_layout()
         self.taxonomy_nanopore_wgs_bool = tk.BooleanVar()
         self.taxonomy_nanopore_16s_bool = tk.BooleanVar()
@@ -132,10 +136,10 @@ class GUI:
 
             return ctk_image
 
-        self.root.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
-        self.root.title(f"MMonitor {VERSION}")
-        self.root.minsize(MAIN_WINDOW_X, MAIN_WINDOW_Y)
-        self.root.configure()  # Set primary color as window background
+        self.geometry(f"{MAIN_WINDOW_X}x{MAIN_WINDOW_Y}")
+        self.title(f"MMonitor {VERSION}")
+        self.minsize(MAIN_WINDOW_X, MAIN_WINDOW_Y)
+        self.configure()  # Set primary color as window background
 
 
         # Style and theme
@@ -162,7 +166,7 @@ class GUI:
 
         # Header with app title
 
-        header_label = ctk.CTkLabel(self.root, text=f"Metagenome Monitor {VERSION}", font=("Helvetica", 18))
+        header_label = ctk.CTkLabel(self, text=f"Metagenome Monitor {VERSION}", font=("Helvetica", 18))
         # header_label.bg_color = PRIMARY_COLOR
         # header_label.fg_color = TEXT_COLOR
         header_label.pack(pady=10)
@@ -174,7 +178,7 @@ class GUI:
             ("Local", [
                 ("Create Local DB", self.create_project, create_local_db_icon),
                 ("Choose Local DB", self.choose_project, add_db_icon),
-                ("Start dashboard", self.start_monitoring, start_offline_monitoring_icon)
+                ("Start Local dashboard", self.start_monitoring, start_offline_monitoring_icon)
 
             ]),
             ("Webserver", [
@@ -222,13 +226,13 @@ class GUI:
         # Configuring Button Style
 
         for category, btns in categories:
-            cat_label = ctk.CTkLabel(self.root, text=category, font=("Helvetica", 20), anchor="center")
+            cat_label = ctk.CTkLabel(self, text=category, font=("Helvetica", 20), anchor="center")
             # cat_label.bg_color = PRIMARY_COLOR
             # cat_label.fg_color = TEXT_COLOR
             cat_label.pack(pady=10)
 
             for text, cmd, img in btns:
-                btn = ctk.CTkButton(self.root, text=text, command=cmd, image=img, width=210, height=40
+                btn = ctk.CTkButton(self, text=text, command=cmd, image=img, width=210, height=40
                                     )
 
                 # btn.bg_color = BUTTON_COLOR
@@ -240,7 +244,7 @@ class GUI:
                 btn.pack(pady=2)
 
         # Quit button
-        quit_btn = ctk.CTkButton(self.root, width=210, height=40, text="Quit", command=self.stop_app, image=quit_icon)
+        quit_btn = ctk.CTkButton(self, width=210, height=40, text="Quit", command=self.stop_app, image=quit_icon)
         # quit_btn.bg_color = BUTTON_COLOR
         # quit_btn.fg_color = BUTTON_TEXT_COLOR
         # quit_btn.hover_bg_color = BUTTON_COLOR  # Set the hover background color
@@ -256,25 +260,6 @@ class GUI:
         tooltip = ToolTip(widget, text)
         widget.bind("<Enter>", tooltip.show_tip)
         widget.bind("<Leave>", tooltip.hide_tip)
-
-    # def ask_create_subproject(self):
-    #     # Create the root window but don't show it
-    #     top = tk.Toplevel(self.root)
-    #     top.geometry("300x300")
-    #
-    #     # Ask the user if they want to create a subproject
-    #     answer = messagebox.askyesno("Create Subproject", "Do you want to create a subproject?")
-    #
-    #     # If the user selects 'Yes'
-    #     if answer:
-    #         subproject_name = simpledialog.askstring("Input", "What is the name of your subproject?")
-    #         return subproject_name
-    #     else:
-    #         subproject_name = ""
-    #         return subproject_name
-    #     top.destroy()
-    #     top.quit()
-
 
     def open_calendar(self):
         calendar_window = tk.Toplevel()
@@ -298,12 +283,11 @@ class GUI:
 
         return selected_date_var.get()
 
-    def open_popup(self, text, title):
-        top = tk.Toplevel(self.root)
-        top.geometry("300x120")
-        top.title(title)
-        ttk.Label(top, text=text, font='Helvetica 12').place(x=40, y=10)
-        ttk.Button(top, text="Okay", command=top.destroy).place(x=85, y=50)
+    def open_popup(self, text, title, icon):
+
+        CTkMessagebox(message=text, title=title, icon=icon, option_1="Okay")
+
+
 
     def create_project(self):
         filename = filedialog.asksaveasfilename(
@@ -346,18 +330,17 @@ class GUI:
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
     def check_emu_db_exists(self):
         # unzip if tar exists, but not taxonomy.tsv
-        if os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar") and not os.path.exists(
+        if os.path.exists(f"{ROOT}/src/resources/emu_db/emu.py.tar") and not os.path.exists(
                 f"{ROOT}/src/resources/emu_db/taxonomy.tsv"):
-            self.open_popup("Unzipping tar", "Unzipping emu.tar")
-            self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar", f"{ROOT}/src/resources/emu_db/")
+            self.open_popup("Unzipping tar", "Unzipping emu.py.tar", "check")
+            self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.py.tar", f"{ROOT}/src/resources/emu_db/")
 
 
         if not os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar"):
-            response = messagebox.askquestion("Emu database not found.",
-                                              "Emu DB not found. Do you want to download it?")
-            if response == "yes":
+            response = CTkMessagebox("Emu DB not found. Do you want to download it?", option_1="Yes", option_2="No")
+            if response.selected_option == "Yes":
                 try:
-                    # download emu db from web if it doesn't exist
+                    # download emu.py db from web if it doesn't exist
                     emu_db_path = f"{ROOT}/src/resources/emu_db/emu.tar"
                     self.download_file_from_web(emu_db_path,
                                                 "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/emu.tar")
@@ -368,7 +351,8 @@ class GUI:
                     self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar",f"{ROOT}/src/resources/emu_db/")
 
                 except FileNotFoundError as e:
-                    self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help", "Could not find emu db")
+                    self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help",
+                                    "Could not find emu.py db", icon="cancel")
 
     def download_file_from_web(self,filepath,url):
 
@@ -376,7 +360,7 @@ class GUI:
             # get file size from content-length header
             file_size = int(response.info().get("Content-Length"))
             # create progress bar widget
-            progress = ttk.Progressbar(self.root, orient="horizontal", length=250, mode="determinate")
+            progress = ttk.Progressbar(self, orient="horizontal", length=250, mode="determinate")
             progress.pack()
             self.progress_bar_exists = True
             progress["maximum"] = file_size
@@ -388,7 +372,7 @@ class GUI:
 
 
             # Periodically update the GUI
-            self.root.after(100, self._check_download_progress, download_thread, progress)
+            self.after(100, self._check_download_progress, download_thread, progress)
             download_thread.join()
 
     def _download_file(self, filepath, url, progress):
@@ -404,18 +388,18 @@ class GUI:
         # Once download is complete
         self.progress_bar_exists = False
         progress.destroy()
-        messagebox.showinfo("Download complete", "Download complete. Unpacking files...")
+        CTkMessagebox(message="Download complete. Unpacking files...", icon="check")
 
     def _check_download_progress(self, download_thread, progress):
         # Update the progress bar with the latest progress value
 
         if self.progress_bar_exists:
             progress["value"] = self.download_progress
-            self.root.update_idletasks()
+            self.update_idletasks()
 
         # If the download thread is still running, keep checking
         if download_thread.is_alive():
-            self.root.after(100, self._check_download_progress, download_thread, progress)
+            self.after(100, self._check_download_progress, download_thread, progress)
 
     #
     # def handle_kaiju_output(self):
@@ -436,12 +420,13 @@ class GUI:
     #     db.add_kaiju_output_to_db(sample_name)
 
 
+
     def check_file_exists(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
             if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
-                response = messagebox.askquestion("Centrifuge index compressed",
-                                                  "Index is compressed. Do you want to decompress it?")
-                if response == "yes":
+                response = CTkMessagebox(
+                    "Index is compressed. Do you want to decompress it?", option_1="Yes", option_2="No")
+                if response.selected_option == "Yes":
                     try:
                         self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
                     except FileNotFoundError as e:
@@ -461,10 +446,10 @@ class GUI:
 
 
         else:
-            response = messagebox.askquestion("Centrifuge index not found",
-                                              "Centrifuge index not found. Do you want to download it?"
-                                              " Might take some time, the tool is unusable while download.")
-            if response == "yes":
+            response = CTkMessagebox("Centrifuge index not found. Do you want to download it?"
+                                     " Might take some time, the tool is unusable while download.", option_1="Yes",
+                                     option_2="No")
+            if response.selected_option == "Yes":
                 self.download_file_from_web(filepath,url)
 
     def unzip_tar(self, file, out_folder):
@@ -504,14 +489,14 @@ class GUI:
         # sample_name = simpledialog.askstring(
         #     "Input sample name",
         #     "What should the sample be called?",
-        #     parent=self.root
+        #     parent=self
         # )
         #
         #
         # sample_date = self.open_calendar()
-        win = InputWindow(self.root, self.emu_runner)
+        win = InputWindow(self, self.emu_runner)
         print("Created input window")
-        self.root.wait_window(win.top)
+        self.checkbox_popup()
         # get entries from input window
         sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
         project_name = str(win.project_name_entry)
@@ -576,25 +561,28 @@ class GUI:
 
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
-        win = InputWindow(self.root, self.emu_runner)
-        print("Created input window")
-        self.root.wait_window(win.top)
+
+        self.open_input_window_and_wait()
+
+
         # quit the method when quit button is pressed instead of running the pipeline
-        if win.do_quit:
+        if self.input_window.do_quit:
             return
         # get entries from input window
-        if not win.process_multiple_samples:
-            sample_name = str(win.sample_name)  # Get the content of the entry and convert to string
-            project_name = str(win.project_name)
-            subproject_name = str(win.subproject_name)
+        if not self.input_window.process_multiple_samples:
+            sample_name = str(self.input_window.sample_name)  # Get the content of the entry and convert to string
+            project_name = str(self.input_window.project_name)
+            subproject_name = str(self.input_window.subproject_name)
             try:
-                sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+                sample_date = self.input_window.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
             except AttributeError as e:
                 sample_date = datetime.today()
-                self.open_popup(f"{e}", f"AttributeError did you forget ot select a date?")
+                self.open_popup(f"AttributeError. Please fill out all input fields or use CSV for sample input.",
+                                f"AttributeError", icon="cancel")
                 print(e)
-            files = win.file_paths_single_sample
-            self.emu_runner.run_emu(files, sample_name)
+                return
+            files = self.input_window.file_paths_single_sample
+            self.emu_runner.run_emu(files, sample_name, 0.1)
             print("add statistics")
             self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                 sample_date)
@@ -603,12 +591,12 @@ class GUI:
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
             print("Processing multiple samples")
-            for index, file_path_list in enumerate(win.multi_sample_input["file_paths_lists"]):
+            for index, file_path_list in enumerate(self.input_window.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
-                sample_name = win.multi_sample_input["sample_names"][index]
-                project_name = win.multi_sample_input["project_names"][index]
-                subproject_name = win.multi_sample_input["subproject_names"][index]
-                sample_date = win.multi_sample_input["dates"][index]
+                sample_name = self.input_window.multi_sample_input["sample_names"][index]
+                project_name = self.input_window.multi_sample_input["project_names"][index]
+                subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
+                sample_date = self.input_window.multi_sample_input["dates"][index]
                 self.emu_runner.run_emu(files, sample_name)
                 self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                     sample_date)
@@ -623,11 +611,17 @@ class GUI:
         # self.db_mysql.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
         #                                          subproject_name)
 
-        self.display_popup_message("Analysis complete. You can start monitoring now.")
+        self.show_info("Analysis complete. You can start monitoring now.")
 
+    def open_input_window_and_wait(self):
+        self.input_window = InputWindow(self, self.emu_runner)
+        time.sleep(1)
+        print("Before wait_window")
+        self.wait_window(self.input_window)
+        print("After wait_window")
 
     def checkbox_popup(self):
-        self.pipeline_popup = PipelinePopup(self.root,
+        self.pipeline_popup = PipelinePopup(self,
                                             self)  # Replace run_analysis_pipeline_function with your actual function
 
 
@@ -635,17 +629,15 @@ class GUI:
         sample_name = simpledialog.askstring(
             "Input sample name",
             "What should the sample be called?",
-            parent=self.root
+            parent=self
         )
         return sample_name
 
     # @require_project
 
-    def display_popup_message(self, message):
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showinfo("Process Completed", message)
-        root.destroy()
+    def show_info(self, message):
+        CTkMessagebox(message=message, icon="check", title="Info")
+
 
     @require_project
     def start_monitoring(self):
@@ -654,7 +646,7 @@ class GUI:
             self.monitor_thread = Thread(target=self.dashapp.run_server, args=(False,))
             self.monitor_thread.start()
         except IndexError:
-            self.display_popup_message(
+            self.show_info(
                 "No data found in database. Please first run analysis pipeline to fill DB with data.")
             return
 
@@ -662,17 +654,23 @@ class GUI:
         open_new('http://localhost:8050')
 
     def start_app(self):
-        self.root.mainloop()
+        self.mainloop()
 
     def stop_app(self):
         if self.monitor_thread is not None and self.monitor_thread.is_alive():
             post('http://localhost:8050/shutdown')
             self.monitor_thread.join()
-        self.root.destroy()
+        self.destroy()
 
     def open_db_config_form(self):
-        db_config_form = DataBaseConfigForm(self.root)
+        db_config_form = DataBaseConfigForm(master=self)
         print(db_config_form.last_config)
+
+
+# this method updates the django db after with the new db_config after the user saves a new db config
+def update_db_config_path(self):
+    self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
+
 
     def on_open(self, ws):
         print("WebSocket connection opened.")

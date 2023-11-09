@@ -3,6 +3,8 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 
+import customtkinter as ctk
+
 from build_mmonitor_pyinstaller import ROOT
 
 """
@@ -18,11 +20,14 @@ save_config(): saves the config as a json file under f"{ROOT}/src/resources/db_c
 
 NOTE: After registration an admin has to unlock account first
 """
-class DataBaseConfigForm(tk.Toplevel):
+
+
+class DataBaseConfigForm(ctk.CTkToplevel):
     def __init__(self, master=None):
         super().__init__(master=master)
         self.title("User Authentication")
-        self.geometry("300x160")
+        self.geometry("300x300")
+        self.master = master
 
         self.db_config = {
             "host": tk.StringVar(),
@@ -50,12 +55,14 @@ class DataBaseConfigForm(tk.Toplevel):
         self.create_widgets()
 
     def create_widgets(self):
+        frame = ctk.CTkFrame(self, corner_radius=10)
+        frame.pack(pady=5, padx=10, fill="both", expand=True)
         for i, key in enumerate(self.db_config.keys()):
-            tk.Label(self, text=key).grid(row=i, column=0)
-            tk.Entry(self, textvariable=self.db_config[key]).grid(row=i, column=1)
-        tk.Checkbutton(self, text="Censor password", variable=self.password_censored,
-                       command=self.toggle_password_censor).grid(row=4, column=0, columnspan=2)
-        tk.Button(self, text="Save Config", command=self.save_config).grid(row=5, column=0, columnspan=2)
+            ctk.CTkLabel(frame, text=key).pack(pady=2)
+            ctk.CTkEntry(frame, textvariable=self.db_config[key]).pack(pady=5)
+        ctk.CTkCheckBox(frame, text="Censor password", variable=self.password_censored,
+                        command=self.toggle_password_censor).pack(pady=5)
+        ctk.CTkButton(frame, text="Save Config", command=self.save_config).pack(pady=5)
 
     def toggle_password_censor(self):
         for widget in self.grid_slaves():
@@ -82,4 +89,8 @@ class DataBaseConfigForm(tk.Toplevel):
             json.dump(config, f)
 
         messagebox.showinfo("Success", "DB Config saved successfully")
+        self.master.update_db_config_path()
+        print("Updated db_config path")
+
         self.destroy()
+

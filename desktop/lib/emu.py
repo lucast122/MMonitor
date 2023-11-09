@@ -4,7 +4,6 @@
 """
 @author: kcurry
 """
-
 import argparse
 import math
 import os
@@ -145,7 +144,7 @@ def get_cigar_op_log_probabilities(sam_path):
             del cigar_stats_primary[i]
     n_char = sum(cigar_stats_primary)
     return [math.log(x) for x in np.array(cigar_stats_primary) / n_char], zero_locs, \
-           dict_longest_align
+        dict_longest_align
 
 
 def compute_log_prob_rgs(alignment, cigar_stats, log_p_cigar_op, dict_longest_align, align_len):
@@ -403,23 +402,24 @@ def freq_to_lineage_df(freq, tsv_output_path, taxonomy_df, assigned_count,
     return results_df
 
 
-def generate_alignments(in_file_list, out_basename, database):
+def generate_alignments(in_file_list, out_basename, database, minimap_type, threads, N, K):
     """ Generate .sam alignment file
 
         in_file_list(list(str)): list of path(s) to input sequences
         out_basename(str): path and basename for output files
     """
     # indicate filepath and create file
-    input_file = " ".join(in_file_list)
-    filetype = pathlib.PurePath(args.input_file[0]).suffix
+    input_file = in_file_list
+    filetype = pathlib.PurePath(in_file_list).suffix
     if filetype == '.sam':
         args.keep_files = True
         return input_file
     sam_align_file = "{}_emu_alignments.sam".format(out_basename)
+    print(f"sam_align_file: {sam_align_file}")
     db_sequence_file = os.path.join(database, 'species_taxid.fasta')
 
-    subprocess.check_output("minimap2 -ax {} -t {} -N {} -p .9 -K {} {} {} -o {}".
-                            format(args.type, args.threads, args.N, args.K,
+    subprocess.check_output("{}/lib/minimap2/minimap2 -ax {} -t {} -N {} -p .9 -K {} {} {} -o {}".
+                            format(ROOT, minimap_type, threads, N, K,
                                    db_sequence_file, input_file, sam_align_file),
                             shell=True)
 
@@ -810,7 +810,7 @@ if __name__ == "__main__":
         f_full, f_set_thresh, read_dist = expectation_maximization_iterations(log_prob_rgs,
                                                                               db_species_tids,
                                                                               .01, args.min_abundance)
-        freq_to_lineage_df(f_full, "{}_rel-abundance".format(out_file), df_taxonomy,
+        freq_to_lineage_df(f_full, out_file, df_taxonomy,
                            counts_assigned, counts_unassigned, args.keep_counts)
 
         # output read assignment distributions as a tsv

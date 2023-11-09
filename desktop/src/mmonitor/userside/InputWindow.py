@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 import customtkinter as ctk
+from CTkMessagebox import CTkMessagebox
 from tkcalendar import Calendar
 
 
@@ -27,8 +28,9 @@ def get_files_from_folder(folder_path):
     return files
 
 
-class InputWindow:
+class InputWindow(ctk.CTkToplevel):
     def __init__(self, parent, emu_runner):
+        super().__init__()
         self.selected_date = None
         self.sample_name = None
         self.project_name = None
@@ -39,48 +41,48 @@ class InputWindow:
         self.multi_sample_input = {}  # dictionary that will contain file path lists and all other relevant information
         self.do_quit = False
         # Toplevel window
-        self.top = tk.Toplevel(parent)
+
         font = ctk.CTkFont(family="Helvetica", size=12)
 
-        self.top.title("Sample Data Input")
-        self.top.geometry("500x800")
-        self.top.minsize(500, 800)
+        self.title("Sample Data Input")
+        self.geometry("500x800")
+        self.minsize(500, 800)
         self.process_multiple_samples = False
 
         padding_y = 2
         label_width = 25
-        ctk.CTkLabel(self.top, text="Sample Name", font=font).pack(pady=padding_y)
-        self.sample_name_entry = ctk.CTkEntry(self.top)
+        ctk.CTkLabel(self, text="Sample Name", font=font).pack(pady=padding_y)
+        self.sample_name_entry = ctk.CTkEntry(self)
         self.sample_name_entry.pack(pady=2)
 
-        ctk.CTkLabel(self.top, text="Project Name", font=font).pack(pady=padding_y)
-        self.project_name_entry = ctk.CTkEntry(self.top)
+        ctk.CTkLabel(self, text="Project Name", font=font).pack(pady=padding_y)
+        self.project_name_entry = ctk.CTkEntry(self)
         self.project_name_entry.pack(pady=padding_y)
         # Trace change in project_name_entry to mirror its content into subproject_name_entry
         self.project_name_entry.bind("<KeyRelease>", self.mirror_project_name)
 
-        ctk.CTkLabel(self.top, text="Subproject Name", font=font).pack(pady=padding_y)
-        self.subproject_name_entry = ctk.CTkEntry(self.top)
+        ctk.CTkLabel(self, text="Subproject Name", font=font).pack(pady=padding_y)
+        self.subproject_name_entry = ctk.CTkEntry(self)
         self.subproject_name_entry.pack(pady=padding_y)
 
-        ctk.CTkLabel(self.top, text="Sample Date", font=font).pack(pady=padding_y)
-        self.date_btn = ctk.CTkButton(self.top, text="Select Date", command=self.open_calendar)
+        ctk.CTkLabel(self, text="Sample Date", font=font).pack(pady=padding_y)
+        self.date_btn = ctk.CTkButton(self, text="Select Date", command=self.open_calendar)
         self.date_btn.pack(pady=padding_y)
 
-        ctk.CTkLabel(self.top, text="Files", font=font).pack(pady=padding_y)
-        self.file_display = tk.Text(self.top, width=400, height=15, wrap="word",
+        ctk.CTkLabel(self, text="Files", font=font).pack(pady=padding_y)
+        self.file_display = tk.Text(self, width=400, height=15, wrap="word",
                                     state=tk.DISABLED)  # Adjusted size and made read-only
         self.file_display.pack(pady=padding_y)
 
         self.use_multiplexing = tk.BooleanVar(value=False)  # BooleanVar to store the checkbox value
 
-        ctk.CTkButton(self.top, text="Add one sample", command=self.add_data_single_sample).pack(pady=padding_y)
-        ctk.CTkButton(self.top, text="Add multiples samples from CSV", command=self.load_from_csv).pack(pady=padding_y)
-        self.multiplexing_checkbox = ctk.CTkCheckBox(self.top, text="Use Multiplexing", variable=self.use_multiplexing)
+        ctk.CTkButton(self, text="Add FASTQ from folder", command=self.add_data_single_sample).pack(pady=padding_y)
+        ctk.CTkButton(self, text="Add multiple samples from CSV", command=self.load_from_csv).pack(pady=padding_y)
+        self.multiplexing_checkbox = ctk.CTkCheckBox(self, text="Use Multiplexing", variable=self.use_multiplexing)
         self.multiplexing_checkbox.pack(pady=padding_y)
 
-        ctk.CTkButton(self.top, text="Submit", command=self.submit).pack(pady=padding_y)
-        ctk.CTkButton(self.top, text="Quit", command=self.quit).pack(pady=padding_y)
+        ctk.CTkButton(self, text="Submit", command=self.submit).pack(pady=padding_y)
+        ctk.CTkButton(self, text="Quit", command=self.quit).pack(pady=padding_y)
 
     def mirror_project_name(self, event):
         # Get the current value of project name entry and set it to subproject name entry
@@ -95,7 +97,7 @@ class InputWindow:
             self.selected_date = selected_date
             date_win.destroy()
 
-        date_win = tk.Toplevel(self.top)
+        date_win = tk.Toplevel(self)
         date_win.title("Select a Date")
 
         cal = Calendar(date_win, selectmode='day')
@@ -105,6 +107,7 @@ class InputWindow:
 
     def add_data_single_sample(self):
         self.process_multiple_samples = False
+
         folder = filedialog.askdirectory(initialdir='/', title="Choose directory containing sequencing data")
         files = self.fetch_files_from_folder(folder)
         self.update_file_display(files)
@@ -114,7 +117,7 @@ class InputWindow:
         self.project_name = self.project_name_entry.get()
         self.subproject_name = self.subproject_name_entry.get()
 
-        self.top.destroy()
+        self.destroy()
 
     def load_from_csv(self):
         self.process_multiple_samples = True
@@ -201,20 +204,21 @@ class InputWindow:
             # Provide feedback on the number of samples to be processed
             num_samples_to_process = len(self.multi_sample_input["file_paths_lists"])
             if num_samples_to_process <= 5:
-                self.open_popup(f"Processing {num_samples_to_process} samples.", "Processing multiple samples.")
+                self.open_popup(f"Processing {num_samples_to_process} samples.", "Processing multiple samples.",
+                                icon="check")
             else:
                 self.open_popup(f"Processing {num_samples_to_process} samples. This may take a while.",
-                                "Processing multiple samples.")
+                                "Processing multiple samples.", icon="check")
 
         # Handle error messages from loading the CSV
         if error_messages:
             if len(error_messages) > 2:  # Limit the number of error popups
-                self.open_popup("\n".join(error_messages[:2]) + "\n...and more", "Errors with CSV")
+                self.open_popup("\n".join(error_messages[:2]) + "\n...and more", "Errors with CSV", icon="cancel")
             else:
                 for error in error_messages:
-                    self.open_popup(error, "Error with CSV")
+                    self.open_popup(error, "Error with CSV", icon="cancel")
 
-            self.top.destroy()
+            self.destroy()
 
     def fetch_files_from_folder(self, sample_folder):
         files = [f for f in get_files_from_folder(sample_folder) if
@@ -228,14 +232,10 @@ class InputWindow:
             self.file_display.insert(tk.END, os.path.basename(file) + "\n")
         self.file_display.config(state=tk.DISABLED)
 
-    def open_popup(self, text, title):
-        font = ctk.CTkFont(family="Helvetica", size=12)
-        top = tk.Toplevel(self.parent)
-        top.geometry("300x120")
-        top.title(title)
-        ctk.CTkLabel(top, text=text, font=font).place(x=40, y=10)
-        ctk.CTkButton(top, text="Okay", command=top.destroy).place(x=85, y=50)
+    def open_popup(self, text, title, icon):
+        CTkMessagebox(message=text, title=title, icon=icon, option_1="Okay")
 
+    \
     def quit(self):
         self.do_quit = True
-        self.top.destroy()
+        self.destroy()
