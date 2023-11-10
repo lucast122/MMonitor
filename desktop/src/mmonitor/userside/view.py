@@ -129,8 +129,8 @@ class GUI(ctk.CTk):
             base_width = x
             w_percent = base_width / float(icon.width)
             h_size = int(float(icon.height) * float(w_percent))
-            icon = icon.resize((base_width, h_size), Image.ANTIALIAS)
 
+            icon = icon.resize((base_width, h_size), Image.LANCZOS)
             # Convert the PIL image to a CTkImage
             ctk_image = CTkImage(icon, size=(x, x))
 
