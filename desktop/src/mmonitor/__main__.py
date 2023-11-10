@@ -1,10 +1,7 @@
 import sys
 
-sys.path.append('/Users/timolucas/PycharmProjects/MMonitor/desktop/')
-from mmonitor.userside.view import GUI
-
-
 from build_mmonitor_pyinstaller import ROOT
+from mmonitor.userside.view import GUI
 
 print(ROOT)
 print(f"Before adding folder to sys.path: {sys.path}")
