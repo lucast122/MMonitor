@@ -6,6 +6,15 @@ cimport cmappy
 
 cimport
 
+cimport
+uint8_t, int8_t
+cimport
+cmappy
+cimport
+from libc.stdlib cimport
+
+free
+
 cmappy
 from libc.stdint cimport
 
@@ -190,7 +199,7 @@ cdef class Aligner:
 				cmappy.mm_idx_index_name(self._idx)
 		else:
 			self._idx = cmappy.mappy_idx_seq(self.idx_opt.w, self.idx_opt.k, self.idx_opt.flag & 1,
-											 self.idx_opt.bucket_bits, str.encode(seq), len(seq))
+                                             self.idx_opt.bucket_bits, str.encode(seq), len(seq))
 			cmappy.mm_mapopt_update(&self.map_opt, self._idx)
 			self.map_opt.mid_occ = 1000  # don't filter high-occ seeds
 
