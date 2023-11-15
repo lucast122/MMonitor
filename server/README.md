@@ -11,7 +11,7 @@ body {
 - Set `Rscript` location in `MMonitor/settings.py`
 
 ## Run debug server:
-
+- 
 - PyCharm (requires PyCharm Professional):
   - Set up Django run configuration:
     1. Enable Django support in settings

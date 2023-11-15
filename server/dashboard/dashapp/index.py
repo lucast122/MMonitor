@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import re
+from dash_extensions import WebSocket
 
 import numpy as np
 from natsort import natsorted
@@ -180,14 +181,18 @@ class Index:
         """
 
         location = dcc.Location(id='url', refresh=True)
-        location_django = dcc.Location(id='url-django', refresh=True)
         navigation = html.Div([
             dcc.Link(values['name'], href=url, style={'padding': '5px', 'font-size': "20px", "hover" : "#B22222:",'color':'white'})
             for url, values in self._apps.items()
         ], className="row",style={'margin-left': '0px','backgroundColor':'#444E57','hover':'#B22222'})
         page_content = html.Div(id='page-content', children=[],style={'backgroundColor':'#f5f7fa'})
         # graph1 = dcc.Graph(id='graph1', figure={'data': []})
-        container = html.Div([location, navigation, page_content],style={'backgroundColor': '#f5f7fa'})
+
+        websocket = html.Div([
+    WebSocket(id="ws", url="ws://134.2.78.150:8020/ws/notifications/"),
+    html.Div(id="output")
+])
+        container = html.Div([location, navigation,   page_content],style={'backgroundColor': '#f5f7fa'})
         
         self.layout = container
 
