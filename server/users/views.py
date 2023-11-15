@@ -95,6 +95,14 @@ def add_nanopore_record(request):
 
             NanoporeRecord.objects.create(
                 taxonomy=data.get('taxonomy'),
+                tax_genus=data.get('tax_genus'),
+                tax_family=data.get('tax_family'),
+                tax_order=data.get('tax_order'),
+                tax_class=data.get('tax_class'),
+                tax_phylum=data.get('tax_phylum'),
+                tax_superkingdom=data.get('tax_superkingdom'),
+                tax_clade=data.get('tax_clade'),
+                tax_subspecies=data.get('tax_subspecies'),
                 abundance=data.get('abundance'),
                 sample_id=data.get('sample_id'),
                 project_id=data.get('project_id'),

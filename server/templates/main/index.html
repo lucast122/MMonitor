@@ -1,68 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
 {%  extends "base.html" %}
-
-<li>A web-based dashboard (django-dash) for result visualization.</li>
 {% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMonitor Documentation</title>
 
 
-    <h1 id="mmonitor-user-guide">MMonitor User Guide</h1>
+   
+</head>
+<body>
+
+<img src="static/mmonitor_banner.png" alt="MMonitor graphical user interface" max-width=4000/>
 
 <!-- Highlighted download link section -->
-<div style="background-color: #f7f7f9; padding: 10px 0; text-align: center; margin-bottom: 20px; border-radius: 5px;">
-    <h2>Download MMonitor v1.0-beta</h2>
-    <a href="https://software-ab.cs.uni-tuebingen.de/download/MMonitor/mmonitor_v1.0-b.zip" target="_blank" style="font-size: 20px; color: #007bff; text-decoration: underline;">Get the Latest Release for MacOS</a>
+<div style="background-color: #f7f7f9; padding: 0px 0; text-align: center; margin-bottom: 5px; border-radius: 5px;">
+    <h2> Download  <span>
+    <a href="https://software-ab.cs.uni-tuebingen.de/download/MMonitor/mmonitor_v1.0.1-b.zip"
+       target="_blank" style="font-size: 25px; color: #007bff; text-decoration: under">v1.0.1-beta for MacOS
+
+    </a> For other OS find the code on
+        <a href="https://www.github.com/lucast122/MMonitor"><img class="compact-github" src="static/GitHub_Logo.png"></a>
+
+    </span>
+
+    </h2>
+
+
+</div>
+
 </div>
 
 
+<section>
+    <h2>Introduction</h2>
+    <p>MMonitor is software designed for monitoring metagenomes over time, using data from nanopore sequencing.
+        It includes a Python application for desktop use, which manages the analysis of sequence data and metadata
+        for taxonomic and functional insight, as well as quality control. The accompanying webserver Dashboard
+        provides a platform for users to view their analysis results after logging in. Developed with input from
+        laboratory researchers, MMonitor supports real-time data analysis to offer immediate sample overviews,
+        and is flexible for use on personal computers or via external servers for enhanced processing capabilities.
 
-<h1 id="mmonitor-user-guide">MMonitor User Guide</h1>
-<h2 id="introduction-">Introduction:</h2>
-<p>MMonitor is a comprehensive metagenome monitoring software designed to process, visualize, and analyze nanopore sequencing data. The software consists of two main components: </p>
-<ol>
-<li>A desktop application with a graphical user interface (GUI) for data selection, pipeline execution, and database management.</li>
-<li>A web-based dashboard (django-dash) for result visualization.</li>
-</ol>
-<h2 id="getting-started-">Getting Started:</h2>
-<h3 id="launching-the-application-">Launching the Application:</h3>
-<ul>
-<li>Navigate to the MMonitor root directory and run the <code>__main__.py</code> file.</li>
-<li>The main GUI window will appear, offering several functionalities.</li>
-</ul>
-<h3 id="local-database-management-">Local Database Management:</h3>
-<ul>
-<li><strong>Create Local DB</strong>: Set up a new local database for your project.</li>
-<li><strong>Choose Local DB</strong>: Select an existing local database.</li>
-<li><strong>Start Offline Monitoring</strong>: Begin the offline monitoring process.</li>
-</ul>
-<h3 id="webserver-authentication-">Webserver Authentication:</h3>
-<ul>
-<li>Click on the <code>User Authentication</code> button.</li>
-<li>Provide your username and password registered on the MMonitor webpage.</li>
-<li>Ensure the 'host' and 'database' fields remain unchanged.</li>
-</ul>
-<h3 id="data-addition-">Data Addition:</h3>
-<ul>
-<li><strong>Add Metadata from CSV</strong>: Append metadata by uploading a CSV file. A sample file, 'meta.csv', is available in the root directory for reference.</li>
-<li><strong>Process Sequencing Files</strong>: Process and analyze your sequencing files. Select the desired analysis type and proceed.</li>
-</ul>
-<h2 id="web-dashboard-">Web Dashboard:</h2>
-<ul>
-<li>Access the MMonitor web dashboard through your web browser.</li>
-<li>The dashboard provides various visualization options:
-<ul>
-<li><strong>Taxonomy</strong>: View the taxonomic profile of your samples.</li>
-<li><strong>Correlations</strong>: Analyze correlations between taxonomies and metadata.</li>
-<li>Other visualizations, including horizon plots, statistics, etc.</li>
-</ul>
+    </p>
+</section>
+
+<style>
+    .instructions {
+        counter-reset: list-counter;
+    }
+</style>
+
+<section>
+    <h2>Installation and Usage Instructions</h2>
+    <p>
+       MMonitor is a comprehensive tool comprising two main components: a Desktop Application and a Webserver
+        for visualization. The Desktop Application, designed for pipeline execution,
+        should ideally be installed on the computer managing the nanopore sequencer or
+        one that has access to the sequencing data. It offers the flexibility of being operated through a user-friendly
+        graphical interface or via a command line tool on a remote server. Although MMonitor was designed for handling
+        metagenomes, it could also be used to inspect isolates, e.g. checking them for contamination.
+    </p>
+    <ul>
+        <p>
+
+        <h3><u>MacOS</u></h3>
+        <ol class="instructions">
+
+        <li>Download the prebuilt MMonitor application from this website.
+            </li>
+        <li>
+            There is no installation necessary just unzip the application and open the file 'mmonitor'.
+        </li>
+        <li>
+            Wait for the application to start. If the application doesn't start check the console output for an error message.
+            Proceed with general usage instructions below.
+        </p>
+
+        </li>
+        </ol>
+
+
+            <h3><u>Unix</u></h3>
+
+
+
+            Currently, if you want to run MMonitor on a Unix distribution you will need
+            to clone the<a href="http://www.github.com/lucast122/MMonitor/">github repository</a>and run the code
+            directly using Python.
+
+                <ol class="instructions">
+
+        <li>
+    Open a command line tool like Terminal (Unix) or PowerShell (Windows). Make sure you have Git installed on your system and run:
+    <code>
+        <p>git clone "https://github.com/lucast122/MMonitor/"</p>
+    </code>
 </li>
-</ul>
-<h3 id="tooltips-">Tooltips:</h3>
-<p>Hover over interface elements to view tooltips, which provide additional context and instructions for each function.</p>
-<h3 id="closing-the-application-">Closing the Application:</h3>
-<p>Click on the <code>Quit</code> button to safely close the application.</p>
-<hr>
-<p><strong>Note</strong>: Always ensure your data is backed up before starting any analysis. MMonitor is a powerful tool, but as with all software, understanding its functions and regularly saving your work will help ensure the best experience.</p>
 
-<!-- Added GitHub and latest release links -->
-<p>For more details and updates, visit the MMonitor repository on <a href="https://www.github.com/lucast122/mmonitor/" target="_blank">GitHub</a> or check out the <a href="#latest-release-placeholder" target="_blank">latest release</a>.</p>
+<li>
+    <em>Optional:</em> Create a new Conda environment to avoid conflicting versions:
+    <code>
+        <p>conda create -n mmonitor python=3.10</p>
+        <p>conda activate mmonitor</p>
+    </code>
+</li>
+
+<li>
+    Install the required Python dependencies with:
+    <code>
+        <p>python -m pip install -r MMonitor/desktop/requirements.txt</p>
+    </code>
+</li>
+
+<li>
+    Finally, run the software using:
+    <code>
+        <p>python MMonitor/desktop/src/mmonitor/__main__.py</p>
+    </code>
+</li>
+        </ol>
+
+
+
+
+        <h3><u>Windows</u></h3>
+        <p><b>Warning:
+
+        Running analysis pipelines is not possible using MMonitor's Desktop application with windows as the tools used
+        in the pipelines were not designed to work with Windows. The only thing you can do with MMonitor on Windows right
+        now is adding metadata to a sample and opening local MMonitor databases for result inspection. You can still
+        inspect your results on this website with Windows, however, adding new data is only supported under MacOS or Unix.</b>
+            </p>
+        Currently, if you want to run MMonitor on Windows you will need
+            to clone the<a href="http://www.github.com/lucast122/MMonitor/">github repository</a>and run the code
+            directly using Python.
+        <ol class="instructions">
+
+        <li>
+    Open PowerShell (you can search for it in the Start menu). Ensure you have Git installed on your system. If Git is not installed, you can download and install it from <a href="https://git-scm.com/download/win">here</a>. Then run the following command to clone the repository:
+    <code>
+        <p>git clone "https://github.com/lucast122/MMonitor/"</p>
+    </code>
+</li>
+
+<li>
+    <em>Optional:</em> It's recommended to create a new Conda environment to avoid conflicting versions with other Python projects. If Conda is not installed, you can download and install Anaconda from <a href="https://www.anaconda.com/products/distribution">here</a>. To create and activate a new environment, run:
+    <code>
+        <p>conda create -n mmonitor python=3.10</p>
+        <p>conda activate mmonitor</p>
+    </code>
+</li>
+
+<li>
+    Install the required Python dependencies. Navigate to the directory where you cloned the repository and run:
+    <code>
+        <p>python -m pip install -r MMonitor\desktop\requirements.txt</p>
+    </code>
+    Note: Use backslashes (\) for file paths in Windows.
+</li>
+
+<li>
+    Finally, to run the software, use the following command:
+    <code>
+        <p>python MMonitor\desktop\src\mmonitor\__main__.py</p>
+    </code>
+</li>
+        </ol>
+
+
+<h3><u>General usage instructions</u></h3>
+<ol class="instructions">
+    	<li>Login or register an account on this website by clicking either Login or Register on this website.</li>
+    <li>
+    After installing MMonitor run the application and a window similar to the one below should pop up.
+            <img src="static/gui.png" alt="MMonitor graphical user interface"/ width=300 >
+</li>
+
+    <li>
+            Click on User Authentication. The 'User Authentication' window should pop up. The credentials for a test user
+        should be displayed. Do not change the host. Change the user and password to the username and password you
+        chose when registering for this website. Make sure everything is correct and click'Save config' to save the changes.
+            The user that is provided will be associated with all the data that is evaluated with MMonitor.
+
+            <img src="static/authentication.png" alt="MMonitor graphical user interface"/ width=300 >
+
+        </li>
+        <li>
+        Alternatively you can also skip step 5 and instead use a local database for storing your data. To do this click on
+            'Create local DB' to create one, or 'Choose Local DB' to choose a DB created earlier. If you choose or create
+            a DB your data will automatically be inserted in that DB when processing sequencing files. After adding data
+            click 'Start dashboard' to start a local server with your data.
+        </li>
+        <li>
+            Add your metagenome data. Click 'Process sequencing files'. In the new window select any analysis that you
+            wish to perform. For taxonomic analysis select 'Quick taxonomy nanopore' if you are using nanopore whole genome
+            sequencing reads. If you only sequenced the 16s rRNA gene select 'Quick taxonomy nanopore 16s'.
+            For functional analysis select all the steps you wish to perform, however, when selecting e.g. 'KEGG' you
+            will also need to select the previous steps as they are required. In example you need an assembly for the KEGG
+            pathways and annotation, but you can run only the assembly without running the other functional anlysis steps.
+
+            <img src="static/analysis_window.png" alt="MMonitor graphical user interface"/ width=300 >
+
+
+        </li>
+        <li>
+            After selecting the analysis hit submit and the Input Window should open. You can either add a single sample,
+            by filling out all necessary fields (Sample Name, Project Name, Sample Date, ...) and then clicking
+            'Add FASTQ from folder'. Select the folder with the sequencing data (when using Minknow for sequencing this
+            should be called fastq_pass). After selecting the folder all sequencing files that will be considered for the
+            analysis will be displayed. If you want to add multiple you can do so by providing a CSV file that contains
+            the information you would otherwise fill out in the window as well as the folder path to the sequencing files.
+            Every column in the CSV file will be treated as an extra sample. If you have different barcodes select 'Multiplexing'
+            before adding a CSV and provide the barcode IDs in the respective column of the CSV file. If 'Multiplexing' is
+            not selected, then the barcode column will be ignored. An example CSV file
+            can be downloaded
+            <a href="static/mmonitor_add_samples_example.csv" download>here</a>.
+            Finally, click 'Submit' to start the analysis either for one sample or multiple samples in case
+            you provided a CSV.
+
+
+
+            <img src="static/sample_input.png" alt="MMonitor graphical user interface"/ width=300 >
+
+        </li>
+        <li>
+            When the analysis is finished a popup will notify you. Go to this website and click 'Dashboard' to see the
+            results. If you used a Local Database instead then click 'Start Dashboard' in the main window to see
+            your results instead.
+        </li>
+
+
+</ol>
+
+
+
+</ol>
+
+        </p>
+
+
+    </ul>
+</section>
+
+<section>
+    <h2>Requirements</h2>
+    MMonitor supports MacOS, Ubuntu, and Windows. Currently there is only a build for MacOS on the website,
+        if you want to use MMonitor on a different OS please refer to the
+        <href="http://www.github.com/lucast122/MMonitor/">github page</>.
+        The prerequisites include a modern CPU, 16-32GB of RAM, and an up to date browser like Safari or Google Chrome.</p>
+</section>
+
+
+
+<section>
+    <h2>Contributing</h2>
+    <p>We are open to contributions! Please adhere to community guidelines and ensure a collaborative environment.
+    For source code check out the Github repository.
+
+    <a href="https://www.github.com/lucast122/MMonitor"><img src="static/GitHub_Logo.png" height="100`````````````````````````````````````    </p>
+</section>
+
+<section>
+    <h2>Contact & Support</h2>
+    <p>For any queries, support, or feedback, reach out to me at
+    <a href="mailto:timo-niklas.lucas@uni-tuebingen.de">timo-niklas.lucas@uni-tuebingen.de</a>
+        or open a mew Issue on the Github page.
+    </p>
+</section>
+
+<footer>
+    <p>© 2023 MMonitor. All Rights Reserved.</p>
+</footer>
+
+</body>
+</html>
 
 {% endblock content %}
