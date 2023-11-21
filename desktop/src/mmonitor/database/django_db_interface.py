@@ -162,8 +162,10 @@ class DjangoDBInterface:
             f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
             sep='\t',
             header=None,
-            usecols=[0, 1, 2, 3],
-            names=['Taxid', 'Abundance', 'Species', 'Genus']
+            # usecols=[0, 1, 2, 3],
+            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 19],
+            names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
+                   'Clade', 'Subspecies']
         )
         df = df.fillna("Not Available")
 
@@ -176,7 +178,17 @@ class DjangoDBInterface:
         for index, row in df.iterrows():
             record_data = {
                 "taxonomy": row['Species'],
+                "tax_genus": row['Genus'],
+                "tax_family": row['Family'],
+                "tax_order": row['Order'],
+                "tax_class": row['Class'],
+                "tax_phylum": row['Phylum'],
+                "tax_superkingdom": row['Superkingdom'],
+                "tax_clade": row['Clade'],
+                "tax_subspecies": row['Subspecies'],
+
                 "abundance": row['Abundance'],
+
                 "sample_id": sample_name,
                 "project_id": project_name,
                 "user_id": user_id,
