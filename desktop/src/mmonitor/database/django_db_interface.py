@@ -21,6 +21,23 @@ This class gets the path to a db_config file. The db_config is has the host ip '
 """
 
 
+def convert_date_format(date_str):
+    parts = date_str.split('.')
+
+    # Check if the date is in the format DD.MM.YYYY or DD.MM.YY
+    if len(parts) == 3 and all(part.isdigit() for part in parts):
+        day, month, year = parts
+
+        # Convert 2-digit year to 4-digit year assuming it's in the 2000s
+        if len(year) == 2:
+            year = '20' + year
+
+        return f"{year}-{month}-{day}"
+    else:
+        # Return the original date if the format is not recognized
+        return date_str
+
+
 class DjangoDBInterface:
     def __init__(self, db_config: str):
         try:
@@ -162,21 +179,36 @@ class DjangoDBInterface:
             f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
             sep='\t',
             header=None,
-            usecols=[0, 1, 2, 3],
-            names=['Taxid', 'Abundance', 'Species', 'Genus']
+            # usecols=[0, 1, 2, 3],
+            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 19],
+            names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
+                   'Clade', 'Subspecies']
         )
         df = df.fillna("Not Available")
 
         df = df.sort_values('Abundance', ascending=False)
         df = df.iloc[1:]
         df['Sample'] = sample_name
+        # check if sample is in wrong format and convert using function convert_date_format()
+        sample_date = convert_date_format(sample_date)
 
         df['Sample_date'] = sample_date
+
 
         for index, row in df.iterrows():
             record_data = {
                 "taxonomy": row['Species'],
+                "tax_genus": row['Genus'],
+                "tax_family": row['Family'],
+                "tax_order": row['Order'],
+                "tax_class": row['Class'],
+                "tax_phylum": row['Phylum'],
+                "tax_superkingdom": row['Superkingdom'],
+                "tax_clade": row['Clade'],
+                "tax_subspecies": row['Subspecies'],
+
                 "abundance": row['Abundance'],
+
                 "sample_id": sample_name,
                 "project_id": project_name,
                 "user_id": user_id,
@@ -249,6 +281,8 @@ class DjangoDBInterface:
 
         except Exception as e:
             print(e)
+
+    # method that converts dates from format DD.MM.YYYY to YYYY-MM-DD only if format is DD.MM.YYYY
 
     # def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
     #                                  project_name: str, sample_date):
