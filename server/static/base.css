@@ -3,25 +3,25 @@ ul.menu {
   margin: 0px;
   padding: 0px;
   overflow: hidden;
-  background-color: #444E57; !important;
+  background-color: #16262C; !important;
 }
 
 li.menu {
   float: left;
-  background-color: #444E57; !important;
+  background-color: #16262C; !important;
   color: white;
 }
 
 li.menu a {
   display: block;
   color: white;
-  text-align: center;
+  text-align: left;
 
   text-decoration: none;
 }
 
 li.menu a:hover {
-  background-color: #B22222 !important;
+
 }
 
 .dash-checklist .checklist-entry label {
@@ -29,27 +29,29 @@ li.menu a:hover {
 }
 
 li.menu a {
-  background-color: #444E57 !important;
+  background-color: #16262C !important;
   color: white !important;
   padding: 14px 25px;
   text-align: center;
   text-decoration: none;
+
+
 }
 
 li.menu a:link {
-  background-color: #444E57 !important;
+  background-color: #16262C !important;
 }
 
 li.menu a:visited {
-  background-color: #444E57 !important;
+  background-color: #16262C !important;
 }
 
 li.menu a:hover {
-  background-color: #B22222 !important;
+
 }
 
 li.menu a:active {
-  background-color: #B22222 !important;
+
 }
 /* Reset some default browser styles */
 body, h1, h2, h3, p, ul, ol, li, a {

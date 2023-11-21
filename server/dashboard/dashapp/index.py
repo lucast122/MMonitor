@@ -67,6 +67,7 @@ class Index:
 
     def __init__(self,user_id=None):
         self.user_id = user_id
+        print(user_id)
         self.app = DjangoDash('Index', add_bootstrap_links=True)
 
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
@@ -182,9 +183,9 @@ class Index:
 
         location = dcc.Location(id='url', refresh=True)
         navigation = html.Div([
-            dcc.Link(values['name'], href=url, style={'padding': '5px', 'font-size': "20px", "hover" : "#B22222:",'color':'white'})
+            dcc.Link(values['name'], href=url, style={'padding': '15px 25px', 'font-size': "16px", 'color':'white'})
             for url, values in self._apps.items()
-        ], className="row",style={'margin-left': '0px','backgroundColor':'#444E57','hover':'#B22222'})
+        ], className="row",style={'margin-left': '0px','backgroundColor':'#15242B'})
         page_content = html.Div(id='page-content', children=[],style={'backgroundColor':'#f5f7fa'})
         # graph1 = dcc.Graph(id='graph1', figure={'data': []})
 
@@ -212,15 +213,23 @@ class Index:
         )
         return heatmap
 
-    def plot_stacked_bar(self, df, use_date_value):
-        # If you're using date as the x-axis:
+    def plot_stacked_bar(self, df, use_date_value, taxonomic_rank):
+        # Group and sum the data based on the x-axis and the taxonomic rank
         if use_date_value:
-            fig1 = px.bar(df, x="date", y="abundance", color="taxonomy", barmode="stack", hover_data=self.hover_data,
-                          category_orders={"date": sorted(df["date"].unique())})
-        # If you're using sample_id as the x-axis:
+            x_axis = "date"
         else:
-            fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="stack",
-                          hover_data=self.hover_data,
+            x_axis = "sample_id"
+
+        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+
+        # Plotting the data
+        if use_date_value:
+            fig1 = px.bar(grouped_df, x="date", y="abundance", color=taxonomic_rank, barmode="stack",
+
+                          category_orders={"date": sorted(df["date"].unique())})
+        else:
+            fig1 = px.bar(grouped_df, x="sample_id", y="abundance", color=taxonomic_rank, barmode="stack",
+
                           category_orders={"sample_id": sorted(df["sample_id"].unique(), key=self.split_alphanumeric)})
 
         fig1 = go.Figure(fig1)
@@ -252,60 +261,39 @@ class Index:
         # fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="stack",hover_data=self.hover_data)
         return fig1
 
-    def plot_grouped_bar(self, df,use_date_value):
-        # Plotting code for grouped bar goes here...
-        if use_date_value:
-            fig1 = px.bar(df, x="date", y="abundance", color="taxonomy", barmode="group",
-                          hover_data=self.hover_data)
-        else:
-            fig1 = px.bar(df, x="sample_id", y="abundance", color="taxonomy", barmode="group",hover_data=self.hover_data)
-
-        # fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="group",hover_data=self.hover_data)
-
+    def plot_grouped_bar(self, df, use_date_value, taxonomic_rank):
+        x_axis = "date" if use_date_value else "sample_id"
+        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+        fig1 = px.bar(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, barmode="group",
+                      )
         return fig1
 
-    def plot_scatter(self, df,use_date_value):
-        if use_date_value:
-            fig1 = px.scatter(df, x="date", y="abundance", size="abundance", color="sample_id",
-                              hover_data=self.hover_data)
-        else:
-            fig1 = px.scatter(df, x="sample_id", y="abundance", size="abundance", color="sample_id",hover_data=self.hover_data)
-        # fig2 = px.scatter(df, x="taxonomy", y="sample_id", size="abundance", color="sample_id",
-        #                   hover_data=self.hover_data)
-        # fig2_style = {'display': 'block'}
-        
-        # style={"textAlign": "center", "margin-top": "1px"} 
+    def plot_scatter(self, df, use_date_value, taxonomic_rank):
+        x_axis = "date" if use_date_value else "sample_id"
+        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+        fig1 = px.scatter(grouped_df, x=x_axis, y="abundance", size="abundance", color=taxonomic_rank
+                          )
         return fig1
 
-    def plot_area(self, df,use_date_value):
-        # Plotting code for area plot goes here...
-        if use_date_value:
-            fig1 = px.area(df, x="date", y="abundance", color="taxonomy", line_group="taxonomy",
-                   hover_data=self.hover_data)
-        else:
-            fig1 = px.area(df, x="sample_id", y="abundance", color="taxonomy", line_group="taxonomy",hover_data=self.hover_data)
-        # fig2 = px.area(df, x="sample_id", y="abundance", color="abundance", line_group="abundance",hover_data=self.hover_data)
-        # fig2_style = {'display': 'none'}
-        # markdown_style = {'display': 'none'}
+    def plot_area(self, df, use_date_value, taxonomic_rank):
+        x_axis = "date" if use_date_value else "sample_id"
+        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+        fig1 = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, line_group=taxonomic_rank)
         return fig1
 
-    def plot_scatter_3d(self, df):
+    def plot_scatter_3d(self, df, taxonomic_rank):
         # Plotting code for scatter 3D goes here...
-        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color='taxonomy',hover_data=self.hover_data)
+        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank)
         # fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='abundance',hover_data=self.hover_data)
         return fig1
 
-    def plot_pie(self, df,sample_value_piechart):
-        # Plotting code for pie chart goes here...
-        pie_values = df.loc[df["sample_id"] == sample_value_piechart, 'abundance']
-        pie_names = df.loc[df["sample_id"] == sample_value_piechart, 'taxonomy']
-        fig1 = px.pie(df, values=pie_values, names=pie_names,
+    def plot_pie(self, df, sample_value_piechart, taxonomic_rank):
+        filtered_df = df[df["sample_id"] == sample_value_piechart]
+        aggregated_df = filtered_df.groupby(taxonomic_rank)['abundance'].sum().reset_index()
+        fig1 = px.pie(aggregated_df, values='abundance', names=taxonomic_rank,
                       title=f'Pie chart of bioreactor taxonomy of sample {sample_value_piechart}')
         piechart_style = {'display': 'block'}
-        
-        # fig2_style = {'display': 'none'}
-        # markdown_style = {'display': 'none'}
-        return fig1,piechart_style
+        return fig1, piechart_style
 
     def split_alphanumeric(self,text):
         matches = re.findall(r'(\d+|\D+)', text)
@@ -485,20 +473,22 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
 
 
-        #this updates the graph based on the samples selected 
+        #this updates the graph based on the samples selected
+        # this should also update graph based on taxonomic rank selected
         
         @self.app.callback(
             Output('graph1', 'figure'),
             Output('number_input_piechart', 'style'),
             # Output('markdown-caption','style'),
             Input('dropdown', 'value'),
+            Input('tax_rank_dropdown', 'value'),
             Input('number_input_piechart', 'value'),
             Input('slider', 'value'),
             Input('sample_select_value', 'value'),
             Input('use_date_value','value')
 
         )
-        def plot_selected_figure(value, sample_value_piechart, slider_value, sample_select_value,use_date_value) -> Tuple[Figure, Figure, Dict[str, str]]:
+        def plot_selected_figure(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,use_date_value) -> Tuple[Figure, Figure, Dict[str, str]]:
             """
             Update the figures based on the selected value from the dropdown menu, the selected sample value for the piechart,
             and the selected number of taxa from the slider.
@@ -568,29 +558,29 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             # Plotting
             if value == 'stackedbar':
-                fig1 = self.plot_stacked_bar(self.df_selected, use_date_value)
+                fig1 = self.plot_stacked_bar(self.df_selected, use_date_value,taxonomic_rank)
 
             elif value == 'groupedbar':
-                fig1 = self.plot_grouped_bar(self.df_selected,use_date_value)
+                fig1 = self.plot_grouped_bar(self.df_selected,use_date_value,taxonomic_rank)
                 # fig1, fig2 = self.plot_grouped_bar(self.df_selected, use_date_value)
 
             elif value == 'scatter':
-                fig1 = self.plot_scatter(self.df_selected,use_date_value)
+                fig1 = self.plot_scatter(self.df_selected,use_date_value,taxonomic_rank)
                 # fig1, fig2 = self.plot_scatter(self.df_selected, use_date_value)
 
             elif value == 'area':
                 # fig1,fig2,fig2_style,markdown_style = self.plot_area(self.df_selected,use_date_value)
-                fig1 = self.plot_area(self.df_selected, use_date_value)
+                fig1 = self.plot_area(self.df_selected, use_date_value,taxonomic_rank)
 
             elif value == 'scatter3d':
-                fig1 = self.plot_scatter_3d(self.df_selected)
+                fig1 = self.plot_scatter_3d(self.df_selected,taxonomic_rank)
                 # fig1, fig2 = self.plot_scatter_3d(self.df_selected)
 
             elif value == "pie":
-                fig1,piechart_style = self.plot_pie(self.result_df,sample_value_piechart)
+                fig1,piechart_style = self.plot_pie(self.result_df,sample_value_piechart,taxonomic_rank)
                 # fig1, piechart_style, fig2_style, markdown_style = self.plot_pie(self.result_df, sample_value_piechart)
             elif value == "horizon":
-                fig1 = self.plot_pseudo_horizon(self.df_selected)
+                fig1 = self.plot_pseudo_horizon(self.df_selected,taxonomic_rank)
 
 
             return fig1,piechart_style
