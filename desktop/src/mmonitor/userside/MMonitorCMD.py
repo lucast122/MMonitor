@@ -36,6 +36,8 @@ class MMonitorCMD:
         parser.add_argument('-p', '--project', type=str, help='Project name')
         parser.add_argument('-u', '--subproject', type=str, help='Subproject name')
         parser.add_argument('-b', '--barcodes', type=bool, help='Use barcode column from CSV for handling multiplexing')
+        parser.add_argument('-m', '--minabundance', type=float, default=0.01,
+                            help='Minimal abundance to be considered for 16s taxonomy')
 
         return parser.parse_args()
 
@@ -101,7 +103,7 @@ class MMonitorCMD:
             subproject_name = str(self.args.subproject)
             sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
             files = self.args.input
-            self.emu_runner.run_emu(files, sample_name, 0.1)
+            self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
             print("add statistics")
             # self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
             #                     sample_date)
