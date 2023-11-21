@@ -37,6 +37,7 @@ class EmuRunner:
                 "Make sure that emu.py is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
     def run_emu(self, sequence_list, sample_name, min_abundance):
+        print(f"Running emu with min abundance of {min_abundance}")
         self.emu_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
         print(sequence_list)
         #remove concatenated files from sequence list to avoid concatenating twice
@@ -75,8 +76,8 @@ class EmuRunner:
             f_full, f_set_thresh, read_dist = emu.expectation_maximization_iterations(log_prob_rgs,
                                                                                       db_species_tids,
                                                                                       .01,
-                                                                                      input_threshold=min_abundance)
-            emu.freq_to_lineage_df(f_full, tsv_out, df_taxonomy,
+                                                                                      min_abundance)
+            emu.freq_to_lineage_df(f_set_thresh, tsv_out, df_taxonomy,
                                    counts_assigned, counts_unassigned, True)
 
 
