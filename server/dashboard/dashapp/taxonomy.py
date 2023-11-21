@@ -127,6 +127,27 @@ class Taxonomy:
             ],
             width=6
         ),
+        dbc.Col(
+            [
+                dbc.Label("Taxonomic rank for plot:", html_for='tax_rank_dropdown'),
+                dcc.Dropdown(
+                    id='tax_rank_dropdown',
+                    options=[
+                        {'label': 'Species', 'value': 'taxonomy'},
+                        {'label': 'Genus', 'value': 'tax_genus'},
+                        {'label': 'Family', 'value': 'tax_family'},
+                        {'label': 'Order', 'value': 'tax_order'},
+                        {'label': 'Class', 'value': 'tax_class'},
+                        {'label': 'Phylum', 'value': 'tax_phylum'},
+                        {'label': 'Superkingdom', 'value': 'tax_superkingdom'},
+                        {'label': 'Clade', 'value': 'tax_clade'}
+                    ],
+                    value='taxonomy',
+                    style={'width': '90%'}
+                )
+            ],
+            width=6
+        ),
     ])
 ], fluid=True)
 
