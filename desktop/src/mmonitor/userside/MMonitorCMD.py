@@ -103,8 +103,8 @@ class MMonitorCMD:
             files = self.args.input
             self.emu_runner.run_emu(files, sample_name, 0.1)
             print("add statistics")
-            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
-                                sample_date)
+            # self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+            #                     sample_date)
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
