@@ -36,7 +36,7 @@ class MMonitorCMD:
         parser.add_argument('-p', '--project', type=str, help='Project name')
         parser.add_argument('-u', '--subproject', type=str, help='Subproject name')
         parser.add_argument('-b', '--barcodes', type=bool, help='Use barcode column from CSV for handling multiplexing')
-        parser.add_argument('-m', '--minabundance', type=float, default=0.01,
+        parser.add_argument('-n', '--minabundance', type=float, default=0.01,
                             help='Minimal abundance to be considered for 16s taxonomy')
 
         return parser.parse_args()
