@@ -22,11 +22,19 @@ This class gets the path to a db_config file. The db_config is has the host ip '
 
 
 def convert_date_format(date_str):
-    # Check if the date is in the format DD.MM.YYYY
-    if len(date_str) == 10 and date_str[2] == '.' and date_str[5] == '.':
-        return '-'.join(reversed(date_str.split('.')))
+    parts = date_str.split('.')
+
+    # Check if the date is in the format DD.MM.YYYY or DD.MM.YY
+    if len(parts) == 3 and all(part.isdigit() for part in parts):
+        day, month, year = parts
+
+        # Convert 2-digit year to 4-digit year assuming it's in the 2000s
+        if len(year) == 2:
+            year = '20' + year
+
+        return f"{year}-{month}-{day}"
     else:
-        # Return the original date if it's not in DD.MM.YYYY format
+        # Return the original date if the format is not recognized
         return date_str
 
 
