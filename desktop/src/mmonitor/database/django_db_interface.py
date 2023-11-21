@@ -21,6 +21,15 @@ This class gets the path to a db_config file. The db_config is has the host ip '
 """
 
 
+def convert_date_format(date_str):
+    # Check if the date is in the format DD.MM.YYYY
+    if len(date_str) == 10 and date_str[2] == '.' and date_str[5] == '.':
+        return '-'.join(reversed(date_str.split('.')))
+    else:
+        # Return the original date if it's not in DD.MM.YYYY format
+        return date_str
+
+
 class DjangoDBInterface:
     def __init__(self, db_config: str):
         try:
@@ -172,8 +181,11 @@ class DjangoDBInterface:
         df = df.sort_values('Abundance', ascending=False)
         df = df.iloc[1:]
         df['Sample'] = sample_name
+        # check if sample is in wrong format and convert using function convert_date_format()
+        sample_date = convert_date_format(sample_date)
 
         df['Sample_date'] = sample_date
+
 
         for index, row in df.iterrows():
             record_data = {
@@ -261,6 +273,8 @@ class DjangoDBInterface:
 
         except Exception as e:
             print(e)
+
+    # method that converts dates from format DD.MM.YYYY to YYYY-MM-DD only if format is DD.MM.YYYY
 
     # def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
     #                                  project_name: str, sample_date):
