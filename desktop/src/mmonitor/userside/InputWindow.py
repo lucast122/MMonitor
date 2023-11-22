@@ -235,7 +235,6 @@ class InputWindow(ctk.CTkToplevel):
     def open_popup(self, text, title, icon):
         CTkMessagebox(message=text, title=title, icon=icon, option_1="Okay")
 
-    \
     def quit(self):
         self.do_quit = True
         self.destroy()
