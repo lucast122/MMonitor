@@ -39,13 +39,16 @@ class EmuRunner:
     def run_emu(self, sequence_list, sample_name, min_abundance):
         print(f"Running emu with min abundance of {min_abundance}")
         self.emu_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-        print(sequence_list)
+
         #remove concatenated files from sequence list to avoid concatenating twice
         sequence_list = [s for s in sequence_list if "concatenated" not in s]
+        print(sequence_list)
         concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
         self.concat_file_name = concat_file_name
+        print(f"concat_file_name: {concat_file_name}")
         if not os.path.exists(concat_file_name):
             self.concatenate_fastq_files(sequence_list, concat_file_name)
+
 
         if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0] or ".fastq" in sequence_list[0]\
                 or ".fq" in sequence_list[0]:
@@ -67,6 +70,7 @@ class EmuRunner:
             sam_out = f"{out_file_base}/emu_alignments.sam"
             tsv_out = f"{out_file_base}/{sample_name}_rel-abundance"
             # print(f"Out file: {out_file_base}")
+            print(f"min abundance: {min_abundance}")
             SAM_FILE = emu.generate_alignments(concat_file_name, sam_out, emu_db, "map-ont",
                                                f"{multiprocessing.cpu_count()}", 50, 500000000)
             log_prob_cigar_op, locs_p_cigar_zero, longest_align_dict = \
@@ -76,12 +80,22 @@ class EmuRunner:
             f_full, f_set_thresh, read_dist = emu.expectation_maximization_iterations(log_prob_rgs,
                                                                                       db_species_tids,
                                                                                       .01,
-                                                                                      min_abundance)
-            emu.freq_to_lineage_df(f_set_thresh, tsv_out, df_taxonomy,
+                                                                                      input_threshold=min_abundance)
+            print(f_full)
+            print(f_set_thresh)
+
+            emu.freq_to_lineage_df(f_full, tsv_out, df_taxonomy,
                                    counts_assigned, counts_unassigned, True)
 
+            # convert and save frequency to a tsv
+            if f_set_thresh:
+                emu.freq_to_lineage_df(
+                    f_set_thresh,
+                    os.path.join(out_file_base, f"{sample_name}_rel-abundance-threshold"),
 
-
+                    df_taxonomy, counts_assigned, counts_unassigned, True)
+        # remove concatenated file after processing
+        os.remove(concat_file_name)
 
     def get_files_from_folder(self, folder_path):
         """
@@ -110,6 +124,6 @@ class EmuRunner:
                 open_func = gzip.open if is_gzipped else open
                 mode = 'rt' if is_gzipped else 'r'
 
-                with open_func(input_file, mode) as input:
-                    for line in input:
+                with open_func(input_file, mode) as input2:
+                    for line in input2:
                         output.write(line)

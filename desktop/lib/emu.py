@@ -315,6 +315,7 @@ def expectation_maximization_iterations(log_p_rgs, db_ids, lli_thresh, input_thr
     freq_thresh = 1 / n_reads
     if n_reads > 1000:
         freq_thresh = 10 / n_reads
+    print(f" n_reads: {n_reads} freq_thresh: {freq_thresh}")
 
     # performs iterations of the expectation_maximization algorithm
     total_log_likelihood = -math.inf
@@ -340,6 +341,7 @@ def expectation_maximization_iterations(log_p_rgs, db_ids, lli_thresh, input_thr
             freq_full, updated_log_likelihood, p_sgr = expectation_maximization(log_p_rgs, freq)
             freq_set_thresh = None
             if freq_thresh < input_threshold:
+
                 freq = {k: v for k, v in freq_full.items() if v >= input_threshold}
                 freq_set_thresh, updated_log_likelihood, p_sgr = \
                     expectation_maximization(log_p_rgs, freq)
@@ -389,6 +391,7 @@ def freq_to_lineage_df(freq, tsv_output_path, taxonomy_df, assigned_count,
         returns(df): pandas df with lineage and abundances for values in f
     """
     # add tax lineage for values in freq
+
     results_df = pd.DataFrame(zip(list(freq.keys()) + ['unassigned'],
                                   list(freq.values()) + [0]),
                               columns=["tax_id", "abundance"]).set_index('tax_id')
@@ -414,7 +417,7 @@ def generate_alignments(in_file_list, out_basename, database, minimap_type, thre
     if filetype == '.sam':
         args.keep_files = True
         return input_file
-    sam_align_file = "{}_emu_alignments.sam".format(out_basename)
+    sam_align_file = "{}".format(out_basename)
     print(f"sam_align_file: {sam_align_file}")
     db_sequence_file = os.path.join(database, 'species_taxid.fasta')
 

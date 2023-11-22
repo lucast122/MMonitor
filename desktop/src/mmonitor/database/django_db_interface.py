@@ -56,6 +56,13 @@ class DjangoDBInterface:
         else:
             return None
 
+    def get_unique_sample_ids(self, username: str, password: str):
+        django_url = f"http://{self._db_config['host']}:8020/users/get_unique_sample_ids/"
+        response = pyrequests.post(django_url, data={'username': username, 'password': password})
+        if response.status_code == 200:
+            return response.json().get('sample_ids', [])
+        else:
+            return None
 
     def query_to_dataframe(self, query: str) -> pd.DataFrame:
         return pd.read_sql_query(query, self.conn)
@@ -78,125 +85,39 @@ class DjangoDBInterface:
                                              data=record_data)  # Assuming a structure for NanoporeRecords
                     record.save()
 
-    # def get_abundance_meta_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
-    #     q = "SELECT nanopore.sample_id, mmonitor.abundance, metadata.* " \
-    #         "FROM nanopore " \
-    #         "INNER JOIN metadata " \
-    #         "WHERE nanopore.sample_id = metadata.sample_id " \
-    #         f"AND nanopore.taxonomy = '{taxonomy}' " \
-    #         "ORDER BY nanopore.sample_id"
-    #     return _explode_metadata(self.query_to_dataframe(q))
-
-    # def get_abundance_by_taxonomy(self, taxonomy: str) -> pd.DataFrame:
-    #     q = f"SELECT sample_id, abundance FROM nanopore WHERE taxonomy = '{taxonomy}' ORDER BY sample_id"
-    #     return self.query_to_dataframe(q)
-
-    # def get_all_meta(self) -> pd.DataFrame:
-    #     q = "SELECT * FROM metadata ORDER BY sample_id"
-    #     return _explode_metadata(self.query_to_dataframe(q))
-
-    # def get_unique_taxonomies(self) -> List[str]:
-    #     q = "SELECT DISTINCT taxonomy FROM nanopore"
-    #     return [t[0] for t in self.query_to_list(q)]
-
-    # def get_unique_samples(self) -> List[str]:
-    #     q = "SELECT DISTINCT sample_id FROM nanopore"
-    #     return [t[0] for t in self.query_to_list(q)]
-
-    # def create_db(self):
-    #     user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
-    #     if user_id is None:
-    #         print("Invalid user credentials")
-    #         return
-    #
-    #
-    #     # drop_table_query_metadata = "DROP TABLE metadata;"
-    #     # drop_table_query_mmonitor = "DROP TABLE mmonitor;"
-    #     # self._cursor.execute(drop_table_query_mmonitor)
-    #     # self._cursor.execute(drop_table_query_metadata)
-    #     # self._connection.commit()
-    #     create_command = f"""
-    #     CREATE TABLE IF NOT EXISTS nanopore (
-    #         read_id INTEGER PRIMARY KEY,
-    #         taxonomy TEXT,
-    #         abundance FLOAT,
-    #         sample_id TEXT,
-    #         user_id INT,
-    #         project_id TEXT,
-    #         subproject_id TEXT,
-    #         sample_date TEXT
-    #     );"""  # maker read_id auto increment (1,2,3,4,5...)
-    #
-    #     # increment_command = """ALTER TABLE nanopore MODIFY COLUMN read_id INT AUTO_INCREMENT;"""
-    #
-    #     # self._cursor.execute(create_command)
-    #     # self._cursor.execute(increment_command)
-    #     create_command = """CREATE TABLE IF NOT EXISTS metadata (
-    #                 `meta_id` INTEGER PRIMARY KEY,
-    #                 `sample_id` TEXT,
-    #                 `user_id` INT,
-    #                 `data` TEXT
-    #             )"""
-    #
-    #     self._cursor.execute(create_command)
-    #     self._connection.commit()
-
-    # def update_table_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str,
-    #                               project_name: str, sample_date):
-    #     user_id = self.get_user_id()
-    #     if user_id is None:
-    #         print("Invalid user credentials")
-    #         return
-    #
-    #     df = pd.read_csv(
-    #         f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
-    #         sep='\t',
-    #         header=None,
-    #         usecols=[0, 1, 2, 3],
-    #         names=['Taxid', 'Abundance', 'Species', 'Genus']
-    #     )
-    #     df = df.sort_values('Abundance', ascending=False)
-    #     df = df.iloc[1:]
-    #     df['Sample'] = sample_name
-    #     df['Sample_date'] = sample_date
-    #     for index, row in df.iterrows():
-    #         insert_query = f"""INSERT INTO nanopore
-    #         (taxonomy, abundance, sample_id, project_id, user_id)
-    #         VALUES ('{row['Species']}', {row['Abundance']}, '{sample_name}', '{project_name}', '{user_id}')"""
-    #         self._cursor.execute(insert_query)
-    #     self._connection.commit()
-
-    def update_django_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str,
-                                   project_name: str, sample_date: str, subproject_name: str):
+    def update_django_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str, project_name: str,
+                                   sample_date: str, subproject_name: str, overwrite: bool):
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
 
         if user_id is None:
             print("Invalid user credentials")
             return
-        print(f"User id clientside: {user_id}")
+
+        sample_ids = self.get_unique_sample_ids(self._db_config['user'], self._db_config['password'])
+        if sample_name in sample_ids and not overwrite:
+            print(
+                f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
+            return
 
         df = pd.read_csv(
-            f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
+            f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
             sep='\t',
             header=None,
-            # usecols=[0, 1, 2, 3],
-            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 19],
+            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
                    'Clade', 'Subspecies']
         )
-        df = df.fillna("Not Available")
-
-        df = df.sort_values('Abundance', ascending=False)
-        df = df.iloc[1:]
+        df.fillna("Not Available", inplace=True)
+        df.sort_values('Abundance', ascending=False, inplace=True)
+        df = df.iloc[1:]  # Skipping the first row, assuming it's headers or unwanted data
         df['Sample'] = sample_name
-        # check if sample is in wrong format and convert using function convert_date_format()
-        sample_date = convert_date_format(sample_date)
-
+        sample_date = convert_date_format(sample_date)  # Convert date format if necessary
         df['Sample_date'] = sample_date
 
-
+        # Prepare a list of records
+        records = []
         for index, row in df.iterrows():
-            record_data = {
+            records.append({
                 "taxonomy": row['Species'],
                 "tax_genus": row['Genus'],
                 "tax_family": row['Family'],
@@ -206,34 +127,48 @@ class DjangoDBInterface:
                 "tax_superkingdom": row['Superkingdom'],
                 "tax_clade": row['Clade'],
                 "tax_subspecies": row['Subspecies'],
-
                 "abundance": row['Abundance'],
-
                 "sample_id": sample_name,
                 "project_id": project_name,
                 "user_id": user_id,
                 "subproject": subproject_name,
                 "date": sample_date
+            })
 
-
-            }
-            print(f"Sending record: {record_data}")
-            try:
-                response = pyrequests.post(
-                    f"http://{self._db_config['host']}:8020/users/add_nanopore_record/",
-                    json=record_data,
-                    auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
-                )
-                if response.status_code != 200:
-                    print(f"Failed to add record: {response.content}")
-
-            except Exception as e:
-                print(e)
+        # Send all records in one request
+        try:
+            response = pyrequests.post(
+                f"http://{self._db_config['host']}:8020/users/overwrite_nanopore_record/",
+                json=records,  # Send the list of records
+                auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
+            )
+            if response.status_code != 201:
+                print(f"Failed to add records: {response.content}")
+            else:
+                print(f"Records added successfully.")
+        except Exception as e:
+            print(e)
 
     def send_nanopore_record_centrifuge(self, kraken_out: dict, sample_name: str, project_id: str, subproject_id: str,
-                                        date: str):
+                                        date: str, overwrite: bool):
         import requests as pyrequests
         from requests.auth import HTTPBasicAuth
+
+        user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
+
+        if user_id is None:
+            print("Invalid user credentials")
+            return
+        print(f"User id clientside: {user_id}")
+
+        sample_ids = self.get_unique_sample_ids(self._db_config['user'], self._db_config['password'])
+        print(f"Found samples: {sample_ids}")
+        # do not add sample if overwrite is False and the sample_name is already present in the django DB
+        # this makes sure that a sample is only reprocessed if the overwrite bool is set e.g. with the cmd line or in the GUI
+        if sample_name in sample_ids and not overwrite:
+            print(
+                f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
+            return
 
         records = []
         for hit in kraken_out:
@@ -252,14 +187,17 @@ class DjangoDBInterface:
             try:
                 auth = HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
                 response = pyrequests.post(
-                    f"http://{self._db_config['host']}:8020/users/add_nanopore_record/",
+                    f"http://{self._db_config['host']}:8020/users/overwrite_nanopore_record/",
                     json=record_data,
                     auth=auth
                 )
-                if response.status_code != 200:
+                print(f"response: {response}")
+
+                if response.status_code != 201:
                     print(f"Failed to add record: {response.content}")
             except Exception as e:
                 print(e)
+                print(f"response: {response}")
 
     def send_sequencing_statistics(self, record_data):
         import requests as pyrequests
@@ -281,53 +219,3 @@ class DjangoDBInterface:
 
         except Exception as e:
             print(e)
-
-    # method that converts dates from format DD.MM.YYYY to YYYY-MM-DD only if format is DD.MM.YYYY
-
-    # def update_table_with_kraken_out(self, kraken_out_path: str, tax_rank: str, sample_name: str,
-    #                                  project_name: str, sample_date):
-    #     user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
-    #     if user_id is None:
-    #         print("Invalid user credentials")
-    #         return
-    #
-    #     df = pd.read_csv(
-    #         kraken_out_path,
-    #         sep='\t',
-    #         header=None,
-    #         usecols=[1, 3, 5],
-    #         names=['Count', 'Rank', 'Name']
-    #     )
-    #     df = df.sort_values('Count', ascending=False)
-    #     df['Sample'] = sample_name
-    #     df['Sample_date'] = sample_date
-    #     df = df[df['Rank'] == tax_rank]
-    #     df = df.drop(columns='Rank')
-    #     for index, row in df.iterrows():
-    #         if row['Count'] > 100:
-    #             check_name_exists_in_sample = f"SELECT EXISTS(SELECT 1 FROM nanopore WHERE taxonomy='{row['Name']}' AND sample_id='{sample_name}');"
-    #             self.cursor.execute(check_name_exists_in_sample)
-    #             name_exists = self._cursor.fetchall()[0][0]
-    #             if name_exists == 0:
-    #                 insert_query = f"""INSERT INTO nanopore
-    #                     (taxonomy, abundance, sample_id, project_id, sample_date)
-    #                     VALUES
-    #                     ('{row['Name']}', {row['Count']}, '{sample_name}', '{project_name}','{sample_date}')"""
-    #                 self._cursor.execute(insert_query)
-    #             elif name_exists == 1:
-    #                 update_query = f"UPDATE nanopore SET abundance = abundance + {row['Count']} WHERE taxonomy = '{row['Name']}' AND sample_id='{sample_name}'"
-    #                 self._cursor.execute(update_query)
-    #     self._connection.commit()
-
-    # def append_metadata_from_csv(self, csv_file: str):
-    #     df = pd.read_csv(csv_file)
-    #     meta_cols = [col for col in df.columns if col != 'sample_id']
-    #     df['data'] = df.apply(lambda x: dumps({col: x[col] for col in meta_cols}), axis=1)
-    #     df = df.drop(columns=meta_cols)
-    #     engine = create_engine(
-    #         'mysql+mysqlconnector://{user}:{password}@{host}:3306/{database}'.format(**self._db_config))
-    #     df.to_sql('metadata', engine, if_exists='replace', index=False)
-
-    # def close(self):
-    #     self._cursor.close()
-    #     self._connection.close()
