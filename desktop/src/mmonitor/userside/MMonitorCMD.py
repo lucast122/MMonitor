@@ -36,8 +36,11 @@ class MMonitorCMD:
         parser.add_argument('-p', '--project', type=str, help='Project name')
         parser.add_argument('-u', '--subproject', type=str, help='Subproject name')
         parser.add_argument('-b', '--barcodes', type=bool, help='Use barcode column from CSV for handling multiplexing')
+        parser.add_argument('-q', '--qc', type=bool, help='Calculate quality control statistics for input samples.'
+                                                          ' Enable this to fill QC app with data. Increases time the analysis takes.')
         parser.add_argument('-n', '--minabundance', type=float, default=0.01,
                             help='Minimal abundance to be considered for 16s taxonomy')
+
 
         return parser.parse_args()
 
@@ -85,7 +88,7 @@ class MMonitorCMD:
         self.django_db.send_sequencing_statistics(data)
 
     def taxonomy_nanopore_16s(self):
-        global sample_name
+        global sample_name, project_name, subproject_name, sample_date
 
         def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
             emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
@@ -105,8 +108,6 @@ class MMonitorCMD:
             files = self.args.input
             self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
             print("add statistics")
-            # self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
-            #                     sample_date)
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
@@ -118,10 +119,12 @@ class MMonitorCMD:
                 subproject_name = self.multi_sample_input["subproject_names"][index]
                 sample_date = self.multi_sample_input["dates"][index]
                 self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
-                self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
-                                    sample_date)
-
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+
+        # calculate QC statistics if qc argument is given by user
+        if self.args.qc:
+            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                sample_date)
 
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
 
