@@ -91,6 +91,12 @@ class MMonitorCMD:
 
         self.django_db.send_sequencing_statistics(data)
 
+    # method to check if a sample is already in the database, if user does not want to overwrite results
+    # returns true if sample_name is in db and false if not
+    def check_sample_in_db(self, sample_id):
+        samples_in_db = self.django_db.get_unique_sample_ids()
+        return sample_id in samples_in_db
+
     def taxonomy_nanopore_16s(self):
         global sample_name, project_name, subproject_name, sample_date
 
@@ -103,10 +109,14 @@ class MMonitorCMD:
         if not os.path.exists(os.path.join(ROOT, "src", "resources", "emu_db", "taxonomy.tsv")):
             print("emu db not found")
 
-        # quit the method when quit button is pressed instead of running the pipeline
+
 
         if not self.args.multicsv:
             sample_name = str(self.args.sample)
+            # when a sample is already in the database and user does not want to overwrite quit now
+            if not self.args.overwrite:
+                if self.check_sample_in_db(sample_name):
+                    return
             project_name = str(self.args.project)
             subproject_name = str(self.args.subproject)
             sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
@@ -120,6 +130,12 @@ class MMonitorCMD:
             for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
                 sample_name = self.multi_sample_input["sample_names"][index]
+                # when a sample is already in the database and user does not want to overwrite quit now
+                if not self.args.overwrite:
+                    if self.check_sample_in_db(sample_name):
+                        print(
+                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample..")
+                        continue
                 project_name = self.multi_sample_input["project_names"][index]
                 subproject_name = self.multi_sample_input["subproject_names"][index]
                 sample_date = self.multi_sample_input["dates"][index]

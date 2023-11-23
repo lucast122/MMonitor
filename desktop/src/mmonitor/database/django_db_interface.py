@@ -56,9 +56,10 @@ class DjangoDBInterface:
         else:
             return None
 
-    def get_unique_sample_ids(self, username: str, password: str):
+    def get_unique_sample_ids(self):
         django_url = f"http://{self._db_config['host']}:8020/users/get_unique_sample_ids/"
-        response = pyrequests.post(django_url, data={'username': username, 'password': password})
+        response = pyrequests.post(django_url,
+                                   data={'username': self._db_config['user'], 'password': self._db_config['password']})
         if response.status_code == 200:
             return response.json().get('sample_ids', [])
         else:
@@ -93,7 +94,7 @@ class DjangoDBInterface:
             print("Invalid user credentials")
             return
 
-        sample_ids = self.get_unique_sample_ids(self._db_config['user'], self._db_config['password'])
+        sample_ids = self.get_unique_sample_ids()
         if sample_name in sample_ids and not overwrite:
             print(
                 f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
