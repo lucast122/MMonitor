@@ -35,7 +35,16 @@ class MMonitorCMD:
         parser.add_argument('-d', '--date', type=str, help='Sample date')
         parser.add_argument('-p', '--project', type=str, help='Project name')
         parser.add_argument('-u', '--subproject', type=str, help='Subproject name')
-        parser.add_argument('-b', '--barcodes', type=bool, help='Use barcode column from CSV for handling multiplexing')
+        parser.add_argument('-b', '--barcodes', action="store_true",
+                            help='Use barcode column from CSV for handling multiplexing')
+        parser.add_argument("--overwrite", action="store_true",
+                            help="Enable to overwrite existing records. If not specified, defaults to False.")
+
+        parser.add_argument('-q', '--qc', type=bool, help='Calculate quality control statistics for input samples.'
+                                                          ' Enable this to fill QC app with data. Increases time the analysis takes.')
+        parser.add_argument('-n', '--minabundance', type=float, default=0.5,
+                            help='Minimal abundance to be considered for 16s taxonomy')
+
 
         return parser.parse_args()
 
@@ -82,29 +91,38 @@ class MMonitorCMD:
 
         self.django_db.send_sequencing_statistics(data)
 
+    # method to check if a sample is already in the database, if user does not want to overwrite results
+    # returns true if sample_name is in db and false if not
+    def check_sample_in_db(self, sample_id):
+        samples_in_db = self.django_db.get_unique_sample_ids()
+        return sample_id in samples_in_db
+
     def taxonomy_nanopore_16s(self):
-        global sample_name
+        global sample_name, project_name, subproject_name, sample_date
 
         def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
             emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
             self.django_db.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
-                                                      subproject_name)
+                                                      subproject_name, self.args.overwrite)
+            print(self.args.overwrite)
 
-        if not os.path.exists(os.path.join(ROOT, "src", "resources", "emu_db", "emu.tar")):
+        if not os.path.exists(os.path.join(ROOT, "src", "resources", "emu_db", "taxonomy.tsv")):
             print("emu db not found")
 
-        # quit the method when quit button is pressed instead of running the pipeline
+
 
         if not self.args.multicsv:
             sample_name = str(self.args.sample)
+            # when a sample is already in the database and user does not want to overwrite quit now
+            if not self.args.overwrite:
+                if self.check_sample_in_db(sample_name):
+                    return
             project_name = str(self.args.project)
             subproject_name = str(self.args.subproject)
             sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
             files = self.args.input
-            self.emu_runner.run_emu(files, sample_name, 0.1)
+            self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
             print("add statistics")
-            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
-                                sample_date)
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
@@ -112,14 +130,22 @@ class MMonitorCMD:
             for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
                 sample_name = self.multi_sample_input["sample_names"][index]
+                # when a sample is already in the database and user does not want to overwrite quit now
+                if not self.args.overwrite:
+                    if self.check_sample_in_db(sample_name):
+                        print(
+                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample..")
+                        continue
                 project_name = self.multi_sample_input["project_names"][index]
                 subproject_name = self.multi_sample_input["subproject_names"][index]
                 sample_date = self.multi_sample_input["dates"][index]
-                self.emu_runner.run_emu(files, sample_name, 0.1)
-                self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
-                                    sample_date)
-
+                self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+
+        # calculate QC statistics if qc argument is given by user
+        if self.args.qc:
+            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                sample_date)
 
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
 
