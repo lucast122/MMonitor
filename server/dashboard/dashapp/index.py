@@ -1,51 +1,37 @@
+import base64
 import json
+import re
 import sqlite3
 import tempfile
-import re
-from dash_extensions import WebSocket
-
-import numpy as np
-from natsort import natsorted
-
-
-
-
-import users.models
-from . import taxonomy, correlations,qc
-import pandas as pd
-import plotly.express as px
-from typing import Tuple, List, Any, Dict
-
-from django.conf import settings
-from django.conf import settings
-from django.contrib.sessions.models import Session
-
-from sqlalchemy import create_engine
-from json import loads, dumps
 from io import StringIO
-import base64
+from json import loads
 from typing import Tuple, Any, List, Iterable, Dict, Union
-from scipy.ndimage.filters import gaussian_filter
-import numpy as np
-from scipy.stats import zscore
-from statsmodels.nonparametric.smoothers_lowess import lowess
 
-from django_plotly_dash import DjangoDash
-import plotly.express as px
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+from dash_bootstrap_templates import load_figure_template
+from dash_extensions import WebSocket
+from django_plotly_dash import DjangoDash
+from natsort import natsorted
 from pandas import DataFrame
 from plotly.graph_objects import Figure
-import plotly.graph_objects as go
-from .calculations.stats import scipy_correlation
+from scipy.ndimage.filters import gaussian_filter
+from scipy.stats import zscore
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from users.models import NanoporeRecord
 from users.models import SequencingStatistics
-import flask
-from django.contrib.sessions.models import Session
+from . import taxonomy, correlations, qc
+from .calculations.stats import scipy_correlation
+
 
 # def _init_mysql(user_id):
 
@@ -65,10 +51,14 @@ class Index:
     Contains navigation to the various application pages.
     """
 
-    def __init__(self,user_id=None):
+    def __init__(self, user_id):
         self.user_id = user_id
+        self.sample_ids = None
         print(user_id)
         self.app = DjangoDash('Index', add_bootstrap_links=True)
+        color_map = plt.get_cmap('tab20')  # 'tab20' is a colormap with 20 distinct colors
+        colors = color_map.colors
+        self.colors = colors
 
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
         # self.horizon_app = horizon.Horizon()
@@ -92,8 +82,23 @@ class Index:
         self._table_df = None
         records = NanoporeRecord.objects.filter(user_id=user_id)
 
+        # bootstrap templates for styling plots
+        templates = [
+            "bootstrap",
+            "minty",
+            "pulse",
+            "flatly",
+            "quartz",
+            "cyborg",
+            "darkly",
+            "vapor",
+        ]
+
+        load_figure_template(templates)
 
         self.df = pd.DataFrame.from_records(records.values())
+        self.df.replace("Not available", np.nan, inplace=True)
+        self.df.dropna(inplace=True)
 
         self.meta_df = self.correlations_app.get_all_meta()
         self.df['sample_id'] = self.df['sample_id'].astype(str)
@@ -105,8 +110,8 @@ class Index:
 
         self.hover_data = {column: True for column in self.metadata_columns}
         self.metadata_columns.pop(0)
-
-
+        self.unique_sample_ids = records.values('sample_id').distinct()
+        self.unique_sample_ids = [item['sample_id'] for item in self.unique_sample_ids]
         # Initialize apps
 
         # simple_app = simple.SimpleApp()
@@ -193,8 +198,9 @@ class Index:
     WebSocket(id="ws", url="ws://134.2.78.150:8020/ws/notifications/"),
     html.Div(id="output")
 ])
-        container = html.Div([location, navigation,   page_content],style={'backgroundColor': '#f5f7fa'})
-        
+        container = html.Div([location, navigation, page_content], style={'backgroundColor': '#f5f7fa'},
+                             className="dbc dbc-ag-grid")
+
         self.layout = container
 
     """
@@ -229,6 +235,7 @@ class Index:
                           category_orders={"date": sorted(df["date"].unique())})
         else:
             fig1 = px.bar(grouped_df, x="sample_id", y="abundance", color=taxonomic_rank, barmode="stack",
+                          template='bootstrap',
 
                           category_orders={"sample_id": sorted(df["sample_id"].unique(), key=self.split_alphanumeric)})
 
@@ -261,11 +268,30 @@ class Index:
         # fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="stack",hover_data=self.hover_data)
         return fig1
 
+    def plot_heatmap(self, df, use_date_value, taxonomic_rank):
+        x_axis = "date" if use_date_value else "sample_id"
+        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+
+        fig = go.Figure(data=go.Heatmap(
+            z=grouped_df['abundance'],
+            x=grouped_df[x_axis],
+            y=grouped_df[taxonomic_rank],
+            colorscale='Viridis'))
+
+        return fig
+
+    def plot_line(self, df, use_date_value, taxonomic_rank):
+        x_axis = "date" if use_date_value else "sample_id"
+        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+        fig1 = px.line(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, template='bootstrap'
+                       )
+        return fig1
+
+
     def plot_grouped_bar(self, df, use_date_value, taxonomic_rank):
         x_axis = "date" if use_date_value else "sample_id"
         grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
-        fig1 = px.bar(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, barmode="group",
-                      )
+        fig1 = px.bar(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, template='bootstrap')
         return fig1
 
     def plot_scatter(self, df, use_date_value, taxonomic_rank):
@@ -278,12 +304,13 @@ class Index:
     def plot_area(self, df, use_date_value, taxonomic_rank):
         x_axis = "date" if use_date_value else "sample_id"
         grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
-        fig1 = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, line_group=taxonomic_rank)
+        fig1 = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, line_group=taxonomic_rank,
+                       template='bootstrap')
         return fig1
 
     def plot_scatter_3d(self, df, taxonomic_rank):
         # Plotting code for scatter 3D goes here...
-        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank)
+        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank, template='bootstrap')
         # fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='abundance',hover_data=self.hover_data)
         return fig1
 
@@ -396,88 +423,44 @@ class Index:
 Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- 
         """
 
-
-
-        #GROUP SELECTION CALLBACKS
-
+        from dash_bootstrap_templates import ThemeChangerAIO
         @self.app.callback(
-        Output('selected-data', 'children'),
-        Input('graph1', 'selectedData')
-    )
-        def display_selected_data(selectedData):
-            # print(selectedData)
-            if selectedData is None:
-                return "No taxa selected"
-
-        # Extract the taxa from the selected data
-            selected_taxa = [point['customdata'] for point in selectedData['points']]
-
-            return f"Selected taxa: {', '.join([str(taxon) for taxon in selected_taxa])}"
-
-
-
-        #this enables the group selection components when the checkbox is clicked
-        @self.app.callback(
-        Output('group-name-input', 'style'),
-        Output('create-group-button', 'style'),
-        Output('group-selection-dropdown', 'style'),
-        Input('enable-group-selection', 'value')
+            Output("sample_select_value", "value"),
+            [Input("project-dropdown", "value"),
+             Input("subproject-dropdown", "value")]
         )
-        def toggle_group_selection(enable_group_selection):
-            if 'enabled' in enable_group_selection:
-                style = {'display': 'block'}
-                # print("enabled")
+        def select_samples_by_project_and_subproject(selected_project, selected_subproject):
+            global trigger_id
+            ctx = dash.callback_context
+
+            if not ctx.triggered:
+                return self.unique_sample_ids
             else:
-                style = {'display': 'none'}
-                # print('disabled')
-            return style, style, style
+                trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
+            if trigger_id == "project-dropdown":
+                if selected_project == "ALL":
+                    # If 'All Projects' is selected, don't filter by project_id
+                    filtered_df = self.df_merged
+                else:
+                    filtered_df = self.df_merged[self.df_merged['project_id'] == selected_project]
 
-        @self.app.callback(
-        Output('group-storage', 'data'),
-        Input('create-group-button', 'n_clicks'),
-        State('group-name-input', 'value'),
-        State('graph1', 'selectedData'),
-        State('group-storage', 'data')
-        )
-        def create_group(n_clicks, group_name, selected_data, stored_data):
-            if n_clicks is None:
-                raise PreventUpdate
+            elif trigger_id == "subproject-dropdown":
+                if selected_subproject == "ALL":
+                    # If 'All Subprojects' is selected, don't filter by subproject
+                    filtered_df = self.df_merged
+                else:
+                    filtered_df = self.df_merged[self.df_merged['subproject'] == selected_subproject]
 
-            if group_name is None or group_name == '' or selected_data is None:
-                return stored_data
+            else:
+                return []
 
-            if stored_data is None:
-                stored_data = {}
+            unique_sample_ids = filtered_df['sample_id'].unique().tolist()
+            return unique_sample_ids
 
-            # Extract the taxa from the selected data
-            selected_taxa = [point['customdata'] for point in selected_data['points']]
-
-
-
-            # Add the selected taxa to the group
-            stored_data[group_name] = selected_taxa
-
-            return stored_data
-        @self.app.callback(
-        Output('group-selection-dropdown', 'options'),
-        Input('group-storage', 'data')
-    )
-        def update_group_selection_dropdown(data):
-            if data is None:
-                raise PreventUpdate
-            return [{'label': group, 'value': group} for group in data.keys()]
-
-
-        #this updates the plot based on selected groups
-
-
-
-        #this updates the graph based on the samples selected
-        # this should also update graph based on taxonomic rank selected
-        
         @self.app.callback(
             Output('graph1', 'figure'),
+
             Output('number_input_piechart', 'style'),
             # Output('markdown-caption','style'),
             Input('dropdown', 'value'),
@@ -485,106 +468,51 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             Input('number_input_piechart', 'value'),
             Input('slider', 'value'),
             Input('sample_select_value', 'value'),
-            Input('use_date_value','value')
+            Input('use_date_value', 'value'),
+            Input(ThemeChangerAIO.ids.radio("theme"), "value"),
 
         )
-        def plot_selected_figure(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,use_date_value) -> Tuple[Figure, Figure, Dict[str, str]]:
-            """
-            Update the figures based on the selected value from the dropdown menu, the selected sample value for the piechart,
-            and the selected number of taxa from the slider.
-
-            Args:
-            value (str): The selected value from the dropdown menu.
-            sample_value_piechart (str): The selected sample value for the piechart.
-            slider_value (int): The selected number of taxa from the slider.
-            sample_select_value: (str) output of multi select dropdown (selected samples)
-
-            Returns:
-                Tuple[Figure, Figure, Dict[str, str]]: A tuple containing two figures for the graphs and a dict for the piechart style.
-            """
-            # fallback values
-            # Check if sample_select_value is None or empty list
-            
-            # print("Triggered by:", callback_context.triggered)
-            # print("Current state:", callback_context.states)
-            # print(value)
-            # print(sample_select_value)
-            # print(slider_value)
-            # print(sample_value_piechart)
-
-            # if not value or not sample_value_piechart or not slider_value:
-                # raise PreventUpdate
-
-
+        def plot_selected_figure(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,
+                                 use_date_value, theme):
+            # Simplified initialization
             fig1 = {'data': []}
-            fig2 = {'data': []}
             piechart_style = {'display': 'none'}
+            self.df_merged.needs_processing = True
+            # Check if sorting and duplicate removal is necessary
+            if self.df_merged.needs_processing:  # Replace with appropriate condition
+                self.df_merged.drop_duplicates(
+                    subset=['sample_id', 'abundance', 'taxonomy', 'project_id', 'subproject', 'user_id', 'date'],
+                    inplace=True)
+                sorted_sample_ids = natsorted(self.df_merged['sample_id'].unique(), key=self.split_alphanumeric)
+                self.sample_ids = sorted_sample_ids
+                self.df_sorted = self.df_merged.set_index('sample_id').loc[sorted_sample_ids].reset_index()
+                self.df_merged.needs_processing = False  # Flag to prevent reprocessing
 
+            # Efficient grouping and filtering
+            self.df_selected = self.df_sorted[self.df_sorted['sample_id'].astype(str).isin(sample_select_value)]
+            self.df_selected = self.df_selected.groupby('sample_id').head(slider_value).reset_index(drop=True)
 
-            fig2_style = {'display': 'block',
-                        'border':'2px solid black'}
+            # Mapping of plot types to functions
+            plot_functions = {
+                'stackedbar': self.plot_stacked_bar,
+                'line': self.plot_line,
+                'groupedbar': self.plot_grouped_bar,
+                'scatter': self.plot_scatter,
+                'area': self.plot_area,
+                'scatter3d': self.plot_scatter_3d,
+                'pie': self.plot_pie,
+                'horizon': self.plot_pseudo_horizon,
+                'heatmap': self.plot_heatmap
+            }
 
-            markdown_style = {'display': 'block',"textAlign": "center", "margin-top": "1px"}
-            
-            # request necessary data from database
-            # q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
-            # df = self._sql.query_to_dataframe(q)
+            # Select and execute the plotting function
+            if value in plot_functions:
+                fig1 = plot_functions[value](self.df_selected, use_date_value, taxonomic_rank) if value != 'pie' \
+                    else plot_functions[value](self.result_df, sample_value_piechart, taxonomic_rank)[0]
+                if value == 'pie':
+                    piechart_style = {'display': 'block'}
 
-
-            result_df = pd.DataFrame()
-
-            self.df_merged.drop_duplicates(
-                subset=['sample_id', 'abundance', 'taxonomy', 'project_id', 'subproject', 'user_id', 'date'],
-                inplace=True)
-
-            # Get a sorted list of unique sample_ids using the natural sorting mechanism
-            # Get a sorted list of unique sample_ids using the natural sorting mechanism
-            sorted_sample_ids = natsorted(self.df_merged['sample_id'].unique(), key=self.split_alphanumeric)
-            print(f"sorted sample ids: {sorted_sample_ids}")
-
-            # Sort the DataFrame based on the sorted list of sample_ids
-            self.df_sorted = self.df_merged.set_index('sample_id').loc[sorted_sample_ids].reset_index()
-
-            # Group by and process as you had previously
-            self.df_grouped = self.df_sorted.groupby("sample_id")
-            result_df = pd.DataFrame()
-            for name, group in self.df_grouped:
-                # get most abundant for slider_value number of selected taxa for each sample to display in taxonomy plots
-                sample_rows = group.head(slider_value)
-                result_df = pd.concat([result_df, sample_rows])
-
-            self.result_df = result_df.reset_index(drop=True)
-            self.df_selected = self.result_df[self.result_df['sample_id'].astype(str).isin(sample_select_value)]
-
-            # Plotting
-            if value == 'stackedbar':
-                fig1 = self.plot_stacked_bar(self.df_selected, use_date_value,taxonomic_rank)
-
-            elif value == 'groupedbar':
-                fig1 = self.plot_grouped_bar(self.df_selected,use_date_value,taxonomic_rank)
-                # fig1, fig2 = self.plot_grouped_bar(self.df_selected, use_date_value)
-
-            elif value == 'scatter':
-                fig1 = self.plot_scatter(self.df_selected,use_date_value,taxonomic_rank)
-                # fig1, fig2 = self.plot_scatter(self.df_selected, use_date_value)
-
-            elif value == 'area':
-                # fig1,fig2,fig2_style,markdown_style = self.plot_area(self.df_selected,use_date_value)
-                fig1 = self.plot_area(self.df_selected, use_date_value,taxonomic_rank)
-
-            elif value == 'scatter3d':
-                fig1 = self.plot_scatter_3d(self.df_selected,taxonomic_rank)
-                # fig1, fig2 = self.plot_scatter_3d(self.df_selected)
-
-            elif value == "pie":
-                fig1,piechart_style = self.plot_pie(self.result_df,sample_value_piechart,taxonomic_rank)
-                # fig1, piechart_style, fig2_style, markdown_style = self.plot_pie(self.result_df, sample_value_piechart)
-            elif value == "horizon":
-                fig1 = self.plot_pseudo_horizon(self.df_selected,taxonomic_rank)
-
-
-            return fig1,piechart_style
-
+            return fig1, piechart_style
 
         # Add a new callback that updates the header's style based on the dropdown's value
         @self.app.callback(
@@ -596,8 +524,6 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 return {'display': 'block'}  # Show the header if 'pie' is selected
             else:
                 return {'display': 'none'}  # Hide the header for other options
-
-        
 
         @self.app.callback(
             Output("download-csv", "data"),
@@ -1396,10 +1322,4 @@ def _force_list(x: Union[Any, List]) -> List[Any]:
         #     func()
         #     return 'Server is shutting down...'
 
-    # def run_server(self, debug: bool) -> None:
-    #     """
-    #     Runs the dash app.
-    #     """
-    #     self._app.run_server(debug=debug)
-
-
+    # def run_server(self, debug: bool) -> Non

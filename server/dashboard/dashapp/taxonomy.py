@@ -1,57 +1,65 @@
-from typing import Tuple, List, Any, Dict
-from sqlalchemy import create_engine
 import base64
 from io import StringIO
-import pandas as pd
-from django_plotly_dash import DjangoDash
-from sqlalchemy import create_engine
-from django.conf import settings
-import plotly.express as px
+from typing import Tuple, List, Any, Dict
+
+import dash_bootstrap_components as dbc
 import dash_core_components as dcc
+import pandas as pd
+import plotly.express as px
+from dash import dash_table
 from dash import html
 from dash.dependencies import Input, Output
+from dash_bootstrap_templates import ThemeChangerAIO
+from django_plotly_dash import DjangoDash
 from plotly.graph_objects import Figure
-from dash.dependencies import Input, Output, State
-import io
-import tempfile
 
-import sqlite3
-import pandas as pd
-import base64
-
-from dash import dash_table
-import dash_bootstrap_components as dbc
-from dash.exceptions import PreventUpdate
-from dash import callback_context
-from django.db import connections
-from django.conf import settings
 from users.models import NanoporeRecord
+
+
 class Taxonomy:
     """
     App to display the abundances of taxonomies in various formats.
     """
 
     def get_data(self):
+
         records = NanoporeRecord.objects.filter(user_id=self.user_id)
         self.records = records
         if not records.exists():
             return pd.DataFrame()  # Return an empty DataFrame if no records are found
+
         return pd.DataFrame.from_records(records.values())
+
     def __init__(self,user_id):
         self.records = None
         self.user_id = user_id
-        self.app = DjangoDash('taxonomy', add_bootstrap_links=True)
-        # self._init_mysql()
+        dbc_css = ("https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.2/dbc.min.css")
+        self.app = DjangoDash('taxonomy', external_stylesheets=[dbc.themes.BOOTSTRAP, dbc_css])
+
+
+
         self.unique_sample_ids = None
         self.unique_samples = None
         self.unique_counts = None
+        self.df = pd.DataFrame()
         # Convert the QuerySet to a DataFrame
         self.df = self.get_data()
+        # self.df.replace("Not available", np.nan, inplace=True)
+        # self.df.dropna(inplace=True)
+
         if not self.df.empty:
             self.unique_sample_ids = self.records.values('sample_id').distinct()
             # Convert QuerySet to a list
             self.unique_sample_ids = [item['sample_id'] for item in self.unique_sample_ids]
-            self.unique_samples = NanoporeRecord.objects.values('sample_id').distinct()
+            self.unique_samples = NanoporeRecord.objects.filter(user_id=self.user_id).values('sample_id').distinct()
+            self.unique_projects_ids = NanoporeRecord.objects.filter(user_id=self.user_id).values(
+                'project_id').distinct()
+            self.unique_projects_ids = [item['project_id'] for item in self.unique_projects_ids]
+
+            self.unique_subprojects = NanoporeRecord.objects.filter(user_id=self.user_id).values(
+                'subproject').distinct()
+            self.unique_subprojects = [item['subproject'] for item in self.unique_subprojects]
+
             # print(f"Unique samples{self.unique_samples}")
 
 
@@ -87,17 +95,51 @@ class Taxonomy:
     dbc.Row([
         dbc.Col(
             [
-                dbc.Label("Samples to plot:", html_for='sample_select_value', id='sample_select_text'),
+                dbc.Label("Samples to plot:", html_for='sample_select_value', id='sample_select_text',
+                          style={'width': '100%'}),
                 dcc.Dropdown(
                     id='sample_select_value',
                     options=[{'label': i, 'value': i} for i in self.unique_sample_ids] if self.unique_sample_ids else [
                         {'label': 'Default', 'value': 'Default'}],
                     multi=True,
-                    style={'width': '90%'},
+                    style={'width': '100%', 'margin-bottom': '5px'},
                     value=self.unique_sample_ids
                 ),
             ],
-            width=6
+            width=12
+        ),
+
+        dbc.Col(
+            [
+                dbc.Label("Select Samples by project:", html_for='project-dropdown', id='project-dropdown-text',
+                          style={'width': '100%'}),
+                dcc.Dropdown(
+                    id='project-dropdown',
+                    options=[{'label': 'All Projects', 'value': 'ALL'}] +
+                            [{'label': project, 'value': project} for project in self.unique_projects_ids],
+
+                    value=None,
+                    style={'width': '100%', 'margin-bottom': '5px'}
+
+                ),
+            ],
+            width=2
+        ),
+
+        dbc.Col(
+            [
+                dbc.Label("Select Samples by subproject:", html_for='subproject-dropdown',
+                          id='subproject-dropdown-text'),
+                dcc.Dropdown(
+                    id='subproject-dropdown',
+                    options=[{'label': 'All Subprojects', 'value': 'ALL'}] +
+                            [{'label': subproject, 'value': subproject} for subproject in self.unique_subprojects],
+
+                    value=None
+
+                ),
+            ],
+            width=2
         ),
         dbc.Col(
             [
@@ -108,13 +150,15 @@ class Taxonomy:
                         {'label': 'Stacked Barchart', 'value': 'stackedbar'},
                         {'label': 'Grouped Barchart', 'value': 'groupedbar'},
                         {'label': 'Area plot', 'value': 'area'},
-                        {'label': 'Pie chart', 'value': 'pie'},
-                        {'label': 'Scatter plot', 'value': 'scatter'},
-                        {'label': 'Scatter 3D', 'value': 'scatter3d'},
-                        {'label': 'Horizon plot', 'value': 'horizon'}
+                        {'label': 'Line plot', 'value': 'line'},
+                        {'label': 'Heatmap', 'value': 'heatmap'},
+                        # {'label': 'Pie chart', 'value': 'pie'},
+                        {'label': 'Scatter plot', 'value': 'scatter'}
+                        # {'label': 'Scatter 3D', 'value': 'scatter3d'},
+                        # {'label': 'Horizon plot', 'value': 'horizon'}
                     ],
                     value='stackedbar',
-                    style={'width': '90%'}
+                    style={'width': '100%'}
                 ),
                 dbc.Checklist(id='use_date_value',
                 options=[{'label':'Use Date for plotting','value': True}],
@@ -125,7 +169,7 @@ class Taxonomy:
 
 
             ],
-            width=6
+            width=2
         ),
         dbc.Col(
             [
@@ -146,40 +190,36 @@ class Taxonomy:
                     style={'width': '90%'}
                 )
             ],
-            width=6
+            width=2
         ),
     ])
 ], fluid=True)
 
-
-
-
-
-        group_select = dbc.Row( dbc.Col(html.Div([
-        dbc.Row(
-        dcc.Checklist(
-            id='enable-group-selection',
-            options=[{'label': 'Enable Group Selection', 'value': 'enabled'}],
-            value=[]
-        ),style={'padding':'20px'}),
-        dbc.Input(
-            id='group-name-input',
-            type='text',
-            placeholder='Enter group name',
-            style={'display': 'none'}
-        ),dbc.Col(
-        dbc.Button(
-            'Create Group',
-            id='create-group-button',
-            style={'display': 'none'})
-        ,style={'padding':'5px'}),
-        dcc.Dropdown(
-            id='group-selection-dropdown',
-            placeholder='Select a group',
-            style={'display': 'none'}
-        ),
-        dcc.Store(id='group-storage', storage_type='local')
-        ])),style={'padding':'10px'})
+        # group_select = dbc.Row( dbc.Col(html.Div([
+        # dbc.Row(
+        # dcc.Checklist(
+        #     id='enable-group-selection',
+        #     options=[{'label': 'Enable Group Selection', 'value': 'enabled'}],
+        #     value=[]
+        # ),style={'padding':'20px'}),
+        # dbc.Input(
+        #     id='group-name-input',
+        #     type='text',
+        #     placeholder='Enter group name',
+        #     style={'display': 'none'}
+        # ),dbc.Col(
+        # dbc.Button(
+        #     'Create Group',
+        #     id='create-group-button',
+        #     style={'display': 'none'})
+        # ,style={'padding':'5px'}),
+        # dcc.Dropdown(
+        #     id='group-selection-dropdown',
+        #     placeholder='Select a group',
+        #     style={'display': 'none'}
+        # ),
+        # dcc.Store(id='group-storage', storage_type='local')
+        # ])),style={'padding':'10px'})
 
         graph_container = html.Div(
     [
@@ -193,6 +233,7 @@ class Taxonomy:
                         'layout': {
                             'clickmode': 'event+select',
                             'dragmode':'lasso',
+                            'height': '700px'
                             # Add the rest of your layout properties here...
                         }
                     },
@@ -265,7 +306,7 @@ class Taxonomy:
                 justify='start'
             ),
         ])
-        unique_samples_value = self.unique_samples if self.unique_samples else ['Default Sample']
+        unique_samples_value = self.unique_samples
         pie_chart_input = dcc.Dropdown(
             id='number_input_piechart',
             options=[{'label': t, 'value': t} for t in unique_samples_value],
@@ -284,6 +325,19 @@ class Taxonomy:
         download_button = dbc.Row(dbc.Button("Download CSV", id="btn-download"))
         download_component = dcc.Download(id="download-csv")
 
+        changer = dbc.Container(
+            [
+
+                dbc.Row(
+                    [
+                        dbc.Col(ThemeChangerAIO(aio_id="theme", radio_props={"value": dbc.themes.FLATLY}), width=2, )
+
+                    ]
+                ),
+            ],
+            className="m-4 dbc",
+            fluid=True,
+        )
 
         container = dbc.Container(
 
@@ -292,17 +346,17 @@ class Taxonomy:
         graph_container,
 
           # new definition including both dropdowns
-        group_select #,upload_component,
-        ,slider_header,
+        # group_select #,upload_component,
+        slider_header,
         slider,  # new definition with smaller width
         header_pie_chart_sample_select_dbc, 
         pie_chart_input,
         db_header,
-        download_button, 
-        download_component, 
-        data_tb
-    ], 
-    fluid=True,style={'backgroundColor':'#F5F5F5'}
+        download_button,
+        download_component,
+        data_tb, changer
+    ],
+            fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
 )
 
 
@@ -522,17 +576,5 @@ class Taxonomy:
 
                 # Return the download link and filename
                 return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
-
-    def _init_mysql(self):
-        self.app = DjangoDash('taxonomy', add_bootstrap_links=True)
-        conn_settings = settings.DATABASES['mmonitor']
-        dialect = 'mysql'
-        user = conn_settings['USER']
-        password = conn_settings['PASSWORD']
-        host = conn_settings['HOST']
-        port = conn_settings['PORT']
-        db_name = conn_settings['NAME']
-        db_url = f'{dialect}://{user}:{password}@{host}:{port}/{db_name}'
-        self._engine = create_engine(db_url)
 
 
