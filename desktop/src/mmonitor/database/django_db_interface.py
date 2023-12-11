@@ -72,19 +72,6 @@ class DjangoDBInterface:
         self.cursor.execute(query)
         return self.cursor.fetchall()
 
-    def add_kaiju_output_to_db(self, sample_name):
-        output_dir = os.path.join("kaiju_output", sample_name)
-
-        for output_file in os.listdir(output_dir):
-            with open(os.path.join(output_dir, output_file), 'r') as f:
-                data = f.readlines()  # Parse the Kaiju output as needed
-
-                # Now, add the parsed data to your DjangoDB.
-                # Assuming the structure of the NanoporeRecords, we'll create records and save them
-                for record_data in data:
-                    record = NanoporeRecords(sample_name=sample_name,
-                                             data=record_data)  # Assuming a structure for NanoporeRecords
-                    record.save()
 
     def update_django_with_emu_out(self, emu_out_path: str, tax_rank: str, sample_name: str, project_name: str,
                                    sample_date: str, subproject_name: str, overwrite: bool):
@@ -104,9 +91,9 @@ class DjangoDBInterface:
             f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
             sep='\t',
             header=None,
-            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
             names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
-                   'Clade', 'Subspecies']
+                   'Clade', 'Subspecies', "count"]
         )
         df.fillna("Not Available", inplace=True)
         df.sort_values('Abundance', ascending=False, inplace=True)
@@ -118,6 +105,7 @@ class DjangoDBInterface:
         # Prepare a list of records
         records = []
         for index, row in df.iterrows():
+            print(row)
             records.append({
                 "taxonomy": row['Species'],
                 "tax_genus": row['Genus'],
@@ -129,6 +117,7 @@ class DjangoDBInterface:
                 "tax_clade": row['Clade'],
                 "tax_subspecies": row['Subspecies'],
                 "abundance": row['Abundance'],
+                "count": row["count"],
                 "sample_id": sample_name,
                 "project_id": project_name,
                 "user_id": user_id,

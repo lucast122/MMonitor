@@ -95,7 +95,8 @@ class EmuRunner:
 
                     df_taxonomy, counts_assigned, counts_unassigned, True)
         # remove concatenated file after processing
-        os.remove(concat_file_name)
+        # TODO: calculate statistics and then remove, for now don't remove
+        # os.remove(concat_file_name)
 
     def get_files_from_folder(self, folder_path):
         """

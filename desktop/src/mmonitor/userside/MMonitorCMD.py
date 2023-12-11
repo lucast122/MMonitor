@@ -40,10 +40,15 @@ class MMonitorCMD:
         parser.add_argument("--overwrite", action="store_true",
                             help="Enable to overwrite existing records. If not specified, defaults to False.")
 
-        parser.add_argument('-q', '--qc', type=bool, help='Calculate quality control statistics for input samples.'
+        parser.add_argument('-q', '--qc', action="store_true",
+                            help='Calculate quality control statistics for input samples.'
                                                           ' Enable this to fill QC app with data. Increases time the analysis takes.')
+        parser.add_argument('-x', '--update', action="store_true", help='Only update counts and abundances'
+                                                              ' Enable this if you want to send count and abundances to the MMonitor webserver DB. '
+                                                              ' Can be useful, e.g. when the tsv files from emu changed after analysis.')
         parser.add_argument('-n', '--minabundance', type=float, default=0.5,
                             help='Minimal abundance to be considered for 16s taxonomy')
+
 
 
         return parser.parse_args()
@@ -97,6 +102,7 @@ class MMonitorCMD:
         samples_in_db = self.django_db.get_unique_sample_ids()
         return sample_id in samples_in_db
 
+
     def taxonomy_nanopore_16s(self):
         global sample_name, project_name, subproject_name, sample_date
 
@@ -121,8 +127,12 @@ class MMonitorCMD:
             subproject_name = str(self.args.subproject)
             sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
             files = self.args.input
+            if self.args.update:
+                print("Update parameter specified. Will only update results from file.")
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+                return
+
             self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
-            print("add statistics")
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
@@ -134,11 +144,16 @@ class MMonitorCMD:
                 if not self.args.overwrite:
                     if self.check_sample_in_db(sample_name):
                         print(
-                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample..")
+                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample...")
                         continue
                 project_name = self.multi_sample_input["project_names"][index]
                 subproject_name = self.multi_sample_input["subproject_names"][index]
                 sample_date = self.multi_sample_input["dates"][index]
+                if self.args.update:
+                    print("Update parameter specified. Will only update results from file.")
+                    add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+                    continue
+
                 self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
 
@@ -146,6 +161,7 @@ class MMonitorCMD:
         if self.args.qc:
             self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                 sample_date)
+            print("adding statistics")
 
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
 

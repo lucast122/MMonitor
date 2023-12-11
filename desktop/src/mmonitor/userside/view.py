@@ -335,8 +335,7 @@ class GUI(ctk.CTk):
             self.open_popup("Unzipping tar", "Unzipping emu.py.tar", "check")
             self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.py.tar", f"{ROOT}/src/resources/emu_db/")
 
-
-        if not os.path.exists(f"{ROOT}/src/resources/emu_db/emu.tar"):
+        if not os.path.exists(f"{ROOT}/src/resources/emu_db/taxonomy.tsv"):
             response = CTkMessagebox("Emu DB not found. Do you want to download it?", option_1="Yes", option_2="No")
             if response.selected_option == "Yes":
                 try:
@@ -556,7 +555,7 @@ class GUI(ctk.CTk):
                 self.db.update_table_with_emu_out(emu_out_path, "species", sample_name, "project", self.sample_date)
 
             self.django_db.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
-                                                      subproject_name)
+                                                      subproject_name, True)
 
 
         self.check_emu_db_exists()
