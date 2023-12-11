@@ -40,9 +40,10 @@ class MMonitorCMD:
         parser.add_argument("--overwrite", action="store_true",
                             help="Enable to overwrite existing records. If not specified, defaults to False.")
 
-        parser.add_argument('-q', '--qc', type=bool, help='Calculate quality control statistics for input samples.'
+        parser.add_argument('-q', '--qc', action="store_ture",
+                            help='Calculate quality control statistics for input samples.'
                                                           ' Enable this to fill QC app with data. Increases time the analysis takes.')
-        parser.add_argument('-x', '--update', type=bool, help='Only update counts and abundances'
+        parser.add_argument('-x', '--update', action="store_ture", help='Only update counts and abundances'
                                                               ' Enable this if you want to send count and abundances to the MMonitor webserver DB. '
                                                               ' Can be useful, e.g. when the tsv files from emu changed after analysis.')
         parser.add_argument('-n', '--minabundance', type=float, default=0.5,
