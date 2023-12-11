@@ -104,9 +104,9 @@ class DjangoDBInterface:
             f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
             sep='\t',
             header=None,
-            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12],
             names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
-                   'Clade', 'Subspecies']
+                   'Clade', 'Subspecies', 'estimated counts']
         )
         df.fillna("Not Available", inplace=True)
         df.sort_values('Abundance', ascending=False, inplace=True)
@@ -129,6 +129,7 @@ class DjangoDBInterface:
                 "tax_clade": row['Clade'],
                 "tax_subspecies": row['Subspecies'],
                 "abundance": row['Abundance'],
+                "counts": row['estimated counts'],
                 "sample_id": sample_name,
                 "project_id": project_name,
                 "user_id": user_id,
