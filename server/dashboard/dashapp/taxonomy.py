@@ -14,7 +14,7 @@ from django_plotly_dash import DjangoDash
 from plotly.graph_objects import Figure
 
 from users.models import NanoporeRecord
-
+import skbio.diversity
 
 class Taxonomy:
     """
@@ -30,6 +30,7 @@ class Taxonomy:
 
         return pd.DataFrame.from_records(records.values())
 
+
     def __init__(self,user_id):
         self.records = None
         self.user_id = user_id
@@ -41,9 +42,14 @@ class Taxonomy:
         self.unique_sample_ids = None
         self.unique_samples = None
         self.unique_counts = None
+        self.unique_species = None
+        self.df_full_for_diversity = None
+        self.shannon_diversity = None
+        self.simpson_diversity = None
         self.df = pd.DataFrame()
         # Convert the QuerySet to a DataFrame
         self.df = self.get_data()
+        self.abundance_lists = None
         # self.df.replace("Not available", np.nan, inplace=True)
         # self.df.dropna(inplace=True)
 
@@ -59,13 +65,22 @@ class Taxonomy:
             self.unique_subprojects = NanoporeRecord.objects.filter(user_id=self.user_id).values(
                 'subproject').distinct()
             self.unique_subprojects = [item['subproject'] for item in self.unique_subprojects]
+            self.unique_species = self.df['taxonomy'].unique()
+            self.unique_species = self.df['taxonomy'].unique()
+            self.df_full_for_diversity = self.df.pivot_table(index='sample_id',
+                                                             columns='taxonomy',
+                                                             values='abundance',
+                                                             fill_value=0)
 
-            # print(f"Unique samples{self.unique_samples}")
+            sample_project_mapping = self.records.values('sample_id', 'project_id')
+            self.sample_to_project_dict = {item['sample_id']: item['project_id'] for item in sample_project_mapping}
 
+            # self.df_full_for_diversity.columns = self.df_full_for_diversity.columns.droplevel(0)
 
 
 
             self.df_sorted = self.df.sort_values(by=["sample_id", "abundance"], ascending=[True, False])
+
 
 
             # Get the number of unique values in each column
@@ -195,31 +210,6 @@ class Taxonomy:
     ])
 ], fluid=True)
 
-        # group_select = dbc.Row( dbc.Col(html.Div([
-        # dbc.Row(
-        # dcc.Checklist(
-        #     id='enable-group-selection',
-        #     options=[{'label': 'Enable Group Selection', 'value': 'enabled'}],
-        #     value=[]
-        # ),style={'padding':'20px'}),
-        # dbc.Input(
-        #     id='group-name-input',
-        #     type='text',
-        #     placeholder='Enter group name',
-        #     style={'display': 'none'}
-        # ),dbc.Col(
-        # dbc.Button(
-        #     'Create Group',
-        #     id='create-group-button',
-        #     style={'display': 'none'})
-        # ,style={'padding':'5px'}),
-        # dcc.Dropdown(
-        #     id='group-selection-dropdown',
-        #     placeholder='Select a group',
-        #     style={'display': 'none'}
-        # ),
-        # dcc.Store(id='group-storage', storage_type='local')
-        # ])),style={'padding':'10px'})
 
         graph_container = html.Div(
     [
@@ -232,7 +222,7 @@ class Taxonomy:
                         'data': [],  # Replace with your data
                         'layout': {
                             'clickmode': 'event+select',
-                            'dragmode':'lasso',
+
                             'height': '700px'
                             # Add the rest of your layout properties here...
                         }
@@ -243,9 +233,9 @@ class Taxonomy:
                     dcc.Markdown("**Figure 1**: Abundance of each sample"),
                     style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
                 )
-            ], style={'width': '100%', "padding":"5px"}
-        ),
-
+            ], style={'width': '100%', "padding":"5px"})
+        # ),
+        #
         # html.Div(
         #     [
         #         dcc.Graph(
@@ -259,10 +249,10 @@ class Taxonomy:
         #             dcc.Markdown("**Figure 2**: Abundance of each species"),
         #             style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
         #         ,id='markdown-caption')
-        #     ], style={'width': '0%', "padding":"5px"}
+        #     ], style={'width': '100%', "padding":"5px"}
         # ),
-    ],
-    style={'display': 'flex'}
+    ]
+
 )
 
 
@@ -325,19 +315,6 @@ class Taxonomy:
         download_button = dbc.Row(dbc.Button("Download CSV", id="btn-download"))
         download_component = dcc.Download(id="download-csv")
 
-        changer = dbc.Container(
-            [
-
-                dbc.Row(
-                    [
-                        dbc.Col(ThemeChangerAIO(aio_id="theme", radio_props={"value": dbc.themes.FLATLY}), width=2, )
-
-                    ]
-                ),
-            ],
-            className="m-4 dbc",
-            fluid=True,
-        )
 
         container = dbc.Container(
 
@@ -354,7 +331,7 @@ class Taxonomy:
         db_header,
         download_button,
         download_component,
-        data_tb, changer
+        data_tb
     ],
             fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
 )
@@ -576,5 +553,12 @@ class Taxonomy:
 
                 # Return the download link and filename
                 return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
+
+
+
+
+
+
+
 
 

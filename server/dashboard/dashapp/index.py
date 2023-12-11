@@ -29,7 +29,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from users.models import NanoporeRecord
 from users.models import SequencingStatistics
-from . import taxonomy, correlations, qc
+from . import taxonomy, correlations, qc, diversity
 from .calculations.stats import scipy_correlation
 
 
@@ -63,7 +63,9 @@ class Index:
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
         # self.horizon_app = horizon.Horizon()
         self.correlations_app = correlations.Correlations()
+        self.diversity_app = diversity.Diversity(user_id)
         self.qc_app = qc.QC(user_id)
+        self.diversity_metric = None
 
         pd.set_option('display.max_columns', None)
         pd.set_option('display.max_rows', None)
@@ -131,6 +133,11 @@ class Index:
         #     'instance': self.horizon_app
         # },
         #
+            '/dashapp/diversity': {
+                'name': 'Diversity',
+                'app': self.diversity_app.app,
+                'instance': self.diversity_app
+            },
             '/dashapp/correlations': {
                 'name': 'Correlations',
                 'app': self.correlations_app.app,
@@ -420,7 +427,7 @@ class Index:
                 return f"File {filename} processed successfully."
 
         """
-Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- 
+TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- Taxonomy callbacks ----- 
         """
 
         from dash_bootstrap_templates import ThemeChangerAIO
@@ -460,7 +467,6 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         @self.app.callback(
             Output('graph1', 'figure'),
-
             Output('number_input_piechart', 'style'),
             # Output('markdown-caption','style'),
             Input('dropdown', 'value'),
@@ -468,12 +474,10 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             Input('number_input_piechart', 'value'),
             Input('slider', 'value'),
             Input('sample_select_value', 'value'),
-            Input('use_date_value', 'value'),
-            Input(ThemeChangerAIO.ids.radio("theme"), "value"),
-
+            Input('use_date_value', 'value')
         )
-        def plot_selected_figure(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,
-                                 use_date_value, theme):
+        def plot_selected_taxonomy(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,
+                                 use_date_value):
             # Simplified initialization
             fig1 = {'data': []}
             piechart_style = {'display': 'none'}
@@ -513,6 +517,11 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                     piechart_style = {'display': 'block'}
 
             return fig1, piechart_style
+
+
+
+
+
 
         # Add a new callback that updates the header's style based on the dropdown's value
         @self.app.callback(
@@ -554,8 +563,13 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
                 # Return the download link and filename
                 return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
-                l
+
+
+
+
+
         # @self.app.callback(
+
         # Output('graph3', 'figure'),
         # Input('sample_select_value', 'value')
         # )
@@ -593,8 +607,76 @@ Taxonomy callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         #     return fig
 
 
+        """
+
+        DIVERSITY APP CALLBACKS     DIVERSITY APP CALLBACKS    DIVERSITY APP CALLBACKS   DIVERSITY APP CALLBACKS
+
+        """
 
 
+
+        @self.app.callback(
+            Output('alpha_diversities_plot1', 'figure'),
+            Output('alpha_diversities_plot2', 'figure'),
+            Input('sample_select_value', 'value'),
+            Input('diversity_metric_dropdown', 'value')
+        )
+        def plot_alpha_diversities(sample_select_value,alpha_diversity_metric):
+            if alpha_diversity_metric == "Simpson":
+                diversity_df = self.diversity_app.simpson_diversity.reset_index()
+                diversity_df_without_categories = self.diversity_app.simpson_diversity.reset_index()
+            else:
+                diversity_df = self.diversity_app.shannon_diversity.reset_index()
+                diversity_df_without_categories = self.diversity_app.shannon_diversity.reset_index()
+            diversity_df.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
+            diversity_df_without_categories.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
+            print(diversity_df_without_categories)
+            diversity_df_selected = diversity_df_without_categories[diversity_df_without_categories['sample_id'].astype(str).isin(sample_select_value)]
+            diversity_df['Project'] = diversity_df['sample_id'].map(self.diversity_app.sample_to_project_dict)
+
+
+
+            fig = px.box(diversity_df, x='Project', y=f"{alpha_diversity_metric}Diversity",
+                         title=f'Alpha Diversity ({alpha_diversity_metric} Index) across Sample Categories')
+
+            fig2 = px.line(diversity_df_selected,x="sample_id",y=f"{alpha_diversity_metric}Diversity",
+                           title=f'Alpha Diversity ({alpha_diversity_metric} Index) across selected samples')
+            self.diversity_metric = alpha_diversity_metric
+            return fig,fig2
+
+        @self.app.callback(
+            Output("download-diversity-csv", "data"),
+            [Input("btn-download-diversity", "n_clicks")]
+        )
+        def download_diversity_csv(n_clicks):
+
+            if n_clicks is not None:
+                # Convert DataFrame to CSV string
+                if self.diversity_metric == "Shannon":
+                    df = self.diversity_app.shannon_diversity
+                    csv_string = self.diversity_app.shannon_diversity.to_csv(index=False)
+                else:
+                    df = self.diversity_app.simpson_diversity
+                    csv_string = self.diversity_app.simpson_diversity.to_csv(index=False)
+
+                # Create a BytesIO object to hold the CSV data
+                csv_bytes = StringIO()
+                csv_bytes.write(csv_string)
+
+                # Seek to the beginning of the BytesIO stream
+                csv_bytes.seek(0)
+
+                # Base64 encode the CSV data
+                csv_base64 = base64.b64encode(csv_bytes.read().encode()).decode()
+
+                # Construct the download link
+                csv_href = f"data:text/csv;base64,{csv_base64}"
+
+                # Specify the filename for the download
+                filename = f"alpha_diversity_{self.diversity_metric}.csv"
+
+                # Return the download link and filename
+                return dcc.send_data_frame(df.to_csv, filename=filename)
 
         """
 
