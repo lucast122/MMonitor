@@ -152,7 +152,7 @@ class MMonitorCMD:
                 if self.args.update:
                     print("Update parameter specified. Will only update results from file.")
                     add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
-                    return
+                    break
 
                 self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
