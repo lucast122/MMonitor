@@ -93,7 +93,7 @@ class DjangoDBInterface:
             header=None,
             usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
             names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
-                   'Clade', 'Subspecies', "estimated counts"]
+                   'Clade', 'Subspecies', "count"]
         )
         df.fillna("Not Available", inplace=True)
         df.sort_values('Abundance', ascending=False, inplace=True)
@@ -117,7 +117,7 @@ class DjangoDBInterface:
                 "tax_clade": row['Clade'],
                 "tax_subspecies": row['Subspecies'],
                 "abundance": row['Abundance'],
-                "counts": row["estimated counts"],
+                "count": row["count"],
                 "sample_id": sample_name,
                 "project_id": project_name,
                 "user_id": user_id,
