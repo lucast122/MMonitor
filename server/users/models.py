@@ -1,7 +1,7 @@
-from django.db import models
-from django.contrib.auth.models import User
 from datetime import date
 
+from django.contrib.auth.models import User
+from django.db import models
 
 
 class UserProfile(models.Model):
@@ -16,6 +16,7 @@ class NanoporeRecord(models.Model):
     read_id = models.AutoField(primary_key=True)
     taxonomy = models.TextField(default='empty')
     abundance = models.FloatField(default=0.0)
+    count = models.FloatField(default=0.0)
     sample_id = models.CharField(max_length=255, default='empty')
     project_id = models.CharField(max_length=255, default='empty')
     subproject = models.CharField(max_length=255, default='empty')
