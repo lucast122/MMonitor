@@ -144,7 +144,7 @@ class MMonitorCMD:
                 if not self.args.overwrite:
                     if self.check_sample_in_db(sample_name):
                         print(
-                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample..")
+                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample...")
                         continue
                 project_name = self.multi_sample_input["project_names"][index]
                 subproject_name = self.multi_sample_input["subproject_names"][index]
