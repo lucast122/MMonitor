@@ -6,10 +6,14 @@ import tempfile
 from io import StringIO
 from json import loads
 from typing import Tuple, Any, List, Iterable, Dict, Union
-
+from skbio.stats.ordination import pcoa
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from dash_extensions import Lottie
+from dash import dcc, html
+from dash.dependencies import Input, Output
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -29,7 +33,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from users.models import NanoporeRecord
 from users.models import SequencingStatistics
-from . import taxonomy, correlations, qc, diversity
+from . import taxonomy, correlations, qc, diversity, horizon
 from .calculations.stats import scipy_correlation
 
 
@@ -61,9 +65,10 @@ class Index:
         self.colors = colors
 
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
-        # self.horizon_app = horizon.Horizon()
-        self.correlations_app = correlations.Correlations()
         self.diversity_app = diversity.Diversity(user_id)
+        self.correlations_app = correlations.Correlations()
+        self.horizon_app = horizon.Horizon(user_id)
+
         self.qc_app = qc.QC(user_id)
         self.diversity_metric = None
 
@@ -127,12 +132,12 @@ class Index:
                 'app': self.taxonomy_app.app,
                 'instance': self.taxonomy_app
             },
-        # '/dashapp/horizon': {
-        #     'name': 'Horizon',
-        #     'app': self.horizon_app.app,
-        #     'instance': self.horizon_app
-        # },
-        #
+        '/dashapp/horizon': {
+            'name': 'Horizon',
+            'app': self.horizon_app.app,
+            'instance': self.horizon_app
+        },
+
             '/dashapp/diversity': {
                 'name': 'Diversity',
                 'app': self.diversity_app.app,
@@ -613,7 +618,18 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         """
 
-
+        # @self.app.callback(
+        #     Output("loading-output-1", "children"),
+        #     [Input('beta_diversity_3d_pcoa', "loading_state")]
+        # )
+        # def update_loading_state(loading_state):
+        #     if loading_state.is_loading:
+        #         # Show the Lottie animation when the graph is loading
+        #         return [Lottie(options=options, width="10%", height="10%", url=url),
+        #                 dcc.Graph(id='beta_diversity_3d_pcoa')]
+        #     else:
+        #         # Hide the Lottie animation when the graph is not loading
+        #         return dcc.Graph(id='beta_diversity_3d_pcoa')
 
         @self.app.callback(
             Output('alpha_diversities_plot1', 'figure'),
@@ -643,6 +659,189 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                            title=f'Alpha Diversity ({alpha_diversity_metric} Index) across selected samples')
             self.diversity_metric = alpha_diversity_metric
             return fig,fig2
+
+            # BETA DIVERSITY
+
+        def generate_pcoa_figure(selected_samples, dimensions=2):
+            # Convert the DistanceMatrix to a DataFrame if necessary
+            distance_matrix_df = pd.DataFrame(
+                self.diversity_app.beta_diversity_matrix.data,
+                index=self.diversity_app.beta_diversity_matrix.ids,
+                columns=self.diversity_app.beta_diversity_matrix.ids
+            )
+            if selected_samples:
+                distance_matrix_df = distance_matrix_df.loc[selected_samples, selected_samples]
+
+            # Now perform PCoA with skbio - this needs to be done after each filter operation if the samples change
+            pcoa_results = pcoa(distance_matrix_df)
+
+            # Extract the PCoA scores
+            pcoa_scores = pcoa_results.samples
+
+
+            text_data = selected_samples
+
+            # Select the appropriate number of dimensions
+            if dimensions == 3:
+                fig = px.scatter_3d(
+                    pcoa_scores,
+                    x='PC1',
+                    y='PC2',
+                    z='PC3',
+                    text=text_data,  # Add sample names as hover text
+                    labels={'PC1': 'PC1', 'PC2': 'PC2', 'PC3': 'PC3'},
+                    title="3D PCoA Plot"
+                )
+            else:  # Default to 2D
+                fig = px.scatter(
+                    pcoa_scores,
+                    x='PC1',
+                    y='PC2',
+                    text=text_data,  # Add sample names as hover text
+                    labels={'PC1': 'PC1', 'PC2': 'PC2'},
+                    title="2D PCoA Plot"
+                )
+
+            # Customize the figure as needed
+            fig.update_traces(marker=dict(size=6),
+                              selector=dict(mode='markers+text'))  # Adjust marker size as needed
+            fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
+            return fig
+
+        @self.app.callback(
+            Output('pcoa-plot-container', 'children'),
+            [Input('toggle-3d', 'value'), Input('sample_select_value', 'value')]
+            # Add any other inputs your PCoA plot depends on
+        )
+        def update_pcoa_plot(toggle_3d, selected_samples):
+            # Generate the figure based on selected_samples
+            # For demonstration, let's assume you have a function `generate_pcoa_figure` that returns a figure
+            # You would need to modify it to accept a parameter determining whether to generate a 2D or 3D plot
+            if toggle_3d:
+                # Generate and return a 3D PCoA plot
+                figure = generate_pcoa_figure(selected_samples, dimensions=3)
+                return dcc.Graph(figure=figure)
+            else:
+                # Generate and return a 2D PCoA plot
+                figure = generate_pcoa_figure(selected_samples, dimensions=2)
+                return dcc.Graph(figure=figure)
+
+        @self.app.callback(
+            Output('beta_diversity_plot', 'figure'),
+            [
+                Input('sample_select_value', 'value')
+
+            ]
+        )
+        def update_beta_diversity_plot(selected_samples):
+            if not selected_samples:
+                return {}  # Return an empty plot if no samples are selected
+
+            # Filter the beta diversity matrix based on selected samples
+            filtered_matrix = self.diversity_app.beta_diversity_matrix.filter(selected_samples)
+
+            # Create a 2D ordination plot (like PCoA) using the filtered matrix
+            # PCoA is a common way to visualize beta diversity
+            # You can use skbio or other libraries to perform PCoA
+            pcoa_results = pcoa(filtered_matrix)
+
+            fig = px.scatter(
+                x=pcoa_results.samples['PC1'],
+                y=pcoa_results.samples['PC2'],
+                text=selected_samples
+            )
+            fig.update_layout(title="Beta Diversity (PCoA)", xaxis_title="PC1", yaxis_title="PC2")
+            return fig
+
+        # 3D PCOA BETA DIVERISTY
+
+        @self.app.callback(
+            Output('beta_diversity_3d_pcoa', 'figure'),
+            [Input('sample_select_value', 'value')]
+        )
+        def update_beta_diversity_3d_pcoa(selected_samples):
+            if not selected_samples:
+                return {}  # Return an empty plot if no samples are selected
+
+            # Filter the PCoA results for the selected samples
+            filtered_samples = self.diversity_app.pcoa_results.samples.loc[selected_samples]
+
+            # Make sure to use the correct column names for x, y, z
+            fig = px.scatter_3d(
+                filtered_samples,
+                x='PC1',  # First principal coordinate
+                y='PC2',  # Second principal coordinate
+                z='PC3',  # Third principal coordinate
+                text=selected_samples,
+                labels={'PC1': 'PC1', 'PC2': 'PC2', 'PC3': 'PC3'}
+            )
+            fig.update_layout(
+                title="3D PCoA Plot of Beta Diversity",
+                scene=dict(
+                    xaxis_title='PC1',
+                    yaxis_title='PC2',
+                    zaxis_title='PC3'
+                )
+            )
+            return fig
+
+        @self.app.callback(
+            Output('alpha_diversity_boxplot', 'figure'),
+            [Input('diversity_metric_dropdown', 'value'),
+             Input('project-dropdown', 'value')]
+        )
+        def update_alpha_diversity_boxplot(selected_metric, selected_project):
+            # filter data based on the selected project and metric
+            # For demonstration purposes, let's assume `df` is your DataFrame that contains the alpha diversity data
+            # and `project_column` is the name of the column that contains the project information.
+
+            if selected_metric == 'Shannon':
+                diversity_data = self.diversity_app.shannon_diversity
+            else:
+                diversity_data = self.diversity_app.simpson_diversity
+
+            # If a specific project is selected, filter for that project
+            if selected_project and selected_project != 'ALL':
+                diversity_data = diversity_data[diversity_data['project_id'] == selected_project]
+
+            # Create the box plot
+            fig = px.box(diversity_data, y=selected_metric, color='project_id', labels={'y': selected_metric})
+
+            return fig
+
+        @self.app.callback(
+            Output('beta_diversity_heatmap', 'figure'),
+            [Input('sample_select_value', 'value')]
+        )
+        def update_beta_diversity_heatmap(selected_samples):
+            # Convert the DistanceMatrix to a DataFrame first
+            beta_matrix_df = distance_matrix_to_dataframe(self.diversity_app.beta_diversity_matrix)
+
+            # Now you can use .loc since beta_matrix_df is a DataFrame
+            if selected_samples:
+                # Filter the DataFrame based on selected samples
+                filtered_matrix = beta_matrix_df.loc[selected_samples, selected_samples]
+            else:
+                filtered_matrix = beta_matrix_df  # Use the full DataFrame if no samples are selected
+
+            # Create the heatmap
+            fig = px.imshow(filtered_matrix,
+                            labels=dict(x="Sample", y="Sample", color="Beta Diversity"),
+                            x=filtered_matrix.columns,
+                            y=filtered_matrix.columns)
+            fig.update_layout(title="Beta Diversity Heatmap")
+
+            return fig
+
+        import pandas as pd
+
+        # Convert DistanceMatrix to DataFrame for heatmap plotting
+        def distance_matrix_to_dataframe(distance_matrix):
+            # Convert to a square matrix and then to a DataFrame
+            matrix_df = pd.DataFrame(distance_matrix.data,
+                                     index=distance_matrix.ids,
+                                     columns=distance_matrix.ids)
+            return matrix_df
 
         @self.app.callback(
             Output("download-diversity-csv", "data"),

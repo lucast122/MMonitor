@@ -1,3 +1,6 @@
+from skbio.diversity import beta_diversity
+from dash.dependencies import Input, Output
+from skbio.stats import ordination
 from django_plotly_dash import DjangoDash
 import pandas as pd
 import plotly.express as px
@@ -6,21 +9,17 @@ import skbio.diversity
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 from dash import html
+from dash_extensions import Lottie
+from dash import dcc, html
+from dash.dependencies import Input, Output
+
 
 class Diversity:
     """
     App to display the abundances of taxonomies in various formats.
     """
 
-    def get_data(self):
-
-        records = NanoporeRecord.objects.filter(user_id=self.user_id)
-        self.records = records
-        if not records.exists():
-            return pd.DataFrame()  # Return an empty DataFrame if no records are found
-
-        return pd.DataFrame.from_records(records.values())
-
+    
 
     def __init__(self,user_id):
         self.records = None
@@ -31,8 +30,10 @@ class Diversity:
         self.unique_samples = None
         self.unique_counts = None
         self.unique_species = None
+        self.beta_diversity_matrix = None
         self.df_full_for_diversity = None
         self.shannon_diversity = None
+        self.pcoa_results = None
         self.simpson_diversity = None
         self.df = pd.DataFrame()
         # Convert the QuerySet to a DataFrame
@@ -70,6 +71,7 @@ class Diversity:
             self.unique_counts = min(self.df.nunique()[1], 500)
 
         self.calculate_alpha_diversity()
+        self.calculate_beta_diversity()
         self._init_layout()
 
 
@@ -82,7 +84,7 @@ class Diversity:
                     id='diversity_metric_dropdown',
                     options=[
                         {'label': 'Shannon', 'value': 'Shannon'},
-                        {'label': 'Simpson', 'value': 'Simpson'}
+                        {'label': 'Sixmpson', 'value': 'Simpson'}
                     ],
                     value='Shannon',
                     style={'width': '100%'}
@@ -108,7 +110,7 @@ class Diversity:
                                     # Add the rest of your layout properties here...
                                 }
                             },
-                            style={"border": "2px solid black"}  # Add a border here
+
                         ),
                         html.Div(
 
@@ -124,7 +126,7 @@ class Diversity:
                             figure={
                                 'data': []  # Replace with your data
                             },
-                            style={"border": "2px solid black"}  # Add a border here
+
                         )
 
                     ], style={'width': '100%', "padding": "5px"}
@@ -188,22 +190,67 @@ class Diversity:
             ])
         ],fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid")
 
+        beta_diversity_graph = html.Div(
+            [
+                dcc.Graph(id='beta_diversity_plot')
+            ],
+            style={'width': '100%', "padding": "5px"}
+        )
+
         download_button = dbc.Col(
-            dbc.Button("Download Diversities as CSV", id="btn-download-diversity"),
+            dbc.Button("Download as CSV", id="btn-download-diversity"),
             # Adjust this width too as per your requirement
             width=4
         )
 
         download_component = dcc.Download(id="download-diversity-csv")
+        options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio='xMidYMid slice'))
+
+
+        url = "https://assets7.lottiefiles.com/packages/lf20_EzPrWM.json"
+
+        checkbox = html.Div(
+            [
+                dbc.Checkbox(
+                    id='toggle-3d',
+                    value=False,
+                    label='Show 3D Plot'
+                )
+
+            ]
+        )
+
+        # Remove one of the PCoA plot graphs if you have two
+        # Assume 'pcoa-plot-container' is the id of the div where the PCoA plot will be displayed
+        pcoa_plot_container = html.Div(id='pcoa-plot-container')
 
         # Wrapping in a row
+
         selection_row = dbc.Row([diversity_metric_selector, download_button])
 
+        alpha_diversity_boxplot_section = html.Div(
+            [
+                dcc.Graph(id='alpha_diversity_boxplot')
+            ],
+            style={'width': '100%', "padding": "5px"}
+        )
+
+        beta_diversity_heatmap_section = html.Div(
+            [
+                dcc.Graph(id='beta_diversity_heatmap')
+            ],
+            style={"padding": "5px"}
+        )
+
         # Adjusting the main container
-        container = dbc.Container([metric_label,selection_row, download_component, graph_container, dropdown_container],
+        container = dbc.Container([metric_label,selection_row, download_component, graph_container,
+                                    beta_diversity_heatmap_section,
+                                   pcoa_plot_container,checkbox, dropdown_container],
                                   fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid")
 
         self.app.layout = container
+
+
 
     def calculate_alpha_diversity(self):
         abundance_lists = self.df_full_for_diversity
@@ -214,3 +261,19 @@ class Diversity:
                                                             ids=self.unique_sample_ids)
         print(f"simpson diversity: {self.simpson_diversity}")
         print(f"shannon diversity: {self.shannon_diversity}")
+
+    def calculate_beta_diversity(self):
+        # Bray-Curtis is a common choice for beta diversity, but you can choose other metrics
+        self.beta_diversity_matrix = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
+        self.pcoa_results = ordination.pcoa(self.beta_diversity_matrix)
+
+
+    def get_data(self):
+
+
+        records = NanoporeRecord.objects.filter(user_id=self.user_id)
+        self.records = records
+        if not records.exists():
+            return pd.DataFrame()  # Return an empty DataFrame if no records are found
+
+        return pd.DataFrame.from_records(records.values())

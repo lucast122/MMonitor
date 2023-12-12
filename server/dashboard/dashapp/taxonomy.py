@@ -227,7 +227,7 @@ class Taxonomy:
                             # Add the rest of your layout properties here...
                         }
                     },
-                    style={"border":"2px solid black"}  # Add a border here
+
                 ),
                 html.Div(
                     dcc.Markdown("**Figure 1**: Abundance of each sample"),
@@ -470,8 +470,8 @@ class Taxonomy:
             fig2 = {'data': []}
             piechart_style = {'display': 'none'}
 
-            fig2_style = {'display': 'block',
-                        'border':'2px solid black'}
+            fig2_style = {'display': 'block'}
+
             # request necessary data from database
             # q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
             # df = self._sql.query_to_dataframe(q)
