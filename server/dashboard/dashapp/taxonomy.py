@@ -1,7 +1,8 @@
 import base64
 from io import StringIO
 from typing import Tuple, List, Any, Dict
-
+from dash_ag_grid import AgGrid
+from users.models import SequencingStatistics
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import pandas as pd
@@ -12,6 +13,7 @@ from dash.dependencies import Input, Output
 from dash_bootstrap_templates import ThemeChangerAIO
 from django_plotly_dash import DjangoDash
 from plotly.graph_objects import Figure
+import dash_mantine_components as dmc
 
 from users.models import NanoporeRecord
 import skbio.diversity
@@ -308,13 +310,20 @@ class Taxonomy:
         # data table for debugging
 
         db_header = dbc.Row(dbc.Col(html.H4(children="Database"), width={'size': 12, 'offset': 0}),justify="center")
-        data, columns = self._generate_table_data_cols()
 
+
+        data, columns = self._generate_table_data_cols()
         data_tb = dbc.Row(dbc.Col(dash_table.DataTable(id='table-correlations', data=data, columns=columns), width={'size': 12, 'offset': 0}),justify="center")
 
-        download_button = dbc.Row(dbc.Button("Download CSV", id="btn-download"))
+        grid, columns = self._generate_table_ag_grid(100000)
+
+        data_dag_div = html.Div(grid,style={"margin-top":"10px",'margin-left':'0px'})
+
+        download_button = dbc.Row(dbc.Button("Download CSV", id="btn-download",style={"margin-left":'20px'}))
         download_component = dcc.Download(id="download-csv")
 
+        download_button_counts = dbc.Row(dbc.Button("Download Counts as CSV", id="btn-download-counts", style={"margin-left": '20px','margin-top':'20px'}))
+        download_component_counts = dcc.Download(id="download-counts")
 
         container = dbc.Container(
 
@@ -328,10 +337,13 @@ class Taxonomy:
         slider,  # new definition with smaller width
         header_pie_chart_sample_select_dbc, 
         pie_chart_input,
-        db_header,
-        download_button,
-        download_component,
-        data_tb
+        db_header,download_button, download_button_counts,download_component_counts,
+
+        download_component
+        , data_dag_div,
+
+
+        # data_tb
     ],
             fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
 )
@@ -345,6 +357,38 @@ class Taxonomy:
 
 
         self.app.layout = container
+
+    def _generate_table_ag_grid(self, max_rows=40):
+        """
+        Generate data to populate a dash-ag-grid table with.
+        dash-ag-grid requires the data in a list of dictionaries format and a collection of column definitions.
+
+        Args:
+        max_rows (int, optional): The maximum number of rows to include in the table. Defaults to 40.
+
+        Returns:
+        Dash AgGrid component with the specified data and columns.
+        """
+        # Limit the number of rows if needed
+        if max_rows is not None:
+            df_display = self.df.head(max_rows)
+        else:
+            df_display = self.df
+
+        # Generate column definitions for dash-ag-grid
+        column_defs = [{"headerName": col, "field": col, "sortable": True, "filter": True} for col in df_display.columns]
+
+
+        # Create the AgGrid component
+        ag_grid_table = AgGrid(
+            id="table-correlations",
+            rowData=df_display.to_dict('records'),
+            className="ag-theme-balham",
+
+
+            columnDefs = column_defs)
+        return ag_grid_table, [{'name': i, 'id': i} for i in self.df.columns]
+
 
     def _generate_table_data_cols(self, max_rows=40) -> Tuple[List[Any], List[Any]]:
         """
@@ -553,6 +597,23 @@ class Taxonomy:
 
                 # Return the download link and filename
                 return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
+
+    def calculate_normalized_counts(self):
+        counts_df = pd.DataFrame.from_records(NanoporeRecord.objects.filter(user_id=self.user_id).values())
+        stats_df = pd.DataFrame.from_records(SequencingStatistics.objects.filter(user_id=self.user_id).values())
+
+        # Merge the counts and stats dataframes on sample_id
+        merged_df = pd.merge(counts_df, stats_df, left_on='sample_id',right_on="sample_name")
+
+        # Calculate normalized counts by dividing each count by the numebr of bases sequenced and then multiplying by
+        # 1 million to make normalized counts more similar to normal counts in value range
+        merged_df['normalized_count'] = (merged_df['count'] / merged_df['total_bases_sequenced']) * 1000000
+
+        # Selecting only necessary columns for the final DataFrame
+        normalized_counts_df = merged_df[['sample_id', 'taxonomy', 'abundance', 'count', 'normalized_count']]
+        return normalized_counts_df
+
+
 
 
 

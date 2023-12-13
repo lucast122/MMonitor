@@ -12,9 +12,10 @@ from dash import html
 from dash_extensions import Lottie
 from dash import dcc, html
 from dash.dependencies import Input, Output
-
+import dash_mantine_components as dmc
 
 class Diversity:
+
     """
     App to display the abundances of taxonomies in various formats.
     """
@@ -22,10 +23,13 @@ class Diversity:
     
 
     def __init__(self,user_id):
-        self.records = None
-        self.user_id = user_id
         dbc_css = ("https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.2/dbc.min.css")
         self.app = DjangoDash('diversity', external_stylesheets=[dbc.themes.BOOTSTRAP, dbc_css])
+
+        self.records = None
+        self.user_id = user_id
+
+
         self.unique_sample_ids = None
         self.unique_samples = None
         self.unique_counts = None
@@ -39,6 +43,11 @@ class Diversity:
         # Convert the QuerySet to a DataFrame
         self.df = self.get_data()
         self.abundance_lists = None
+
+        self.alpha_label = html.Label("Alpha diversity plots", className='text-primary my-2',
+                                      style={'font-weight': 'bold'})
+        self.beta_label = html.Label("Beta diversity plots", className='text-primary my-2',
+                                     style={'font-weight': 'bold'})
 
         if not self.df.empty:
             self.unique_sample_ids = self.records.values('sample_id').distinct()
@@ -70,13 +79,15 @@ class Diversity:
             # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
             self.unique_counts = min(self.df.nunique()[1], 500)
 
+        self._init_layout()
         self.calculate_alpha_diversity()
         self.calculate_beta_diversity()
-        self._init_layout()
+
 
 
     def _init_layout(self) -> None:
-        metric_label = dbc.Label("Alpha diversity metric:", html_for='diversity_metric_dropdown')
+
+
         diversity_metric_selector = dbc.Col(
             [
 
@@ -95,162 +106,96 @@ class Diversity:
         )
 
         graph_container = html.Div(
-            [
-                # graph elements
+            [self.alpha_label,
+                # Flex container for alpha diversity plots
                 html.Div(
                     [
-                        dcc.Graph(
-                            id='alpha_diversities_plot1',
-                            figure={
-                                'data': [],  # Replace with your data
-                                'layout': {
-                                    'clickmode': 'event+select'
-
-
-                                    # Add the rest of your layout properties here...
-                                }
-                            },
-
+                        html.Div(
+                            dcc.Graph(id='alpha_diversities_plot1'),
+                            style={'flex': '1', "padding": "5px"}
                         ),
                         html.Div(
-
-
-                        )
-                    ], style={'width': '100%', "padding": "5px"}
+                            dcc.Graph(id='alpha_diversities_plot2'),
+                            style={'flex': '1', "padding": "5px"}
+                        ),
+                    ],
+                    style={'display': 'flex', 'flex-direction': 'row', 'justify-content': 'space-between'}
                 ),
+                self.beta_label,
 
+                # Beta diversity heatmap section
                 html.Div(
-                    [
-                        dcc.Graph(
-                            id='alpha_diversities_plot2',
-                            figure={
-                                'data': []  # Replace with your data
-                            },
 
-                        )
-
-                    ], style={'width': '100%', "padding": "5px"}
+                    dcc.Graph(id='beta_diversity_heatmap'),
+                    style={"padding": "5px"}
                 ),
-            ]
-
-        )
-
-        dropdown_container = dbc.Container([
-            dbc.Row([
-                dbc.Col(
-                    [
-                        dbc.Label("Samples to plot:", html_for='sample_select_value', id='sample_select_text',
-                                  style={'width': '100%'}),
-                        dcc.Dropdown(
-                            id='sample_select_value',
-                            options=[{'label': i, 'value': i} for i in
-                                     self.unique_sample_ids] if self.unique_sample_ids else [
-                                {'label': 'Default', 'value': 'Default'}],
-                            multi=True,
-                            style={'width': '100%', 'margin-bottom': '5px'},
-                            value=self.unique_sample_ids
-                        ),
-                    ]
-
+                # PCoA plot container
+                html.Div(
+                    dcc.Graph(id='pcoa_plot_container'),
+                    style={"padding": "5px"
+                           }
                 ),
+                # Checkbox for 3D PCoA plot
+                html.Div([
+                    dmc.Switch(
+                        size="lg",
+                        radius="sm",
+                        id="toggle-3d",
+                        label="Toggle 3D",
+                        checked=False
+                    ),
+                    dmc.Space(h=10),
+                    dmc.Text(id="toggle-3d-text")],
 
-                dbc.Col(
-                    [
-                        dbc.Label("Select Samples by project:", html_for='project-dropdown', id='project-dropdown-text',
-                                  style={'width': '100%'}),
-                        dcc.Dropdown(
-                            id='project-dropdown',
-                            options=[{'label': 'All Projects', 'value': 'ALL'}] +
-                                    [{'label': project, 'value': project} for project in self.unique_projects_ids],
-
-                            value=None,
-                            style={'width': '100%', 'margin-bottom': '5px'}
-
-                        ),
-                    ],
-                    width=2
+                    # dbc.Checkbox(id='toggle-3d', value=False, label='Show 3D Plot'),
+                    # style={"padding": "5px"}
                 ),
-
-                dbc.Col(
-                    [
-                        dbc.Label("Select Samples by subproject:", html_for='subproject-dropdown',
-                                  id='subproject-dropdown-text'),
-                        dcc.Dropdown(
-                            id='subproject-dropdown',
-                            options=[{'label': 'All Subprojects', 'value': 'ALL'}] +
-                                    [{'label': subproject, 'value': subproject} for subproject in
-                                     self.unique_subprojects],
-
-                            value=None
-
-                        ),
-                    ],
-                    width=2
-                )
-            ])
-        ],fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid")
-
-        beta_diversity_graph = html.Div(
-            [
-                dcc.Graph(id='beta_diversity_plot')
-            ],
-            style={'width': '100%', "padding": "5px"}
-        )
-
-        download_button = dbc.Col(
-            dbc.Button("Download as CSV", id="btn-download-diversity"),
-            # Adjust this width too as per your requirement
-            width=4
-        )
-
-        download_component = dcc.Download(id="download-diversity-csv")
-        options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio='xMidYMid slice'))
-
-
-        url = "https://assets7.lottiefiles.com/packages/lf20_EzPrWM.json"
-
-        checkbox = html.Div(
-            [
-                dbc.Checkbox(
-                    id='toggle-3d',
-                    value=False,
-                    label='Show 3D Plot'
-                )
-
-            ]
-        )
-
-        # Remove one of the PCoA plot graphs if you have two
-        # Assume 'pcoa-plot-container' is the id of the div where the PCoA plot will be displayed
-        pcoa_plot_container = html.Div(id='pcoa-plot-container')
-
-        # Wrapping in a row
-
-        selection_row = dbc.Row([diversity_metric_selector, download_button])
-
-        alpha_diversity_boxplot_section = html.Div(
-            [
-                dcc.Graph(id='alpha_diversity_boxplot')
-            ],
-            style={'width': '100%', "padding": "5px"}
-        )
-
-        beta_diversity_heatmap_section = html.Div(
-            [
-                dcc.Graph(id='beta_diversity_heatmap')
             ],
             style={"padding": "5px"}
         )
 
-        # Adjusting the main container
-        container = dbc.Container([metric_label,selection_row, download_component, graph_container,
-                                    beta_diversity_heatmap_section,
-                                   pcoa_plot_container,checkbox, dropdown_container],
-                                  fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid")
+        # Dropdowns and buttons
+        project_dropdown = self.create_dropdown('project-dropdown', self.unique_projects_ids,
+                                                'Select Samples by project:')
+        subproject_dropdown = self.create_dropdown('subproject-dropdown', self.unique_subprojects,
+                                                   'Select Samples by subproject:')
+        diversity_metric_selector = self.create_dropdown('diversity_metric_dropdown',
+                                                         [('Shannon', 'Shannon'), ('Simpson', 'Simpson')],
+                                                         'Alpha diversity metric:',"Shannon")
+
+        dropdown_container = dbc.Container(
+            dbc.Row([dbc.Col(item, width=4) for item in
+                     [diversity_metric_selector, project_dropdown, subproject_dropdown]]),
+            fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
+        )
+
+        download_button = dbc.Button("Download as CSV", id="btn-download-diversity", style={'margin-top': '20px'})
+        download_component = dcc.Download(id="download-diversity-csv")
+
+        sample_select_dropdown = dcc.Dropdown(
+            id='sample_select_value',
+            options=[{'label': i, 'value': i} for i in self.unique_sample_ids] if self.unique_sample_ids else [
+                {'label': 'Default', 'value': 'Default'}],
+            multi=True,
+            style={'width': '100%', 'margin-bottom': '5px','margin-top':'10px','margin-bot':'5px'},
+            value=self.unique_sample_ids
+        )
+
+
+        # Main container
+        container = dbc.Container(
+            [sample_select_dropdown,
+                dropdown_container,
+                download_button,
+
+                download_component,
+
+                graph_container
+            ],
+            fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
+        )
 
         self.app.layout = container
-
-
 
     def calculate_alpha_diversity(self):
         abundance_lists = self.df_full_for_diversity
@@ -266,6 +211,21 @@ class Diversity:
         # Bray-Curtis is a common choice for beta diversity, but you can choose other metrics
         self.beta_diversity_matrix = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
         self.pcoa_results = ordination.pcoa(self.beta_diversity_matrix)
+
+
+    def create_dropdown(self, dropdown_id, options, label_text, value=None):
+        """ Helper function to create dropdown elements. """
+        # label = dbc.Label(label_text, html_for=dropdown_id)
+        label = html.Label(label_text, className='text-primary my-2', style={'font-weight': 'bold'})
+
+        options_formatted = [{'label': name, 'value': value} for value, name in options] if isinstance(options[0], tuple) else [{'label': value, 'value': value} for value in options]
+        dropdown = dcc.Dropdown(
+            id=dropdown_id,
+            options=options_formatted,
+            style={'width': '100%'},
+            value=value
+        )
+        return dbc.Col([label, dropdown])
 
 
     def get_data(self):
