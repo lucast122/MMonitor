@@ -466,18 +466,28 @@ class GUI(ctk.CTk):
     # @require_project
     # @require_centrifuge
     def taxonomy_nanopore_wgs(self):
-        # check if centrifuge index exists, if not download it using check_file_exists method
-        centrifuge_index = "dec22"
-        download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
-                                                               "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
-        download_thread.start()
-        download_thread.join()
+        def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
+            kraken_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out"
 
-        self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
+
+            if self.db is not None:
+                self.db.update_table_with_kraken_out(kraken_out, "species", sample_name, "project", self.sample_date)
+            self.django_db.send_nanopore_record_centrifuge(kraken_out,sample_name,project_name,subproject_name,sample_date,True)
+
+
+
+        # check if centrifuge index exists, if not download it using check_file_exists method
+        centrifuge_index_path = f"{ROOT}/src/resources/dec_22"
+        # download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
+        #                                                        "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
+        # download_thread.start()
+        # download_thread.join()
+
+        # self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
 
         # folder = filedialog.askdirectory(
         #     initialdir='/',
@@ -493,21 +503,38 @@ class GUI(ctk.CTk):
         #
         #
         # sample_date = self.open_calendar()
-        win = InputWindow(self, self.emu_runner)
+        self.open_input_window_and_wait()
+        if self.input_window.do_quit:
+            return
+
+
         print("Created input window")
-        self.checkbox_popup()
+        # self.checkbox_popup()
         # get entries from input window
-        sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
-        project_name = str(win.project_name_entry)
-        subproject_name = str(win.subproject_name_entry)
-        sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
-        files = win.file_paths_single_sample
+        # sample_name = str(self.input_window.sample_name_entry)  # Get the content of the entry and convert to string
+        # project_name = str(self.input_window.project_name_entry)
+        # subproject_name = str(self.input_window.subproject_name_entry)
+        # sample_date = self.input_window.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+        # files = self.input_window.file_paths_single_sample
 
-        self.centrifuge_runner.run_centrifuge(files, sample_name)
-        self.centrifuge_runner.make_kraken_report()
+        if self.input_window.process_multiple_samples:
+            for index, file_path_list in enumerate(self.input_window.multi_sample_input["file_paths_lists"]):
+                files = file_path_list
+                sample_name = self.input_window.multi_sample_input["sample_names"][index]
+                project_name = self.input_window.multi_sample_input["project_names"][index]
+                subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
+                sample_date = self.input_window.multi_sample_input["dates"][index]
+                self.centrifuge_runner.run_centrifuge(files, sample_name, centrifuge_index_path)
+                self.centrifuge_runner.make_kraken_report(centrifuge_index_path)
 
-        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
-                                             sample_name, project_name, sample_date)
+                self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                    sample_date)
+
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+            self.show_info("Analysis complete. You can start monitoring now.")
+
+        # self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
+        #                                      sample_name, project_name, sample_date)
 
     def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date):
         fastq_stats = FastqStatistics(fastq_file)
@@ -541,9 +568,6 @@ class GUI(ctk.CTk):
         }
 
         self.django_db.send_sequencing_statistics(data)
-
-
-
 
 
     def taxonomy_nanopore_16s(self):
