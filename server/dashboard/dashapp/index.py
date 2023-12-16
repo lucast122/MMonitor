@@ -13,8 +13,8 @@ import dash_html_components as html
 from dash_extensions import Lottie
 from dash import dcc, html
 from dash.dependencies import Input, Output
-
-import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as pltpc
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -40,13 +40,12 @@ from .calculations.stats import scipy_correlation
 # def _init_mysql(user_id):
 
 
-
 def _explode_metadata(df):
     return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
 
+
 def _parse_dict(x):
     return pd.Series(loads(x))
-
 
 
 class Index:
@@ -60,15 +59,14 @@ class Index:
         self.sample_ids = None
         print(user_id)
         self.app = DjangoDash('Index', add_bootstrap_links=True)
-        color_map = plt.get_cmap('tab20')  # 'tab20' is a colormap with 20 distinct colors
-        colors = color_map.colors
-        self.colors = colors
+        # color_map = plt.get_cmap('tab20')  # 'tab20' is a colormap with 20 distinct colors
+        # colors = color_map.colors
+        # self.colors = colors
 
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
         self.diversity_app = diversity.Diversity(user_id)
         self.correlations_app = correlations.Correlations()
         self.horizon_app = horizon.Horizon(user_id)
-
 
         self.qc_app = qc.QC(user_id)
         self.diversity_metric = None
@@ -83,7 +81,7 @@ class Index:
         # session = Session.objects.get(session_key=session_key)
 
         # Get the user ID from the session
-        user_id=self.user_id
+        user_id = self.user_id
         # user_id = session.get_decoded().get('_auth_user_id')
 
         self._heatmap_df = None
@@ -125,19 +123,17 @@ class Index:
         # simple_app = simple.SimpleApp()
         # kraken_app = kraken.Kraken()
 
-
-
         self._apps = {
-        '/dashapp/taxonomy': {
+            '/dashapp/taxonomy': {
                 'name': 'Taxonomy',
                 'app': self.taxonomy_app.app,
                 'instance': self.taxonomy_app
             },
-        # '/dashapp/horizon': {
-        #     'name': 'Horizon',
-        #     'app': self.horizon_app.app,
-        #     'instance': self.horizon_app
-        # },
+            # '/dashapp/horizon': {
+            #     'name': 'Horizon',
+            #     'app': self.horizon_app.app,
+            #     'instance': self.horizon_app
+            # },
 
             '/dashapp/diversity': {
                 'name': 'Diversity',
@@ -154,7 +150,6 @@ class Index:
                 'app': self.qc_app.app,
                 'instance': self.qc_app
             }
-
 
             # '/dashapp/kegg': {
             #     'name': 'Metabolic Maps',
@@ -173,27 +168,21 @@ class Index:
         self.app.layout = self.layout
         print("Initialized Index layout")
         self.taxonomy_app._init_layout()
-        
 
         # Initialize callbacks for each app
         # for app_info in self._apps.values():
         #     print(f"Initializing callbacks for {app_info['name']} app")
         #     app_info['instance']
 
-
         # Initialize Index callbacks
         self._init_callbacks()
         print("Initialized Index callbacks")
-
-
 
     # def _init_apps(self) -> None:
     #     """
     #     Register apps by their urls, names and instances.
     #     This is the only place you need to add an app.
     #     """
-        
-
 
     def _init_layout(self) -> None:
         """
@@ -203,13 +192,11 @@ class Index:
 
         location = dcc.Location(id='url', refresh=True)
         navigation = html.Div([
-            dcc.Link(values['name'], href=url, style={'padding': '15px 25px', 'font-size': "16px", 'color':'white'})
+            dcc.Link(values['name'], href=url, style={'padding': '15px 25px', 'font-size': "16px", 'color': 'white'})
             for url, values in self._apps.items()
-        ], className="row",style={'margin-left': '0px','backgroundColor':'#15242B'})
-        page_content = html.Div(id='page-content', children=[],style={'backgroundColor':'#f5f7fa'})
+        ], className="row", style={'margin-left': '0px', 'backgroundColor': '#15242B'})
+        page_content = html.Div(id='page-content', children=[], style={'backgroundColor': '#f5f7fa'})
         # graph1 = dcc.Graph(id='graph1', figure={'data': []})
-
-
 
         container = html.Div([location, navigation, page_content], style={'backgroundColor': '#f5f7fa'},
                              className="dbc dbc-ag-grid")
@@ -220,7 +207,7 @@ class Index:
     Taxonomy app helper functions
     """
 
-    def plot_pseudo_horizon(self,df):
+    def plot_pseudo_horizon(self, df):
         # Create gaussian filtered data to imitate horizonplot look
         smooth_data = gaussian_filter(df['abundance'], sigma=1)
 
@@ -263,7 +250,7 @@ class Index:
                 y=1,
                 x=1.1
             ),
-                clickmode='event+select',
+            clickmode='event+select',
             dragmode='lasso',
 
             margin=dict(
@@ -273,7 +260,7 @@ class Index:
                 t=100  # Add top margin
             ),
             autosize=True
-            
+
         )
 
         fig2_style = {'display': 'None'}
@@ -299,7 +286,6 @@ class Index:
         fig1 = px.line(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, template='bootstrap'
                        )
         return fig1
-
 
     def plot_grouped_bar(self, df, use_date_value, taxonomic_rank):
         x_axis = "date" if use_date_value else "sample_id"
@@ -335,7 +321,7 @@ class Index:
         piechart_style = {'display': 'block'}
         return fig1, piechart_style
 
-    def split_alphanumeric(self,text):
+    def split_alphanumeric(self, text):
         matches = re.findall(r'(\d+|\D+)', text)
         numbers = [int(m) for m in matches if m.isdigit()]
         non_numbers = [m for m in matches if not m.isdigit()]
@@ -373,11 +359,12 @@ class Index:
             else:
                 return "Please select an app from the menu above."
                 #
+
             @self.app.callback(
-            Output('graph1', 'figure'),
-            Input('group-selection-dropdown', 'value'),
-            Input('group-storage', 'data'),
-            State('graph1', 'figure')
+                Output('graph1', 'figure'),
+                Input('group-selection-dropdown', 'value'),
+                Input('group-storage', 'data'),
+                State('graph1', 'figure')
             )
             def update_plot(selected_group, data, figure):
                 if selected_group is None or data is None or figure is None or figure['data'] is None:
@@ -389,11 +376,11 @@ class Index:
                 selected_taxa = data[selected_group]
 
                 # Update the plot to show only the selected taxa
-                figure['data'] = [trace for trace in figure['data'] if 'customdata' in trace and trace['customdata'] and trace['customdata'][0] in selected_taxa]
+                figure['data'] = [trace for trace in figure['data'] if
+                                  'customdata' in trace and trace['customdata'] and trace['customdata'][
+                                      0] in selected_taxa]
 
                 return figure
-
-
 
         # UPLOAD SQLITE CALLBACK
         @self.app.callback(
@@ -483,7 +470,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             Input('use_date_value', 'value')
         )
         def plot_selected_taxonomy(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,
-                                 use_date_value):
+                                   use_date_value):
             # Simplified initialization
             fig1 = {'data': []}
             piechart_style = {'display': 'none'}
@@ -523,11 +510,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                     piechart_style = {'display': 'block'}
 
             return fig1, piechart_style
-
-
-
-
-
 
         # Add a new callback that updates the header's style based on the dropdown's value
         @self.app.callback(
@@ -615,7 +597,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         #     for sample_id in self.taxonomy_app.unique_sample_ids:
         #         df_sample = self.df_sorted.loc[self.df_sorted['sample_id'] == sample_id]
-                
+
         #         # calculating diversity measures
         #         richness_values.append(richness(df_sample))
         #         evenness_values.append(evenness(df_sample))
@@ -637,7 +619,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         #     return fig
 
-
         """
 
         DIVERSITY APP CALLBACKS     DIVERSITY APP CALLBACKS    DIVERSITY APP CALLBACKS   DIVERSITY APP CALLBACKS
@@ -656,6 +637,21 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         #     else:
         #         # Hide the Lottie animation when the graph is not loading
         #         return dcc.Graph(id='beta_diversity_3d_pcoa')
+        @self.app.callback(
+            [Output("menu-text", "children"),
+             Output('project-clicks', 'data'),
+             Output('subproject-clicks', 'data')],
+            [Input("project-button", "n_clicks"),
+             Input("subproject-button", "n_clicks")],
+        )
+        def click_menu(project_clicks, subproject_clicks):
+            # Store the click counts in the Store components
+            project_data = {'clicks': project_clicks}
+            subproject_data = {'clicks': subproject_clicks}
+
+            # Update the text to display the click counts
+            text = f"Project clicked {project_clicks} times. Subproject clicked {subproject_clicks} times."
+            return text, project_data, subproject_data
 
         @self.app.callback(
             Output('alpha_diversities_plot1', 'figure'),
@@ -663,7 +659,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             Input('sample_select_value', 'value'),
             Input('diversity_metric_dropdown', 'value')
         )
-        def plot_alpha_diversities(sample_select_value,alpha_diversity_metric):
+        def plot_alpha_diversities(sample_select_value, alpha_diversity_metric):
             if alpha_diversity_metric == "Simpson":
                 diversity_df = self.diversity_app.simpson_diversity.reset_index()
                 diversity_df_without_categories = self.diversity_app.simpson_diversity.reset_index()
@@ -673,30 +669,43 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             diversity_df.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
             diversity_df_without_categories.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
             print(diversity_df_without_categories)
-            diversity_df_selected = diversity_df_without_categories[diversity_df_without_categories['sample_id'].astype(str).isin(sample_select_value)]
+            diversity_df_selected = diversity_df_without_categories[
+                diversity_df_without_categories['sample_id'].astype(str).isin(sample_select_value)]
             diversity_df['Project'] = diversity_df['sample_id'].map(self.diversity_app.sample_to_project_dict)
-
-
 
             fig = px.box(diversity_df, x='Project', y=f"{alpha_diversity_metric}Diversity",
                          title=f'Alpha Diversity ({alpha_diversity_metric} Index) across Sample Categories')
 
-            fig2 = px.line(diversity_df_selected,x="sample_id",y=f"{alpha_diversity_metric}Diversity",
+            fig2 = px.line(diversity_df_selected, x="sample_id", y=f"{alpha_diversity_metric}Diversity",
                            title=f'Alpha Diversity ({alpha_diversity_metric} Index) across selected samples')
             self.diversity_metric = alpha_diversity_metric
-            return fig,fig2
+            return fig, fig2
 
             # BETA DIVERSITY
 
         @self.app.callback(
-        Output('pcoa_plot_container', 'figure'),
-        Input('sample_select_value', 'value'),
-        Input('toggle-3d', 'checked')
+            Output('pcoa_plot_container', 'figure'),
+            [
+                Input('sample_select_value', 'value'),
+                Input('toggle-3d', 'checked'),
+                Input('project-button', 'n_clicks'),
+                Input('subproject-button', 'n_clicks'),
+                Input('kmeans-button', 'n_clicks'),
+                Input('sample-date-button', 'n_clicks'),
+                State('kmeans-input', 'value')
+            ]
         )
-        def generate_pcoa_figure(selected_samples, toggle_3d):
-            dimensions=2
-            if toggle_3d:
-                dimensions=3
+        def generate_pcoa_figure(selected_samples, toggle_3d, project_clicks, subproject_clicks, kmeans_clicks,
+                                 sample_date_clicks, k_value):
+
+
+            # Default n_clicks to 0 if they are None
+            project_clicks = project_clicks or 0
+            subproject_clicks = subproject_clicks or 0
+            kmeans_clicks = kmeans_clicks or 0
+            sample_date_clicks = sample_date_clicks or 0
+
+            dimensions = 3 if toggle_3d else 2
             # Convert the DistanceMatrix to a DataFrame if necessary
             distance_matrix_df = pd.DataFrame(
                 self.diversity_app.beta_diversity_matrix.data,
@@ -712,8 +721,34 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # Extract the PCoA scores
             pcoa_scores = pcoa_results.samples
 
-
             text_data = selected_samples
+
+            # Determine coloring based on the last button clicked
+
+            selected_sample_to_project_dict = {item['sample_id']: item['project_id'] for item in
+                                               self.diversity_app.sample_project_mapping}
+
+            selected_sample_to_subproject_dict = {item['sample_id']: item['subproject']
+                                                  for item in self.diversity_app.sample_subproject_mapping}
+
+            # include only selected samples
+            selected_sample_to_project_dict = {k: v for k, v in selected_sample_to_project_dict.items() if
+                                               k in selected_samples}
+            selected_sample_to_subproject_dict = {k: v for k, v in selected_sample_to_subproject_dict.items() if
+                                                  k in selected_samples}
+
+            if (kmeans_clicks > project_clicks and kmeans_clicks > subproject_clicks and kmeans_clicks >
+                    sample_date_clicks):
+                # Perform K-means clustering
+                kmeans = KMeans(n_clusters=k_value, random_state=0).fit(pcoa_scores.iloc[:, :dimensions])
+                pcoa_scores['ColorCategory'] = kmeans.labels_
+                color = 'ColorCategory'
+            elif project_clicks > subproject_clicks and project_clicks > sample_date_clicks:
+                color = selected_sample_to_project_dict
+            elif subproject_clicks > sample_date_clicks:
+                color = selected_sample_to_subproject_dict
+            else:
+                color = self.diversity_app.sample_to_date_dict
 
             # Select the appropriate number of dimensions
             if dimensions == 3:
@@ -724,7 +759,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                     z='PC3',
                     text=text_data,  # Add sample names as hover text
                     labels={'PC1': 'PC1', 'PC2': 'PC2', 'PC3': 'PC3'},
-                    title="3D PCoA Plot of inter sample beta diversity"
+                    title="3D PCoA Plot of inter sample beta diversity",
+                    color=color
                 )
             else:  # Default to 2D
                 fig = px.scatter(
@@ -733,52 +769,51 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                     y='PC2',
                     text=text_data,  # Add sample names as hover text
                     labels={'PC1': 'PC1', 'PC2': 'PC2'},
-                    title="2D PCoA Plot of inter sample beta diversity"
+                    title="2D PCoA Plot of inter sample beta diversity",
+                    color=color
                 )
 
             # Customize the figure as needed
-            fig.update_traces(marker=dict(size=6),textposition="top center",
+            fig.update_traces(marker=dict(size=10), textposition="top center",
                               selector=dict(mode='markers+text'))  # Adjust marker size as needed
             fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
-            fig.update_layout(width=1600,height=900)
-
+            fig.update_layout(width=1800, height=900)
             return fig
 
-
-        @self.app.callback(
-            Output('beta_diversity_plot', 'figure'),
-            [
-                Input('sample_select_value', 'value')
-
-            ]
-        )
-        def update_beta_diversity_plot(selected_samples):
-            if not selected_samples:
-                return {}  # Return an empty plot if no samples are selected
-
-            # Filter the beta diversity matrix based on selected samples
-            filtered_matrix = self.diversity_app.beta_diversity_matrix.filter(selected_samples)
-
-            # Create a 2D ordination plot (like PCoA) using the filtered matrix
-            # PCoA is a common way to visualize beta diversity
-            # You can use skbio or other libraries to perform PCoA
-            pcoa_results = pcoa(filtered_matrix)
-
-            fig = px.scatter(
-                x=pcoa_results.samples['PC1'],
-                y=pcoa_results.samples['PC2'],
-                text=selected_samples
-            )
-            fig.update_layout(title="Beta Diversity (PCoA)", xaxis_title="PC1", yaxis_title="PC2")
-            return fig
+        # @self.app.callback(
+        #     Output('beta_diversity_plot', 'figure'),
+        #     [
+        #         Input('sample_select_value', 'value')
+        #
+        #     ]
+        # )
+        # def update_beta_diversity_plot(selected_samples):
+        #     if not selected_samples:
+        #         return {}  # Return an empty plot if no samples are selected
+        #
+        #     # Filter the beta diversity matrix based on selected samples
+        #     filtered_matrix = self.diversity_app.beta_diversity_matrix.filter(selected_samples)
+        #
+        #     # Create a 2D ordination plot (like PCoA) using the filtered matrix
+        #     # PCoA is a common way to visualize beta diversity
+        #     # You can use skbio or other libraries to perform PCoA
+        #     pcoa_results = pcoa(filtered_matrix)
+        #
+        #     fig = px.scatter(
+        #         x=pcoa_results.samples['PC1'],
+        #         y=pcoa_results.samples['PC2'],
+        #         text=selected_samples
+        #     )
+        #     fig.update_layout(title="Beta Diversity (PCoA)", xaxis_title="PC1", yaxis_title="PC2")
+        #     return fig
 
         # 3D PCOA BETA DIVERISTY
 
-        @self.app.callback(
-            Output('beta_diversity_3d_pcoa', 'figure'),
-            [Input('sample_select_value', 'value')]
-        )
-        # def update_beta_diversity_3d_pcoa(selected_samples):
+        # @self.app.callback(
+        #     Output('beta_diversity_3d_pcoa', 'figure'),
+        #     [Input('sample_select_value', 'value')]
+        # )
+        # # def update_beta_diversity_3d_pcoa(selected_samples):
         #     if not selected_samples:
         #         return {}  # Return an empty plot if no samples are selected
         #
@@ -866,8 +901,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             return fig
 
-
-
         # Convert DistanceMatrix to DataFrame for heatmap plotting
         def distance_matrix_to_dataframe(distance_matrix):
             # Convert to a square matrix and then to a DataFrame
@@ -916,17 +949,12 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         """
 
-
-
-
-
-
         @self.app.callback(
-        Output('graph-score', 'figure'),
-        Output('graph-test', 'figure'),
-        Input('taxonomy-dd', 'value'),
-        Input('methods-dd', 'value'),
-        Input('tests-dd', 'value')
+            Output('graph-score', 'figure'),
+            Output('graph-test', 'figure'),
+            Input('taxonomy-dd', 'value'),
+            Input('methods-dd', 'value'),
+            Input('tests-dd', 'value')
         )
         def _update_graphs(tax: str, method: str, test: str) -> Tuple[Figure, Figure]:
             species = [x for x in tax] if tax else []
@@ -959,7 +987,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # for each metadata calculate the correlation and probability
             # transpose the list of tuples and extract each a correlation and a probability list:
             # [(c1, p1), (c2, p2), (c3, p3), ...] -> [c1, c2, c3, ...], [p1, p2, p3, ...]
-            
 
             # print(df[meta])
             # print(test)
@@ -974,12 +1001,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # try:
             y_axis_tuple = None
 
-            y_axis_tuple = [scipy_correlation(df['abundance'], df[meta], test, method) for meta in self.metadata_columns]
-
-
-
-
-
+            y_axis_tuple = [scipy_correlation(df['abundance'], df[meta], test, method) for meta in
+                            self.metadata_columns]
 
             # print("df[meta]")
             # print(df[meta])
@@ -987,16 +1010,14 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # print("metadata_columns")
             # print(self.metadata_columns)
 
-
             # print(y_axis_tuple)
-            
 
             y_axis_score, y_axis_test = zip(*y_axis_tuple)
             y_axis_test = [xs[test] for xs in y_axis_test]
 
-
             # generate plots
-            fig_score = px.scatter(x=self.metadata_columns, y=y_axis_score, labels={'x': 'Metric', 'y': f'{method} Score'})
+            fig_score = px.scatter(x=self.metadata_columns, y=y_axis_score,
+                                   labels={'x': 'Metric', 'y': f'{method} Score'})
             fig_test = px.scatter(x=self.metadata_columns, y=y_axis_test, labels={'x': 'Metric', 'y': f'{test} Score'})
 
             return fig_score, fig_test
@@ -1015,12 +1036,12 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             State('table-correlations', 'data'),
         )
         def _update_table(x: int, y: int, z: int,
-                      taxonomies: Union[str, List[str]],
-                      methods: Union[str, List[str]],
-                      tests: Union[str, List[str]],
-                      tb_columns: Any,
-                      tb_data: Any,
-                      ) -> Tuple[Iterable, Dict, List]:
+                          taxonomies: Union[str, List[str]],
+                          methods: Union[str, List[str]],
+                          tests: Union[str, List[str]],
+                          tb_columns: Any,
+                          tb_data: Any,
+                          ) -> Tuple[Iterable, Dict, List]:
             """
             Populate the data table with correlation scores and their probabilities
             according to the dropdown selections. This table contains data more suited
@@ -1046,8 +1067,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             ...
             """
 
-                # figure out which button was clicked
-                # default behaviour is 'apply'
+            # figure out which button was clicked
+            # default behaviour is 'apply'
             ctx = dash.callback_context
             button_id = 'apply-btn-tb'
             if ctx.triggered:
@@ -1067,16 +1088,16 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 raise PreventUpdate
 
             # request data from database and filter for metadata columns
-            
+
             meta_cols = [meta for meta in self.meta_df.columns if meta != 'sample_id']
 
             # prepare the resulting dataframe/table
             columns = ['Taxonomy', 'Method or Test', *meta_cols]
             df = DataFrame(columns=columns, index=None)
-            heatmap_df = pd.DataFrame(columns=['taxonomy'] + [f"{method}_{meta}" for method in methods for meta in meta_cols])
+            heatmap_df = pd.DataFrame(
+                columns=['taxonomy'] + [f"{method}_{meta}" for method in methods for meta in meta_cols])
 
             # print(heatmap_df)
-
 
             # print("Initial Heatmap DF:\n", heatmap_df)
 
@@ -1136,22 +1157,16 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
                         # print(f"META: {meta}")
 
-
-
-
                         score, test_scores = scipy_correlation(abundance_series, merged_df_meta[meta],
-                                                                       tests, method)
+                                                               tests, method)
 
                         heatmap_df.loc[f"{tax}_{method}", f"{method}_{meta}"] = score
-
 
                         # Create new row
                         # Append the row to the DataFrame
                         # Append the row to the DataFrame
 
                         # print("Final Heatmap DF:\n", heatmap_df)
-
-
 
                         # populate the row containing correlation scores per metadata
                         score_row[meta] = score
@@ -1170,12 +1185,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                         df = pd.concat([df, pd.DataFrame([test_row])], ignore_index=True)
                     self._heatmap_df = heatmap_df
 
-
-
                     self._heatmap_df.index = replace_brackets(self._heatmap_df.index)
-
-
-
 
             # return data for the dash data table according to
             # https://dash.plotly.com/datatable
@@ -1184,7 +1194,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             self._heatmap_df = heatmap_df  # Save the heatmap DataFrame as an attribute of the class
 
             return [{"name": i, "id": i} for i in df.columns], df.to_dict('records'), taxonomies
-
 
         @self.app.callback(Output('heatmap-graph', 'figure'),
                            Input('methods-dd', 'value'))
@@ -1203,11 +1212,10 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 # try:
                 selected_data = selected_data[~selected_data.index.astype(str).str.contains('nan')]
 
-
-            # Extract only the numerical values from the filtered selected_data DataFrame
+                # Extract only the numerical values from the filtered selected_data DataFrame
                 numerical_values = selected_data.iloc[:, 1:].values
 
-            # Get the index after filtering the 'nan' rows
+                # Get the index after filtering the 'nan' rows
                 filtered_index = selected_data.index
 
                 # print(f"numerical values of method  {methods_value}: {numerical_values}")
@@ -1221,9 +1229,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 return fig
 
         @self.app.callback(
-                Output('download-tb', 'data'),
-                Input('export-btn-tb', 'n_clicks'),
-            )
+            Output('download-tb', 'data'),
+            Input('export-btn-tb', 'n_clicks'),
+        )
         def _export_table(n_clicks) -> Dict[Any, str]:
             """
             Download data table content.
@@ -1231,7 +1239,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             if n_clicks is None:
                 raise PreventUpdate
             return dict(content=self._table_df.to_csv(index=False), filename='correlations.csv')
-
 
         """
     
@@ -1249,6 +1256,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         stat_indicator_plots_width = 120
 
         ...
+
         # MEAN QUALITY PER BASE PLOT
         @self.app.callback(
             Output('mean-quality-per-base-plot', 'figure'),
@@ -1264,7 +1272,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             # Filter out the tail values based on z-score
             z_scores = zscore(avg_qualities)
-            threshold = 0.5 # restrict to only show bases within 0.1 sd of mean of all base positions (increase to show more bases)
+            threshold = 0.5  # restrict to only show bases within 0.1 sd of mean of all base positions (increase to show more bases)
             valid_indices = np.where(np.abs(z_scores) < threshold)[0]
             truncated_avg_qualities = [avg_qualities[i] for i in valid_indices]
 
@@ -1305,14 +1313,14 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             return fig
 
-
         @self.app.callback(
             Output('mean_read_length-graph', 'figure'),
             [Input('sample-dropdown-qc', 'value')]
         )
         def update_mean_read_length_plot(selected_sample):
             # Fetch the SequencingStatistics for the selected sample
-            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id, sample_name=selected_sample).first()
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
 
             # Extract mean read length
             mean_read_length = stats_for_sample.mean_read_length
@@ -1320,8 +1328,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # Generate the plot
             fig = go.Figure()
             fig.add_trace(go.Indicator(
-                mode = "number",
-                value = mean_read_length,
+                mode="number",
+                value=mean_read_length,
                 title={"text": "Mean Read Length", "font": {"size": stat_indicator_plots_title_fontsize}},
                 number={"font": {"size": stat_indicator_plots_fontsize}}
             ))
@@ -1329,7 +1337,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-            margin=stat_indicator_plots_margin  # Reduce left margin
+                margin=stat_indicator_plots_margin  # Reduce left margin
                 # Adjust the height as desired
             )
 
@@ -1391,7 +1399,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin= stat_indicator_plots_margin
+                margin=stat_indicator_plots_margin
 
             )
 
@@ -1412,7 +1420,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 value=stats_for_sample.total_bases_sequenced,
                 title={"text": "Total Bases Sequenced", "font": {"size": stat_indicator_plots_title_fontsize}},
 
-            number={"font": {"size": stat_indicator_plots_fontsize}}
+                number={"font": {"size": stat_indicator_plots_fontsize}}
 
             ))
 
@@ -1494,7 +1502,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         )
         def update_mean_gc_indicator_plot(selected_sample):
             # Fetch the SequencingStatistics for the selected sample
-            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id, sample_name=selected_sample).first()
+            stats_for_sample = SequencingStatistics.objects.filter(user_id=self.user_id,
+                                                                   sample_name=selected_sample).first()
 
             # Extract mean GC content
             mean_gc = stats_for_sample.mean_gc_content
@@ -1551,7 +1560,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             # Deserialize the sequences field
 
-
             # Compute GC content for each sequence
             gc_contents = json.loads(stats_for_sample.gc_contents_per_sequence)
 
@@ -1574,7 +1582,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         # if isinstance(tax, list):
         #     tax = tax[0]
 
-            # print(f"Taxonomy in get_abundance_meta_by_taxonomy method {taxonomy}")
+        # print(f"Taxonomy in get_abundance_meta_by_taxonomy method {taxonomy}")
 
         q = f"""
             SELECT nanopore.sample_id, nanopore.abundance, metadata.*
@@ -1594,8 +1602,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         q = f"SELECT sample_id, abundance FROM nanopore WHERE taxonomy = '{taxonomy}' ORDER BY sample_id"
         return self.query_to_dataframe(q)
 
-
-    def query_to_dataframe(self,query: str) -> pd.DataFrame:
+    def query_to_dataframe(self, query: str) -> pd.DataFrame:
         return pd.read_sql_query(query, self._engine)
 
 
@@ -1624,16 +1631,15 @@ def _force_list(x: Union[Any, List]) -> List[Any]:
 
     return x if isinstance(x, list) else [x]
 
-
-            # @self.app.server.route('/shutdown', methods=['POST'])
-        # def shutdown():
-        #     """
-        #     Terminate the dash app.
-        #     """
-        #     func = request.environ.get('werkzeug.server.shutdown')
-        #     if func is None:
-        #         raise RuntimeError('Not running with the Werkzeug Server')
-        #     func()
-        #     return 'Server is shutting down...'
+    # @self.app.server.route('/shutdown', methods=['POST'])
+    # def shutdown():
+    #     """
+    #     Terminate the dash app.
+    #     """
+    #     func = request.environ.get('werkzeug.server.shutdown')
+    #     if func is None:
+    #         raise RuntimeError('Not running with the Werkzeug Server')
+    #     func()
+    #     return 'Server is shutting down...'
 
     # def run_server(self, debug: bool) -> Non
