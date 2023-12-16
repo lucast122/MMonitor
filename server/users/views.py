@@ -176,7 +176,7 @@ def overwrite_nanopore_record(request):
                     tax_clade=record_data.get('tax_clade'),
                     tax_subspecies=record_data.get('tax_subspecies'),
                     abundance=record_data.get('abundance'),
-                    counts=record_data.get('counts'),
+                    count=record_data.get('count'),
                     sample_id=sample_id,
                     project_id=record_data.get('project_id'),
                     subproject=record_data.get('subproject'),
