@@ -1431,7 +1431,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 xaxis_title='Base Position',
                 yaxis_title='Mean Quality',
                 xaxis=dict(showgrid=False),
-                yaxis=dict(showgrid=True, gridcolor='rgba(230,230,230,0.5)'),
+                yaxis=dict(showgrid=False, gridcolor='rgba(230,230,230,0.5)'),
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
             )
@@ -1462,9 +1462,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin  # Reduce left margin
-                # Adjust the height as desired
-            )
+                margin=stat_indicator_plots_margin,  # Reduce left margin
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)')
 
             return fig
 
@@ -1494,9 +1494,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin  # Reduce left margin
+                margin=stat_indicator_plots_margin , # Reduce left margin
+            plot_bgcolor = 'rgba(0,0,0,0)')
 
-            )
 
             return fig
 
@@ -1524,7 +1524,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin
+                margin=stat_indicator_plots_margin,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
 
             )
 
@@ -1555,7 +1557,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin
+                margin=stat_indicator_plots_margin,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
 
             )
 
@@ -1585,7 +1589,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin
+                margin=stat_indicator_plots_margin,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
 
             )
 
@@ -1615,7 +1621,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin
+                margin=stat_indicator_plots_margin,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
 
             )
 
@@ -1645,7 +1653,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin  # Reduce left margin
+                margin=stat_indicator_plots_margin , # Reduce left margin
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
             )
 
             return fig
@@ -1668,7 +1678,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                               xaxis_title="Read Length",
                               yaxis_title="Frequency",
                               xaxis=dict(showgrid=False),
-                              yaxis=dict(showgrid=True, gridcolor='rgba(230,230,230,0.5)'),
+                              yaxis=dict(showgrid=False, gridcolor='rgba(230,230,230,0.5)'),
                               plot_bgcolor='rgba(0,0,0,0)',
                               paper_bgcolor='rgba(0,0,0,0)')
 
@@ -1694,7 +1704,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                               xaxis_title="GC Content (%)",
                               yaxis_title="Frequency",
                               xaxis=dict(showgrid=False),
-                              yaxis=dict(showgrid=True, gridcolor='rgba(230,230,230,0.5)'),
+                              yaxis=dict(showgrid=True),
                               plot_bgcolor='rgba(0,0,0,0)',
                               paper_bgcolor='rgba(0,0,0,0)')
 

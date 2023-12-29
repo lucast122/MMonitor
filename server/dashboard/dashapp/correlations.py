@@ -16,7 +16,7 @@ from plotly.graph_objects import Figure
 from django.db import connections
 from .calculations.stats import scipy_correlation
 from json import loads, dumps
-
+import dash_mantine_components as dmc
 
 def _explode_metadata(df):
     return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
@@ -88,7 +88,7 @@ class Correlations:
         """
 
         # graph dropdown menus in a flex box
-        header = html.H1('Correlations of abundances and metadata')
+        header = dmc.Header(dmc.Text('Correlations of abundances and metadata'),height=100)
         taxonomy_dd = dcc.Dropdown(
             id='taxonomy-dd',
             options=[{'label': t, 'value': t} for t in self._taxonomies],
@@ -244,8 +244,8 @@ class Correlations:
 
         container = html.Div(
             [header, dropdowns, graph_container, header_tb, dropdowns_tb,
-             selections_tb, correlations_tb, download_tb],
-            style={'margin-bottom': '200px','backgroundColor':'#F5F5F5'}
+             selections_tb, correlations_tb, download_tb]
+
         )
         self.app.layout = container
 
