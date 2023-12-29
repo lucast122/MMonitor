@@ -17,11 +17,12 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as pltpc
 import numpy as np
 import pandas as pd
+import dash_mantine_components as dmc
 import plotly.express as px
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash_bootstrap_templates import load_figure_template
+# from dash_bootstrap_templates import load_figure_template
 from dash_extensions import WebSocket
 from django_plotly_dash import DjangoDash
 from natsort import natsorted
@@ -35,6 +36,11 @@ from users.models import NanoporeRecord
 from users.models import SequencingStatistics
 from . import taxonomy, correlations, qc, diversity, horizon
 from .calculations.stats import scipy_correlation
+from dash_extensions import Lottie  # Assuming you're using Lottie for animations
+from dash_extensions.enrich import Dash, Output, Input, State, Trigger
+
+
+
 
 
 # def _init_mysql(user_id):
@@ -50,6 +56,32 @@ def _parse_dict(x):
 
 class Index:
     """
+    The Index class is the main class of the application.
+    It contains the main layout and callbacks.
+    """
+
+    def create_navigation(self):
+        # Create a Mantine styled navigation menu
+        return dmc.Navbar(
+            [
+                dmc.Group(
+
+                    align="center",
+                    children=[
+                        html.A(
+                            dmc.Text(values['name'], variant="text", size="lg",
+                                     style={'textDecoration': 'none', 'color': 'white'}),
+                            href=url,
+                            style={'padding': '10px', 'display': 'block'}
+                        )
+                        for url, values in self._apps.items()
+                    ]
+                )
+            ],
+            style={'backgroundColor': '#15242B', 'width': '100%'}
+        )
+
+    """
     Landing page of the dash application.
     Contains navigation to the various application pages.
     """
@@ -59,8 +91,10 @@ class Index:
         self.sample_ids = None
         print(user_id)
         self.app = DjangoDash('Index', add_bootstrap_links=True)
-        # color_map = plt.get_cmap('tab20')  # 'tab20' is a colormap with 20 distinct colors
-        # colors = color_map.colors
+
+        self.colors = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
+        self.colors = self.colors + px.colors.qualitative.Plotly + px.colors.qualitative.Pastel
+
         # self.colors = colors
 
         self.taxonomy_app = taxonomy.Taxonomy(user_id)
@@ -100,7 +134,7 @@ class Index:
             "vapor",
         ]
 
-        load_figure_template(templates)
+        # load_figure_template(templates)
 
         self.df = pd.DataFrame.from_records(records.values())
         self.df.replace("Not available", np.nan, inplace=True)
@@ -167,7 +201,7 @@ class Index:
         self._init_layout()
         self.app.layout = self.layout
         print("Initialized Index layout")
-        self.taxonomy_app._init_layout()
+        # self.taxonomy_app._init_layout()
 
         # Initialize callbacks for each app
         # for app_info in self._apps.values():
@@ -190,16 +224,52 @@ class Index:
         the currently selected app's page content.
         """
 
+
+
+        #
+    #     location = dmc.Container(
+    #     [
+    #         dmc.Space(h=50),
+    #         dmc.Title("My Dash App", align="center"),
+    #         dmc.Space(h=20),
+    #         dmc.Group(
+    #             position="center",
+    #             children=[
+    #                 html.A(
+    #                     dmc.Button("Diversity Dashboard", variant="outline"),
+    #                     href=f"values['name']",
+    #
+    #
+    #
+    #
+    #                 ),
+    #                 # Wrap more buttons in html.A if you have other dashboard links
+    #                 # html.A(
+    #                 #     dmc.Button("Another Dashboard", variant="outline"),
+    #                 #     href="/another"
+    #                 # ),
+    #             ]
+    #         ),
+    #         dmc.Space(h=50),
+    #         # Include other components as needed
+    #     ],
+    #     style={'textAlign': 'center'}
+    #
+    #
+    # )
+    #
         location = dcc.Location(id='url', refresh=True)
         navigation = html.Div([
             dcc.Link(values['name'], href=url, style={'padding': '15px 25px', 'font-size': "16px", 'color': 'white'})
             for url, values in self._apps.items()
         ], className="row", style={'margin-left': '0px', 'backgroundColor': '#15242B'})
-        page_content = html.Div(id='page-content', children=[], style={'backgroundColor': '#f5f7fa'})
+        page_content = html.Div(id='page-content', children=[], style={})
         # graph1 = dcc.Graph(id='graph1', figure={'data': []})
 
-        container = html.Div([location, navigation, page_content], style={'backgroundColor': '#f5f7fa'},
+        container = html.Div([location, navigation, page_content], style={},
                              className="dbc dbc-ag-grid")
+
+        self.layout = container
 
         self.layout = container
 
@@ -235,7 +305,7 @@ class Index:
                           category_orders={"date": sorted(df["date"].unique())})
         else:
             fig1 = px.bar(grouped_df, x="sample_id", y="abundance", color=taxonomic_rank, barmode="stack",
-                          template='bootstrap',
+
 
                           category_orders={"sample_id": sorted(df["sample_id"].unique(), key=self.split_alphanumeric)})
 
@@ -250,22 +320,15 @@ class Index:
                 y=1,
                 x=1.1
             ),
-            clickmode='event+select',
-            dragmode='lasso',
 
-            margin=dict(
-                l=100,  # Add left margin to accommodate the legend
-                r=100,  # Add right margin to accommodate the legend
-                b=100,  # Add bottom margin
-                t=100  # Add top margin
-            ),
-            autosize=True
+
+
+
 
         )
 
-        fig2_style = {'display': 'None'}
-        markdown_style = {'display': 'none'}
-        # fig2 = px.bar(df, x="taxonomy", y="abundance", color="sample_id", barmode="stack",hover_data=self.hover_data)
+
+
         return fig1
 
     def plot_heatmap(self, df, use_date_value, taxonomic_rank):
@@ -276,21 +339,44 @@ class Index:
             z=grouped_df['abundance'],
             x=grouped_df[x_axis],
             y=grouped_df[taxonomic_rank],
-            colorscale='Viridis'))
+            colorscale='Turbo'))
+
+        # add abundance to legend description
+        fig.update_layout(
+
+            legend=dict(
+                title="Abundance",
+                orientation="v",
+                y=1,
+                x=1.1
+
+            ),
+
+
+            xaxis_title="Sample IDs",
+
+            yaxis_title="Taxonomy",
+        )
+        # make plot bigger for heatmap (height = 1000)
+        fig.update_layout(width=1800, height=1000)
+        # make x-axis font size 12 and y-axis 10
+        fig.update_xaxes(tickfont=dict(size=14))
+        fig.update_yaxes(tickfont=dict(size=8))
+
 
         return fig
 
     def plot_line(self, df, use_date_value, taxonomic_rank):
         x_axis = "date" if use_date_value else "sample_id"
         grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
-        fig1 = px.line(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, template='bootstrap'
+        fig1 = px.line(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank
                        )
         return fig1
 
     def plot_grouped_bar(self, df, use_date_value, taxonomic_rank):
         x_axis = "date" if use_date_value else "sample_id"
         grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
-        fig1 = px.bar(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, template='bootstrap')
+        fig1 = px.bar(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank)
         return fig1
 
     def plot_scatter(self, df, use_date_value, taxonomic_rank):
@@ -303,13 +389,12 @@ class Index:
     def plot_area(self, df, use_date_value, taxonomic_rank):
         x_axis = "date" if use_date_value else "sample_id"
         grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
-        fig1 = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank, line_group=taxonomic_rank,
-                       template='bootstrap')
+        fig1 = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank)
         return fig1
 
     def plot_scatter_3d(self, df, taxonomic_rank):
         # Plotting code for scatter 3D goes here...
-        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank, template='bootstrap')
+        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank)
         # fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='abundance',hover_data=self.hover_data)
         return fig1
 
@@ -505,9 +590,42 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # Select and execute the plotting function
             if value in plot_functions:
                 fig1 = plot_functions[value](self.df_selected, use_date_value, taxonomic_rank) if value != 'pie' \
-                    else plot_functions[value](self.result_df, sample_value_piechart, taxonomic_rank)[0]
+                    else plot_functions[value](self.df_selected, sample_value_piechart, taxonomic_rank)[0]
                 if value == 'pie':
                     piechart_style = {'display': 'block'}
+
+            #  give distinct color based on self.colors
+
+            if value != 'heatmap':
+                for i in range(len(fig1['data'])):
+                    fig1['data'][i]['marker']['color'] = self.colors[i % len(self.colors)]
+            #     make plot bigger if not heatmap
+                fig1.update_layout(width=1800, height=600)
+
+            # also change color for px.area plot
+            if value == 'area':
+                for i in range(len(fig1['data'])):
+                    fig1['data'][i]['fillcolor'] = self.colors[i % len(self.colors)]
+
+
+            if value == 'pie':
+                fig1['data'][0]['marker']['colors'] = self.colors
+
+            # change color for scatter plot
+            if value == 'scatter':
+                fig1['data'][0]['marker']['colorscale'] = self.colors
+            # remove grey background from plot
+            fig1['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
+
+
+
+
+            # sort legend based on values from high to low
+            if value != 'heatmap':
+                fig1['data'] = sorted(fig1['data'], key=lambda x: sum(x['y']), reverse=True)
+
+
+
 
             return fig1, piechart_style
 
@@ -679,7 +797,11 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig2 = px.line(diversity_df_selected, x="sample_id", y=f"{alpha_diversity_metric}Diversity",
                            title=f'Alpha Diversity ({alpha_diversity_metric} Index) across selected samples')
             self.diversity_metric = alpha_diversity_metric
+            fig['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
+            fig2['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
+
             return fig, fig2
+
 
             # BETA DIVERSITY
 
@@ -776,8 +898,11 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # Customize the figure as needed
             fig.update_traces(marker=dict(size=10), textposition="top center",
                               selector=dict(mode='markers+text'))  # Adjust marker size as needed
-            fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
-            fig.update_layout(width=1800, height=900)
+            fig.update_layout(margin=dict(l=0, r=0, b=0, t=100))
+            fig.update_layout(width=1500, height=850)
+            fig['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
+
+
             return fig
 
         # @self.app.callback(
@@ -890,8 +1015,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # Update layout for better readability and aesthetics
             fig.update_layout(
                 title="Beta Diversity Heatmap",
-                xaxis=dict(tickangle=-90, tickfont=dict(size=8)),  # Adjust font size if needed
-                yaxis=dict(tickmode='array', tickvals=filtered_matrix.index, tickfont=dict(size=7)),
+                xaxis=dict(tickangle=-90, tickfont=dict(size=12)),  # Adjust font size if needed
+                yaxis=dict(tickmode='array', tickvals=filtered_matrix.index, tickfont=dict(size=12)),
                 # Adjust font size if needed
                 coloraxis_colorbar=dict(title="Diversity Score"),
                 width=1600,  # Adjust the width

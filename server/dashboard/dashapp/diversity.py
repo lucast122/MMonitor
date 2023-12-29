@@ -74,10 +74,10 @@ class Diversity:
         self.df = self.get_data()
         self.abundance_lists = None
 
-        self.alpha_label = html.Label("Alpha diversity plots", className='text-primary my-2',
-                                      style={'font-weight': 'bold'})
-        self.beta_label = html.Label("Beta diversity plots", className='text-primary my-2',
-                                     style={'font-weight': 'bold'})
+        self.alpha_label = dmc.Center(dmc.Title("Alpha diversity plots", className='text-primary my-2',
+                                     style={'font-weight': 'bold'}))
+        self.beta_label = dmc.Center(dmc.Title("Beta diversity plots", className='text-primary my-2',
+                                                style={'font-weight': 'bold'}))
 
         if not self.df.empty:
             self.unique_sample_ids = self.records.values('sample_id').distinct()
@@ -186,20 +186,21 @@ class Diversity:
         dropdown_container = dbc.Container(
             dbc.Row([dbc.Col(item, width=4) for item in
                      [diversity_metric_selector, project_dropdown, subproject_dropdown]]),
-            fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
+            fluid=True, style={'padding-left': 0}, className="dbc dbc-ag-grid"
         )
 
-        download_button = dbc.Button("Download as CSV", id="btn-download-diversity", style={'margin-top': '20px'})
+        download_button = dbc.Button("Download as CSV", id="btn-download-diversity", style={'margin-top': '20px','margin-left': '20px'})
         download_component = dcc.Download(id="download-diversity-csv")
 
-        sample_select_dropdown = dcc.Dropdown(
+        sample_select_dropdown = dbc.Col([dmc.Text("Samples to plot:", className='text-primary my-2', id='sample_select_text',
+                                 style={'width': '100%'}),dcc.Dropdown(
             id='sample_select_value',
             options=[{'label': i, 'value': i} for i in self.unique_sample_ids] if self.unique_sample_ids else [
                 {'label': 'Default', 'value': 'Default'}],
             multi=True,
             style={'width': '100%', 'margin-bottom': '5px', 'margin-top': '10px', 'margin-bot': '5px'},
             value=self.unique_sample_ids
-        )
+        )],style={"padding-left": "0px"})
 
         # Main container
         container = dbc.Container(
@@ -212,7 +213,7 @@ class Diversity:
              create_colour_by_menu()
 
              ],
-            fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
+            fluid=True, style={}, className="dbc dbc-ag-grid"
         )
 
         self.app.layout = container
@@ -232,21 +233,32 @@ class Diversity:
         self.beta_diversity_matrix = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
         self.pcoa_results = ordination.pcoa(self.beta_diversity_matrix)
 
-    def create_dropdown(self, dropdown_id, options, label_text, value=None):
+    def create_dropdown(self, dropdown_id, options, label_text, value=None, multi_select=False):
         """ Helper function to create dropdown elements. """
-        # label = dbc.Label(label_text, html_for=dropdown_id)
-        label = html.Label(label_text, className='text-primary my-2', style={'font-weight': 'bold'})
+        label = dmc.Text(label_text, className='text-primary my-2')
 
-        options_formatted = [{'label': name, 'value': value} for value, name in options] if isinstance(options[0],
-                                                                                                       tuple) else [
-            {'label': value, 'value': value} for value in options]
+        # Handling no options provided
+        if not options:
+            options_formatted = [{'label': 'Default', 'value': 'Default'}]
+        else:
+            options_formatted = [{'label': 'All Projects', 'value': 'ALL'}]
+            if isinstance(options[0], tuple):
+                options_formatted += [{'label': name, 'value': val} for val, name in options]
+            else:
+                options_formatted += [{'label': val, 'value': val} for val in options]
+
+        dropdown_style = {'width': '100%'}
+        if multi_select:
+            dropdown_style['margin-bottom'] = '5px'
+
         dropdown = dcc.Dropdown(
             id=dropdown_id,
             options=options_formatted,
-            style={'width': '100%'},
-            value=value
+            style=dropdown_style,
+            value=value,
+            multi=multi_select
         )
-        return dbc.Col([label, dropdown])
+        return dbc.Col([label, dropdown], style={'padding-left': 0}, width=12)
 
     def get_data(self):
 

@@ -107,111 +107,100 @@ class Taxonomy:
             children=html.Button('Upload SQLite File'),
             multiple=False  # Allow single file upload
         )
-
         dropdown_container = dbc.Container([
-    dbc.Row([
-        dbc.Col(
-            [
-                dbc.Label("Samples to plot:", html_for='sample_select_value', id='sample_select_text',
-                          style={'width': '100%'}),
-                dcc.Dropdown(
-                    id='sample_select_value',
-                    options=[{'label': i, 'value': i} for i in self.unique_sample_ids] if self.unique_sample_ids else [
-                        {'label': 'Default', 'value': 'Default'}],
-                    multi=True,
-                    style={'width': '100%', 'margin-bottom': '5px'},
-                    value=self.unique_sample_ids
-                ),
-            ],
-            width=12
-        ),
-
-        dbc.Col(
-            [
-                dbc.Label("Select Samples by project:", html_for='project-dropdown', id='project-dropdown-text',
-                          style={'width': '100%'}),
-                dcc.Dropdown(
-                    id='project-dropdown',
-                    options=[{'label': 'All Projects', 'value': 'ALL'}] +
-                            [{'label': project, 'value': project} for project in self.unique_projects_ids],
-
-                    value=None,
-                    style={'width': '100%', 'margin-bottom': '5px'}
-
-                ),
-            ],
-            width=2
-        ),
-
-        dbc.Col(
-            [
-                dbc.Label("Select Samples by subproject:", html_for='subproject-dropdown',
-                          id='subproject-dropdown-text'),
-                dcc.Dropdown(
-                    id='subproject-dropdown',
-                    options=[{'label': 'All Subprojects', 'value': 'ALL'}] +
-                            [{'label': subproject, 'value': subproject} for subproject in self.unique_subprojects],
-
-                    value=None
-
-                ),
-            ],
-            width=2
-        ),
-        dbc.Col(
-            [
-                dbc.Label("Plot type:", html_for='dropdown'),
-                dcc.Dropdown(
-                    id='dropdown',
-                    options=[
-                        {'label': 'Stacked Barchart', 'value': 'stackedbar'},
-                        {'label': 'Grouped Barchart', 'value': 'groupedbar'},
-                        {'label': 'Area plot', 'value': 'area'},
-                        {'label': 'Line plot', 'value': 'line'},
-                        {'label': 'Heatmap', 'value': 'heatmap'},
-                        # {'label': 'Pie chart', 'value': 'pie'},
-                        {'label': 'Scatter plot', 'value': 'scatter'}
-                        # {'label': 'Scatter 3D', 'value': 'scatter3d'},
-                        # {'label': 'Horizon plot', 'value': 'horizon'}
+            dbc.Row([
+                dbc.Col(
+                    [
+                        dmc.Text("Samples to plot:", className='text-primary my-2', id='sample_select_text',
+                                 style={'width': '100%'}),
+                        dcc.Dropdown(
+                            id='sample_select_value',
+                            options=[{'label': i, 'value': i} for i in
+                                     self.unique_sample_ids] if self.unique_sample_ids else [
+                                {'label': 'Default', 'value': 'Default'}],
+                            multi=True,
+                            style={'width': '100%', 'margin-bottom': '5px'},
+                            value=self.unique_sample_ids
+                        ),
                     ],
-                    value='stackedbar',
-                    style={'width': '100%'}
+                    width=12, style={'padding-left': 0}
                 ),
-                dbc.Checklist(id='use_date_value',
-                options=[{'label':'Use Date for plotting','value': True}],
-                value=[],
-                inline=True)
 
-
-
-
-            ],
-            width=2
-        ),
-        dbc.Col(
-            [
-                dbc.Label("Taxonomic rank for plot:", html_for='tax_rank_dropdown'),
-                dcc.Dropdown(
-                    id='tax_rank_dropdown',
-                    options=[
-                        {'label': 'Species', 'value': 'taxonomy'},
-                        {'label': 'Genus', 'value': 'tax_genus'},
-                        {'label': 'Family', 'value': 'tax_family'},
-                        {'label': 'Order', 'value': 'tax_order'},
-                        {'label': 'Class', 'value': 'tax_class'},
-                        {'label': 'Phylum', 'value': 'tax_phylum'},
-                        {'label': 'Superkingdom', 'value': 'tax_superkingdom'},
-                        {'label': 'Clade', 'value': 'tax_clade'}
+                dbc.Col(
+                    [
+                        dmc.Text("Select Samples by project:", id='project-dropdown-text', style={'width': '100%'},
+                                 className='text-primary my-2'),
+                        dcc.Dropdown(
+                            id='project-dropdown',
+                            options=[{'label': 'All Projects', 'value': 'ALL'}] +
+                                    [{'label': project, 'value': project} for project in self.unique_projects_ids],
+                            value=None,
+                            style={'width': '100%', 'margin-bottom': '5px'},
+                        ),
                     ],
-                    value='taxonomy',
-                    style={'width': '90%'}
-                )
-            ],
-            width=2
-        ),
-    ])
-], fluid=True)
+                    width=2, style={'padding-left': 0}
+                ),
 
+                dbc.Col(
+                    [
+                        dmc.Text("Select Samples by subproject:", id='subproject-dropdown-text',
+                                 className='text-primary my-2'),
+                        dcc.Dropdown(
+                            id='subproject-dropdown',
+                            options=[{'label': 'All Subprojects', 'value': 'ALL'}] +
+                                    [{'label': subproject, 'value': subproject} for subproject in
+                                     self.unique_subprojects],
+                            value=None
+                        ),
+                    ],
+                    width=2, style={'padding-left': 0}
+                ),
+                dbc.Col(
+                    [
+                        dmc.Text("Plot type:", className='text-primary my-2'),
+                        dcc.Dropdown(
+                            id='dropdown',
+                            options=[
+                                {'label': 'Stacked Barchart', 'value': 'stackedbar'},
+                                {'label': 'Grouped Barchart', 'value': 'groupedbar'},
+                                {'label': 'Area plot', 'value': 'area'},
+                                {'label': 'Line plot', 'value': 'line'},
+                                {'label': 'Heatmap', 'value': 'heatmap'},
+                                {'label': 'Scatter plot', 'value': 'scatter'}
+                            ],
+                            value='stackedbar',
+                            style={'width': '100%'}
+                        ),
+                        dbc.Checklist(id='use_date_value',
+                                      options=[{'label': 'Use Date for plotting', 'value': True}],
+                                      value=[],
+                                      inline=True)
+                    ],
+                    width=2, style={'padding-left': 0}
+                ),
+                dbc.Col(
+                    [
+                        dmc.Text("Taxonomic rank for plot:", className='text-primary my-2'),
+                        dcc.Dropdown(
+                            id='tax_rank_dropdown',
+                            options=[
+                                {'label': 'Species', 'value': 'taxonomy'},
+                                {'label': 'Genus', 'value': 'tax_genus'},
+                                {'label': 'Family', 'value': 'tax_family'},
+                                {'label': 'Order', 'value': 'tax_order'},
+                                {'label': 'Class', 'value': 'tax_class'},
+                                {'label': 'Phylum', 'value': 'tax_phylum'},
+                                {'label': 'Superkingdom', 'value': 'tax_superkingdom'},
+                                {'label': 'Clade', 'value': 'tax_clade'}
+                            ],
+                            value='taxonomy',
+                            style={'width': '90%'}
+                        )
+                    ],
+                    width=2, style={'padding-left': 0}
+                ),
+            ])
+        ], fluid=True)
 
         graph_container = html.Div(
     [
@@ -275,7 +264,7 @@ class Taxonomy:
             dbc.Col(dbc.Label(children='Select a sample to display.'), width={'size': 10, 'offset': 0}),justify="center",style = {'display': 'none'},id='header_pie_chart_sample_select_dbc')
 
         slider_header = dbc.Row(
-            dbc.Col(dbc.Label(children='Number of taxa to display:'), width={'size': 12, 'offset': 0}),justify="start")
+            dbc.Col(dmc.Text(children='Number of taxa to display:', className='text-primary my-2'), width={'size': 12, 'offset': 0}),justify="start")
 
         unique_counts_value = self.unique_counts if self.unique_counts else 10
         slider = html.Div([
@@ -286,7 +275,7 @@ class Taxonomy:
                         min=1,
 
                         max=unique_counts_value,
-                        value=10,
+                        value=unique_counts_value,
                         marks={
                             i: str(i) if i in [1, unique_counts_value // 2, unique_counts_value] else ""
                             for i in range(1, unique_counts_value + 1)
@@ -309,7 +298,7 @@ class Taxonomy:
 
         # data table for debugging
 
-        db_header = dbc.Row(dbc.Col(html.H4(children="Database"), width={'size': 12, 'offset': 0}),justify="center")
+
 
 
         data, columns = self._generate_table_data_cols()
@@ -336,26 +325,14 @@ class Taxonomy:
         slider_header,
         slider,  # new definition with smaller width
         header_pie_chart_sample_select_dbc, 
-        pie_chart_input,
-        db_header,download_button, download_button_counts,download_component_counts,
-
-        download_component
-        , data_dag_div,
+        pie_chart_input, download_button, download_button_counts,download_component_counts, download_component,
+        data_dag_div,
 
 
         # data_tb
     ],
-            fluid=True, style={'backgroundColor': '#F5F5F5'}, className="dbc dbc-ag-grid"
+            fluid=True, style={}, className="dbc dbc-ag-grid"
 )
-
-
-
-
-
-
-
-
-
         self.app.layout = container
 
     def _generate_table_ag_grid(self, max_rows=40):
