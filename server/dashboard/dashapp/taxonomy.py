@@ -32,7 +32,6 @@ class Taxonomy:
 
         return pd.DataFrame.from_records(records.values())
 
-
     def __init__(self,user_id):
         self.records = None
         self.user_id = user_id
