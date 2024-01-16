@@ -2,6 +2,7 @@ from datetime import date
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import JSONField
 
 
 class UserProfile(models.Model):
@@ -45,7 +46,6 @@ class NanoporeRecord(models.Model):
 #     subproject = models.CharField(max_length=255)
 #     date = models.CharField(max_length=255)
 
-
 # model that gets basic statistics from the sequencing files
 class SequencingStatistics(models.Model):
     sample_name = models.CharField(max_length=255)
@@ -71,18 +71,15 @@ class SequencingStatistics(models.Model):
         verbose_name_plural = "Sequencing Statistics"
 
 
-
-
-class MetaDB(models.Model):
-    meta_id = models.AutoField(primary_key=True)
-    project_id = models.IntegerField()
-    sample_id = models.IntegerField()
-    n_butyric_acid = models.FloatField()
-    n_valeric_acid = models.FloatField()
-    n_caproic_acid = models.FloatField()
-    n_heptanoic_acid = models.FloatField()
-    n_caprylic_acid = models.FloatField()
+class Metadata(models.Model):
+    user_id = models.IntegerField(default=0)
+    sample_id = models.CharField(max_length=255, default='empty')
+    data = JSONField()  # This field will store the dynamic metadata
 
     class Meta:
-        managed = False
-        db_table = 'metadata'
+        verbose_name_plural = "Metadata"
+    @classmethod
+    def create_metadata(cls,sample_id,data,user_id):
+        metadata = cls(sample_id=sample_id,data=data,user_id=user_id)
+        return metadata
+
