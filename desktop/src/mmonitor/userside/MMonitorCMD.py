@@ -9,6 +9,7 @@ from build_mmonitor_pyinstaller import ROOT
 from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import get_files_from_folder
 from src.mmonitor.database.django_db_interface import DjangoDBInterface
+from src.mmonitor.userside.CentrifugeRunner import CentrifugeRunner
 from src.mmonitor.userside.EmuRunner import EmuRunner
 
 
@@ -17,6 +18,7 @@ class MMonitorCMD:
         self.use_multiplexing = None
         self.multi_sample_input = None
         self.emu_runner = EmuRunner()
+        self.centrifuge_runner = CentrifugeRunner()
         self.args = self.parse_arguments()
         self.db_config = {}
         self.django_db = DjangoDBInterface(self.args.config)
@@ -265,6 +267,76 @@ class MMonitorCMD:
 
         # Handle error messages from loading the CSV
 
+    def taxonomy_nanopore_wgs(self):
+        cent_db_path = os.path.join(ROOT, 'src', 'resources', 'p_compressed')
+
+        def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
+            cent_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
+            self.django_db.send_nanopore_record_centrifuge(cent_out_path, sample_name, project_name, subproject_name,
+                                                           sample_date, self.args.overwrite)
+            print(self.args.overwrite)
+
+        if not os.path.exists(os.path.join(ROOT, "src", "resources", "p_compressed.1.cf")):
+            print("centrifuge db not found")
+
+        if not self.args.multicsv:
+            sample_name = str(self.args.sample)
+            # when a sample is already in the database and user does not want to overwrite quit now
+            if not self.args.overwrite:
+                if self.check_sample_in_db(sample_name):
+                    return
+            project_name = str(self.args.project)
+            subproject_name = str(self.args.subproject)
+            # sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
+            sample_date = self.args.date  # Convert date to string format
+
+            files = self.args.input
+            files = get_files_from_folder(files)
+            print(files)
+            files_cent = self.centrifuge_runner.unpack_fastq_list(files)
+            print(files_cent)
+            if self.args.update:
+                print("Update parameter specified. Will only update results from file.")
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+                return
+
+            # self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
+            self.centrifuge_runner.run_centrifuge(files_cent, sample_name, cent_db_path)
+
+            # add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+        else:
+            print("Processing multiple samples")
+            for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
+                files = file_path_list
+                files_cent = get_files_from_folder(files)
+                files_cent = self.centrifuge_runner.unpack_fastq_list(files_cent)
+
+                sample_name = self.multi_sample_input["sample_names"][index]
+                # when a sample is already in the database and user does not want to overwrite quit now
+                if not self.args.overwrite:
+                    if self.check_sample_in_db(sample_name):
+                        print(
+                            f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample...")
+                        continue
+                project_name = self.multi_sample_input["project_names"][index]
+                subproject_name = self.multi_sample_input["subproject_names"][index]
+                sample_date = self.multi_sample_input["dates"][index]
+                if self.args.update:
+                    print("Update parameter specified. Will only update results from file.")
+                    add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+                    continue
+
+                # self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
+                self.centrifuge_runner.run_centrifuge(files_cent, sample_name, cent_db_path)
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+
+        # calculate QC statistics if qc argument is given by user
+        if self.args.qc:
+            self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                sample_date)
+            print("adding statistics")
+
+
 
 if __name__ == "__main__":
     command_runner = MMonitorCMD()
@@ -273,3 +345,6 @@ if __name__ == "__main__":
     if command_runner.args.analysis == "taxonomy-16s":
         command_runner.load_from_csv()
         command_runner.taxonomy_nanopore_16s()
+    if command_runner.args.analysis == "taxonomy-wgs":
+        command_runner.load_from_csv()
+        command_runner.taxonomy_nanopore_wgs()
