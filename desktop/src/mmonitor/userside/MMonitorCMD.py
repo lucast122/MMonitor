@@ -138,6 +138,7 @@ class MMonitorCMD:
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
+            self.load_from_csv()
             print("Processing multiple samples")
             for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
@@ -268,15 +269,15 @@ class MMonitorCMD:
         # Handle error messages from loading the CSV
 
     def taxonomy_nanopore_wgs(self):
-        cent_db_path = os.path.join(ROOT, 'src', 'resources', 'p_compressed')
+        cent_db_path = os.path.join(ROOT, 'src', 'resources', 'dec_22')
 
         def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
-            cent_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
-            self.django_db.send_nanopore_record_centrifuge(cent_out_path, sample_name, project_name, subproject_name,
+            kraken_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out"
+            self.django_db.send_nanopore_record_centrifuge(kraken_out_path, sample_name, project_name, subproject_name,
                                                            sample_date, self.args.overwrite)
             print(self.args.overwrite)
 
-        if not os.path.exists(os.path.join(ROOT, "src", "resources", "p_compressed.1.cf")):
+        if not os.path.exists(os.path.join(ROOT, "src", "resources", "dec_22.1.cf")):
             print("centrifuge db not found")
 
         if not self.args.multicsv:
@@ -284,6 +285,7 @@ class MMonitorCMD:
             # when a sample is already in the database and user does not want to overwrite quit now
             if not self.args.overwrite:
                 if self.check_sample_in_db(sample_name):
+                    print("Sample is already in DB use --overwrite to overwrite it...")
                     return
             project_name = str(self.args.project)
             subproject_name = str(self.args.subproject)
@@ -292,25 +294,21 @@ class MMonitorCMD:
 
             files = self.args.input
             files = get_files_from_folder(files)
-            print(files)
-            files_cent = self.centrifuge_runner.unpack_fastq_list(files)
-            print(files_cent)
             if self.args.update:
                 print("Update parameter specified. Will only update results from file.")
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
                 return
 
             # self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
-            self.centrifuge_runner.run_centrifuge(files_cent, sample_name, cent_db_path)
+            self.centrifuge_runner.run_centrifuge(files, sample_name, cent_db_path)
+            self.centrifuge_runner.make_kraken_report(cent_db_path)
 
-            # add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+            add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
+            self.load_from_csv()
             print("Processing multiple samples")
             for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
-                files_cent = get_files_from_folder(files)
-                files_cent = self.centrifuge_runner.unpack_fastq_list(files_cent)
-
                 sample_name = self.multi_sample_input["sample_names"][index]
                 # when a sample is already in the database and user does not want to overwrite quit now
                 if not self.args.overwrite:
@@ -326,8 +324,8 @@ class MMonitorCMD:
                     add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
                     continue
 
-                # self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
-                self.centrifuge_runner.run_centrifuge(files_cent, sample_name, cent_db_path)
+                self.centrifuge_runner.run_centrifuge(files, sample_name, cent_db_path)
+                self.centrifuge_runner.make_kraken_report(cent_db_path)
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
 
         # calculate QC statistics if qc argument is given by user
@@ -343,8 +341,6 @@ if __name__ == "__main__":
     print(command_runner.args)
     command_runner.load_config()
     if command_runner.args.analysis == "taxonomy-16s":
-        command_runner.load_from_csv()
         command_runner.taxonomy_nanopore_16s()
     if command_runner.args.analysis == "taxonomy-wgs":
-        command_runner.load_from_csv()
         command_runner.taxonomy_nanopore_wgs()

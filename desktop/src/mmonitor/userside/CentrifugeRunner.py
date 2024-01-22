@@ -63,14 +63,15 @@ class CentrifugeRunner:
             cmd = f'centrifuge -x "{database_path}" -U {concat_file_name} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
             print(cmd)
             os.system(cmd)
-            # return
-        if ".fasta" in sequence_list[0] or ".fa" in sequence_list[0]:
+            self.make_kraken_report(database_path)
+            return
+        if sequence_list[0].lower().endswith(('.fa', '.fasta', '.fasta.gz', '.fa.gz')):
             cmd = f'centrifuge -x "{database_path}" -f {concat_file_name} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
             print(cmd)
             os.system(cmd)
-            # return
-        self.make_kraken_report(database_path)
-        return
+            self.make_kraken_report(database_path)
+            return
+
 
     def make_kraken_report(self,centrifuge_index_path):
         cmd = f"centrifuge-kreport -x {centrifuge_index_path} {self.cent_out} > {self.cent_out.replace('cent_out', 'kraken_out')}"
