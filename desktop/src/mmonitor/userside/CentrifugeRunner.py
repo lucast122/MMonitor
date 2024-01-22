@@ -53,8 +53,7 @@ class CentrifugeRunner:
 
         self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
 
-        if not os.path.exists(concat_file_name):
-            concatenate_fastq_files(sequence_list, concat_file_name)
+        concatenate_fastq_files(sequence_list, concat_file_name)
 
         if sequence_list[0].lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
             self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
@@ -64,12 +63,16 @@ class CentrifugeRunner:
             print(cmd)
             os.system(cmd)
             self.make_kraken_report(database_path)
+            os.remove(self.concat_file_name)
+
             return
+
         if sequence_list[0].lower().endswith(('.fa', '.fasta', '.fasta.gz', '.fa.gz')):
             cmd = f'centrifuge -x "{database_path}" -f {concat_file_name} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
             print(cmd)
             os.system(cmd)
             self.make_kraken_report(database_path)
+            os.remove(self.concat_file_name)
             return
 
 

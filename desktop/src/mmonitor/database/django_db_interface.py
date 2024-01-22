@@ -152,15 +152,11 @@ class DjangoDBInterface:
         )
 
         df = df.sort_values('Count', ascending=False)
-        # format name
 
-        # df['Name'] = df['Name'].apply(lambda s: s.strip())
-        # add sample name
         df['Sample'] = sample_name
         df['Sample_date'] = date
         df = df[df['Rank'] == "S"]
         df = df.drop(columns='Rank')
-        print(df)
 
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
 
@@ -185,7 +181,7 @@ class DjangoDBInterface:
                 "project_id": project_id,
                 "subproject_id": subproject_id,
                 "date": date,
-                "taxonomy": row["Name"],  # Assuming species for now; might need adjustments based on taxonomic rank
+                "taxonomy": row["Name"].strip(),  # Assuming species for now; might need adjustments based on taxonomic rank
                 "abundance": row["abundance"]/100, #divide abundance by 100 to get same format used by emu
                 "count": row["Count"],
                 "project_id": project_id,

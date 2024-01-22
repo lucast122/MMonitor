@@ -275,7 +275,6 @@ class MMonitorCMD:
             kraken_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out"
             self.django_db.send_nanopore_record_centrifuge(kraken_out_path, sample_name, project_name, subproject_name,
                                                            sample_date, self.args.overwrite)
-            print(self.args.overwrite)
 
         if not os.path.exists(os.path.join(ROOT, "src", "resources", "dec_22.1.cf")):
             print("centrifuge db not found")
