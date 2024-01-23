@@ -36,6 +36,7 @@ class Correlations:
     """
 
     def __init__(self, user_id):
+        self.text_style = 'text-primary my-2'
         self.user_id = user_id
         self.app = DjangoDash('correlations', add_bootstrap_links=True)
         self.correlation_matrix = None
@@ -83,7 +84,7 @@ class Correlations:
             - Data table containing correlations and test scores
         """
         title = dmc.Center(dmc.Title("Upload a csv with metadata to perform correlation analysis for your metagenomes",
-                                     className='text-primary my-2',
+                                     className=self.text_style,
                                      style={'font-weight': 'bold'}))
         download_template_button = dmc.Center(dmc.Group([dmc.Space(h=10),
                                                          dmc.Button('Download Metadata CSV Template',
@@ -106,13 +107,13 @@ class Correlations:
         upload_component = dcc.Upload(
             id='upload-data',
             children=html.Div([
-                'Drag and Drop or ',
-                html.A('Select Files')
+                dmc.Space(bottom=100),
+                dmc.Text('Drag and Drop, or Select Files',weight=500, size='xl')
             ]),
             style={
                 'width': '100%',
-                'height': '60px',
-                'lineHeight': '60px',
+                'height': '300px',
+
                 'borderWidth': '1px',
                 'borderStyle': 'dashed',
                 'borderRadius': '5px',
@@ -277,11 +278,17 @@ class Correlations:
         # data table and its download element
         correlations_tb = DataTable(id='table-correlations', data=[], columns=[])
         download_tb = dcc.Download(id='download-tb')
+
+        bottom_text = dmc.Center(dmc.Text("Press left button to download template. Fill it out and upload it."
+                               " Then refresh and Click right button to download Correlations.", className=self.text_style))
+
         download_buttons = dmc.Center(dmc.Group([download_template_button, download_correlations_button]))
         container = html.Div(
             [title, upload_component, download_correlations_component, download_buttons, notification_placeholder,
-             dropdowns, corr_heatmap_dend, header_tb, dropdowns_tb,
-             selections_tb, correlations_tb, download_tb, download_template_component])
+             bottom_text
+             # ,dropdowns, corr_heatmap_dend, header_tb, dropdowns_tb,
+             # selections_tb, correlations_tb, download_tb, download_template_component
+             ])
 
         self.app.layout = dmc.MantineProvider(
             dmc.NotificationsProvider([
