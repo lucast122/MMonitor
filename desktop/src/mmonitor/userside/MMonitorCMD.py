@@ -2,7 +2,7 @@ import argparse
 import csv
 import json
 import os
-
+import gzip
 import numpy as np
 
 from build_mmonitor_pyinstaller import ROOT
@@ -25,7 +25,7 @@ class MMonitorCMD:
 
     def parse_arguments(self):
         parser = argparse.ArgumentParser(description='MMonitor command line tool')
-        parser.add_argument('-a', '--analysis', required=True, choices=['taxonomy-wgs', 'taxonomy-16s', 'functional'],
+        parser.add_argument('-a', '--analysis', required=True, choices=['taxonomy-wgs', 'taxonomy-16s', 'stats'],
                             help='Type of analysis to perform')
         parser.add_argument('-c', '--config', required=True, type=str, help='Path to JSON config file')
 
@@ -66,14 +66,15 @@ class MMonitorCMD:
         else:
             print(f"Config path doesn't exist")
 
-    def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date):
-        fastq_stats = FastqStatistics(fastq_file)
-
+    def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date,multi=True):
+        fastq_stats = FastqStatistics(fastq_file,multi=multi)
         # Calculate statistics
         fastq_stats.quality_statistics()
         fastq_stats.read_lengths_statistics()
         quality_vs_lengths_data = fastq_stats.qualities_vs_lengths()
         gc_contents = fastq_stats.gc_content_per_sequence()
+        # qual_dist = fastq_stats.quality_score_distribution()
+        # q20_q30 = fastq_stats.q20_q30_scores()
 
         data = {
             'sample_name': sample_name,
@@ -88,10 +89,10 @@ class MMonitorCMD:
             'avg_qualities': json.dumps(quality_vs_lengths_data['avg_qualities']),
             'number_of_reads': fastq_stats.number_of_reads(),
             'total_bases_sequenced': fastq_stats.total_bases_sequenced(),
-            'q20_score': fastq_stats.q20_q30_scores()[0],
-            'q30_score': fastq_stats.q20_q30_scores()[1],
-            'avg_quality_per_read': fastq_stats.quality_score_distribution()[0],
-            'base_quality_avg': fastq_stats.quality_score_distribution()[1],
+            # 'q20_score': q20_q30[0],
+            # 'q30_score': q20_q30[0],
+            # 'avg_quality_per_read': qual_dist[0],
+            # 'base_quality_avg': qual_dist[1],
             'gc_contents_per_sequence': json.dumps(gc_contents)
 
         }
@@ -104,6 +105,29 @@ class MMonitorCMD:
         samples_in_db = self.django_db.get_unique_sample_ids()
         return sample_id in samples_in_db
 
+    def update_only_statistics(self):
+
+        if not self.args.multicsv:
+            sample_name = str(self.args.sample)
+            project_name = str(self.args.project)
+            subproject_name = str(self.args.subproject)
+            sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
+            files = self.args.input
+            self.add_statistics(files, sample_name, project_name, subproject_name,
+                                sample_date,multi=True)
+
+        else:
+            self.load_from_csv()
+            print("Processing multiple samples")
+            for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
+                files = file_path_list
+                sample_name = self.multi_sample_input["sample_names"][index]
+                project_name = self.multi_sample_input["project_names"][index]
+                subproject_name = self.multi_sample_input["subproject_names"][index]
+                sample_date = self.multi_sample_input["dates"][index]
+
+                self.add_statistics(files, sample_name, project_name, subproject_name,
+                                    sample_date,multi=True)
 
     def taxonomy_nanopore_16s(self):
         global sample_name, project_name, subproject_name, sample_date
@@ -137,6 +161,11 @@ class MMonitorCMD:
             self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+            if self.args.qc:
+                self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                    sample_date)
+                print("adding statistics")
+
         else:
             self.load_from_csv()
             print("Processing multiple samples")
@@ -159,12 +188,12 @@ class MMonitorCMD:
 
                 self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+                if self.args.qc:
+                    self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                        sample_date)
+                    print("adding statistics")
 
         # calculate QC statistics if qc argument is given by user
-        if self.args.qc:
-            self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
-                                sample_date)
-            print("adding statistics")
 
         # emu_out_path = f"{ROOT}/src/resources/pipeline_out/subset/"
 
@@ -275,7 +304,6 @@ class MMonitorCMD:
             kraken_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out"
             self.django_db.send_nanopore_record_centrifuge(kraken_out_path, sample_name, project_name, subproject_name,
                                                            sample_date, self.args.overwrite)
-            print(self.args.overwrite)
 
         if not os.path.exists(os.path.join(ROOT, "src", "resources", "dec_22.1.cf")):
             print("centrifuge db not found")
@@ -304,6 +332,11 @@ class MMonitorCMD:
             self.centrifuge_runner.make_kraken_report(cent_db_path)
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+            if self.args.qc:
+                self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                    sample_date)
+                print("adding statistics")
+
         else:
             self.load_from_csv()
             print("Processing multiple samples")
@@ -328,11 +361,23 @@ class MMonitorCMD:
                 self.centrifuge_runner.make_kraken_report(cent_db_path)
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
 
-        # calculate QC statistics if qc argument is given by user
-        if self.args.qc:
-            self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
-                                sample_date)
-            print("adding statistics")
+                # calculate QC statistics if qc argument is given by user
+                if self.args.qc:
+                    self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                        sample_date)
+                    print("adding statistics")
+
+    @staticmethod
+    def concatenate_fastq_files(input_files, output_file):
+        print(f"concatenating {input_files} to {output_file}")
+        with gzip.open(output_file, 'wt') as output:
+            for input_file in input_files:
+                is_gzipped = input_file.endswith(".gz")
+                open_func = gzip.open if is_gzipped else open
+                mode = 'rt' if is_gzipped else 'r'
+                with open_func(input_file, mode) as input2:
+                    for line in input2:
+                        output.write(line)
 
 
 
@@ -344,3 +389,6 @@ if __name__ == "__main__":
         command_runner.taxonomy_nanopore_16s()
     if command_runner.args.analysis == "taxonomy-wgs":
         command_runner.taxonomy_nanopore_wgs()
+    if command_runner.args.analysis == "stats":
+        command_runner.update_only_statistics()
+
