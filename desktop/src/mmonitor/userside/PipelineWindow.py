@@ -70,9 +70,9 @@ class PipelinePopup(ctk.CTkToplevel):
         #     sample_name = self.gui.ask_sample_name()
         #     self.gui.functional_analysis_runner.check_software_avail()
 
-        # if self.taxonomy_nanopore_wgs.get():
-        #     thread_wgs = Thread(target=self.gui.taxonomy_nanopore_wgs)
-        #     thread_wgs.start()
+        if self.taxonomy_nanopore_wgs.get():
+            thread_wgs = Thread(target=self.gui.taxonomy_nanopore_wgs)
+            thread_wgs.start()
 
         if self.taxonomy_nanopore_16s_bool.get():
             thread_16s = Thread(target=self.gui.taxonomy_nanopore_16s)

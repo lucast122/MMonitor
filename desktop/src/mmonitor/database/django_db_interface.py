@@ -99,6 +99,7 @@ class DjangoDBInterface:
         df.sort_values('Abundance', ascending=False, inplace=True)
         df = df.iloc[1:]  # Skipping the first row, assuming it's headers or unwanted data
         df['Sample'] = sample_name
+        df['Sample'] = sample_name
         sample_date = convert_date_format(sample_date)  # Convert date format if necessary
         df['Sample_date'] = sample_date
 
@@ -139,10 +140,27 @@ class DjangoDBInterface:
         except Exception as e:
             print(e)
 
-    def send_nanopore_record_centrifuge(self, kraken_out: dict, sample_name: str, project_id: str, subproject_id: str,
+    def send_nanopore_record_centrifuge(self, kraken_out_path: str, sample_name: str, project_id: str, subproject_id: str,
                                         date: str, overwrite: bool):
-        import requests as pyrequests
-        from requests.auth import HTTPBasicAuth
+
+        df = pd.read_csv(
+            kraken_out_path,
+            sep='\t',
+            header=None,
+            usecols=[0,1, 3, 5],
+            names=["abundance",'Count', 'Rank', 'Name']
+        )
+
+        df = df.sort_values('Count', ascending=False)
+        # format name
+
+        # df['Name'] = df['Name'].apply(lambda s: s.strip())
+        # add sample name
+        df['Sample'] = sample_name
+        df['Sample_date'] = date
+        df = df[df['Rank'] == "S"]
+        df = df.drop(columns='Rank')
+        print(df)
 
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
 
@@ -151,7 +169,7 @@ class DjangoDBInterface:
             return
         print(f"User id clientside: {user_id}")
 
-        sample_ids = self.get_unique_sample_ids(self._db_config['user'], self._db_config['password'])
+        sample_ids = self.get_unique_sample_ids()
         print(f"Found samples: {sample_ids}")
         # do not add sample if overwrite is False and the sample_name is already present in the django DB
         # this makes sure that a sample is only reprocessed if the overwrite bool is set e.g. with the cmd line or in the GUI
@@ -161,33 +179,43 @@ class DjangoDBInterface:
             return
 
         records = []
-        for hit in kraken_out:
+        for index, row in df.iterrows():
             record_data = {
-                "sample_name": sample_name,
+                "sample_id": sample_name,
                 "project_id": project_id,
                 "subproject_id": subproject_id,
                 "date": date,
-                "tax_id": hit["tax_id"],
-                "species": hit["taxonomy"]  # Assuming species for now; might need adjustments based on taxonomic rank
+                "taxonomy": row["Name"],  # Assuming species for now; might need adjustments based on taxonomic rank
+                "abundance": row["abundance"]/100, #divide abundance by 100 to get same format used by emu
+                "count": row["Count"],
+                "project_id": project_id,
+                "subproject": subproject_id,
+                "tax_genus": "empty",
+                "tax_family": "empty",
+                "tax_order": "empty",
+                "tax_class": "empty",
+                "tax_phylum": "empty",
+                "tax_superkingdom": "empty",
+                "tax_clade": "empty",
+                "tax_subspecies": "empty"
+
             }
+            # print(record_data)
             records.append(record_data)
 
-        for record_data in records:
-            print(f"Sending record: {record_data}")
-            try:
-                auth = HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
-                response = pyrequests.post(
-                    f"http://{self._db_config['host']}:8020/users/overwrite_nanopore_record/",
-                    json=record_data,
-                    auth=auth
-                )
-                print(f"response: {response}")
-
-                if response.status_code != 201:
-                    print(f"Failed to add record: {response.content}")
-            except Exception as e:
-                print(e)
-                print(f"response: {response}")
+        print(f"Sending record: {records}")
+        try:
+            response = pyrequests.post(
+                f"http://{self._db_config['host']}:8020/users/overwrite_nanopore_record/",
+                json=records,  # Send the list of records
+                auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
+            )
+            if response.status_code != 201:
+                print(f"Failed to add records: {response.content}")
+            else:
+                print(f"Records added successfully.")
+        except Exception as e:
+            print(e)
 
     def send_sequencing_statistics(self, record_data):
         import requests as pyrequests

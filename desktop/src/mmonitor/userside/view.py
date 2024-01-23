@@ -23,6 +23,7 @@ from future.moves.tkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
 
+# from mmonitor.Tooltip import ToolTip
 from build_mmonitor_pyinstaller import ROOT, IMAGES_PATH
 from mmonitor.dashapp.index import Index
 from mmonitor.database.DBConfigForm import DataBaseConfigForm
@@ -61,8 +62,6 @@ def require_project(func):
     return func_wrapper
 
 
-
-
 def compute_sha256(file_path):
     """Compute the sha256 checksum of a file. Used to check if index files like emu_db index have been downloaded correctly"""
     sha256_hash = hashlib.sha256()
@@ -89,6 +88,8 @@ class GUI(ctk.CTk):
         self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
         self.progress_bar_exists = False
         self.input_window = None
+        self.download_progress = 0
+
         # self.db_mysql.create_db()
 
         # declare data base class variable, to be chosen by user with choose_project()
@@ -141,10 +142,7 @@ class GUI(ctk.CTk):
         self.minsize(MAIN_WINDOW_X, MAIN_WINDOW_Y)
         self.configure()  # Set primary color as window background
 
-
         # Style and theme
-
-
 
         # style.map('TButton',
         #           foreground=[('pressed', 'white'), ('active', 'black')],
@@ -254,7 +252,7 @@ class GUI(ctk.CTk):
         quit_btn.pack(pady=15)
 
     # create_tooltip(local_label, "This is the tooltip text for the Local category.")
-        # create_tooltip(webserver_label, "This is the tooltip text for the Webserver category.")
+    # create_tooltip(webserver_label, "This is the tooltip text for the Webserver category.")
 
     def create_tooltip(self, widget, text):
         tooltip = ToolTip(widget, text)
@@ -286,8 +284,6 @@ class GUI(ctk.CTk):
     def open_popup(self, text, title, icon):
 
         CTkMessagebox(message=text, title=title, icon=icon, option_1="Okay")
-
-
 
     def create_project(self):
         filename = filedialog.asksaveasfilename(
@@ -328,6 +324,7 @@ class GUI(ctk.CTk):
 
         # ceck if a file exists and if not asks the user to download it. gets used to check if db are all present
         # TODO: also add checksum check to make sure the index is completely downloaded, if not remove file and download again
+
     def check_emu_db_exists(self):
         # unzip if tar exists, but not taxonomy.tsv
         if os.path.exists(f"{ROOT}/src/resources/emu_db/emu.py.tar") and not os.path.exists(
@@ -346,14 +343,13 @@ class GUI(ctk.CTk):
                     computed_checksum = compute_sha256(emu_db_path)
                     print(f"Checksum of the downloaded file: {computed_checksum}")
 
-
-                    self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar",f"{ROOT}/src/resources/emu_db/")
+                    self.unzip_tar(f"{ROOT}/src/resources/emu_db/emu.tar", f"{ROOT}/src/resources/emu_db/")
 
                 except FileNotFoundError as e:
                     self.open_popup("Could not download the EMU DB. Please contact the MMonitor developer for help",
                                     "Could not find emu.py db", icon="cancel")
 
-    def download_file_from_web(self,filepath,url):
+    def download_file_from_web(self, filepath, url):
 
         with urllib.request.urlopen(url) as response:
             # get file size from content-length header
@@ -368,7 +364,6 @@ class GUI(ctk.CTk):
             # Start the download in a separate thread
             download_thread = Thread(target=self._download_file, args=(filepath, url, progress))
             download_thread.start()
-
 
             # Periodically update the GUI
             self.after(100, self._check_download_progress, download_thread, progress)
@@ -418,8 +413,6 @@ class GUI(ctk.CTk):
     #     db = DjangoDBInterface()  # Assuming this class has methods to handle Kaiju output
     #     db.add_kaiju_output_to_db(sample_name)
 
-
-
     def check_file_exists(self, filepath, url):
         if os.path.exists(f"{ROOT}/src/resources/dec22.tar"):
             if not os.path.exists(f"{ROOT}/src/resources/dec22.1.cf"):
@@ -449,7 +442,7 @@ class GUI(ctk.CTk):
                                      " Might take some time, the tool is unusable while download.", option_1="Yes",
                                      option_2="No")
             if response.selected_option == "Yes":
-                self.download_file_from_web(filepath,url)
+                self.download_file_from_web(filepath, url)
 
     def unzip_tar(self, file, out_folder):
         my_tar = tarfile.open(file, mode='r')
@@ -466,18 +459,26 @@ class GUI(ctk.CTk):
     # @require_project
     # @require_centrifuge
     def taxonomy_nanopore_wgs(self):
-        # check if centrifuge index exists, if not download it using check_file_exists method
-        centrifuge_index = "dec22"
-        download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
-                                                               "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
-        download_thread.start()
-        download_thread.join()
+        def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
+            kraken_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out"
 
-        self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
-        self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
+            if self.db is not None:
+                self.db.update_table_with_kraken_out(kraken_out, "species", sample_name, "project", self.sample_date)
+            self.django_db.send_nanopore_record_centrifuge(kraken_out, sample_name, project_name, subproject_name,
+                                                           sample_date, True)
+
+        # check if centrifuge index exists, if not download it using check_file_exists method
+        centrifuge_index_path = f"{ROOT}/src/resources/dec_22"
+        # download_thread = Thread(target=self.check_file_exists(f"{ROOT}/src/resources/{centrifuge_index}.tar",
+        #                                                        "https://software-ab.cs.uni-tuebingen.de/download/MMonitor/dec22.tar"))
+        # download_thread.start()
+        # download_thread.join()
+
+        # self.unzip_tar(f"{ROOT}/src/resources/dec22.tar", f"{ROOT}/src/resources/")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.1.cf.gz")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.2.cf.gz")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.3.cf.gz")
+        # self.unzip_gz(f"{ROOT}/src/resources/dec22.4.cf.gz")
 
         # folder = filedialog.askdirectory(
         #     initialdir='/',
@@ -493,21 +494,37 @@ class GUI(ctk.CTk):
         #
         #
         # sample_date = self.open_calendar()
-        win = InputWindow(self, self.emu_runner)
+        self.open_input_window_and_wait()
+        if self.input_window.do_quit:
+            return
+
         print("Created input window")
-        self.checkbox_popup()
+        # self.checkbox_popup()
         # get entries from input window
-        sample_name = str(win.sample_name_entry)  # Get the content of the entry and convert to string
-        project_name = str(win.project_name_entry)
-        subproject_name = str(win.subproject_name_entry)
-        sample_date = win.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
-        files = win.file_paths_single_sample
+        # sample_name = str(self.input_window.sample_name_entry)  # Get the content of the entry and convert to string
+        # project_name = str(self.input_window.project_name_entry)
+        # subproject_name = str(self.input_window.subproject_name_entry)
+        # sample_date = self.input_window.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+        # files = self.input_window.file_paths_single_sample
 
-        self.centrifuge_runner.run_centrifuge(files, sample_name)
-        self.centrifuge_runner.make_kraken_report()
+        if self.input_window.process_multiple_samples:
+            for index, file_path_list in enumerate(self.input_window.multi_sample_input["file_paths_lists"]):
+                files = file_path_list
+                sample_name = self.input_window.multi_sample_input["sample_names"][index]
+                project_name = self.input_window.multi_sample_input["project_names"][index]
+                subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
+                sample_date = self.input_window.multi_sample_input["dates"][index]
+                self.centrifuge_runner.run_centrifuge(files, sample_name, centrifuge_index_path)
+                self.centrifuge_runner.make_kraken_report(centrifuge_index_path)
 
-        self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
-                                             sample_name, project_name, sample_date)
+                self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
+                                    sample_date)
+
+                add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
+            self.show_info("Analysis complete. You can start monitoring now.")
+
+        # self.db.update_table_with_kraken_out(f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out", "species",
+        #                                      sample_name, project_name, sample_date)
 
     def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date):
         fastq_stats = FastqStatistics(fastq_file)
@@ -537,14 +554,9 @@ class GUI(ctk.CTk):
             'base_quality_avg': fastq_stats.quality_score_distribution()[1],
             'gc_contents_per_sequence': json.dumps(gc_contents)
 
-
         }
 
         self.django_db.send_sequencing_statistics(data)
-
-
-
-
 
     def taxonomy_nanopore_16s(self):
         global sample_name
@@ -557,12 +569,10 @@ class GUI(ctk.CTk):
             self.django_db.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
                                                       subproject_name, True)
 
-
         self.check_emu_db_exists()
         # create input window to input all relevant sample information and sequencing files
 
         self.open_input_window_and_wait()
-
 
         # quit the method when quit button is pressed instead of running the pipeline
         if self.input_window.do_quit:
@@ -585,7 +595,6 @@ class GUI(ctk.CTk):
             print("add statistics")
             self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                 sample_date)
-
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
         else:
@@ -623,7 +632,6 @@ class GUI(ctk.CTk):
         self.pipeline_popup = PipelinePopup(self,
                                             self)  # Replace run_analysis_pipeline_function with your actual function
 
-
     def ask_sample_name(self):
         sample_name = simpledialog.askstring(
             "Input sample name",
@@ -636,7 +644,6 @@ class GUI(ctk.CTk):
 
     def show_info(self, message):
         CTkMessagebox(message=message, icon="check", title="Info")
-
 
     @require_project
     def start_monitoring(self):
@@ -669,7 +676,6 @@ class GUI(ctk.CTk):
 # this method updates the django db after with the new db_config after the user saves a new db config
 def update_db_config_path(self):
     self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
-
 
     def on_open(self, ws):
         print("WebSocket connection opened.")
