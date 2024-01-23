@@ -48,7 +48,7 @@ class CentrifugeRunner:
         print(sequence_list)
         #remove concatenated files from sequence list to avoid concatenating twice
         sequence_list = [s for s in sequence_list if "concatenated" not in s]
-        concat_file_name = f"{ROOT}/src/resources/pipeline_out/{sample_name}_concatenated.fastq.gz"
+        concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
         self.concat_file_name = concat_file_name
 
         self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
