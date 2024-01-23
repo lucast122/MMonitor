@@ -23,7 +23,7 @@
 </head>
 <body>
 <ul class="menu">
-    <li class="menu"><a class="menu" href="{% url "main:index" %}">Home</a></li>
+    <li class="menu"><a class="menu" href="{% url "main:index" %}">Info</a></li>
     {% if user.is_authenticated %}
         <li class="menu"><a class="menu" href="{% url "dashboard:index" %}">Dashboard</a></li>
     {% endif %}
@@ -32,7 +32,11 @@
     {% endif %}
 
     {% if user.is_authenticated %}
+        <li class="menu" style="float:right"><a class="menu" href="{% url "users:submit_feedback" %}">Submit Feedback</a></li>
         <li class="menu" style="float:right"><a class="menu" href="{% url "users:logout" %}">Log out</a></li>
+
+
+
     {% else %}
         <li style="float:right" class="menu" ><a class="menu" href="{% url "users:register" %}">Register</a></li>
         <li style="float:right" class="menu" ><a class="menu" href="{% url "users:login" %}">Log in</a></li>

@@ -3,6 +3,18 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import JSONField
+from django.conf import settings
+
+class Feedback(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    subject = models.CharField(max_length=100)
+    message = models.TextField()
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback from {self.user.username} - {self.subject}"
+
+
 
 
 class UserProfile(models.Model):
@@ -82,4 +94,5 @@ class Metadata(models.Model):
     def create_metadata(cls,sample_id,data,user_id):
         metadata = cls(sample_id=sample_id,data=data,user_id=user_id)
         return metadata
+
 

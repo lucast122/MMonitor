@@ -27,13 +27,23 @@ class Taxonomy:
     """
 
     def get_data(self):
-
         records = NanoporeRecord.objects.filter(user_id=self.user_id)
         self.records = records
         if not records.exists():
             return pd.DataFrame()  # Return an empty DataFrame if no records are found
 
-        return pd.DataFrame.from_records(records.values())
+        for record in records:
+            if record.date == 'default':
+                # Print the record or take other actions if the date is 'default'
+                print("Record with 'default' date:", record)
+
+        # Create DataFrame
+        try:
+            return pd.DataFrame.from_records(records.values())
+        except ValueError as e:
+            print("Error while converting data to DataFrame:", e)
+            # Handle the error or return an empty DataFrame
+            return pd.DataFrame()
 
     def __init__(self, user_id):
         self.records = None

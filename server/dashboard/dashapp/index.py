@@ -313,16 +313,14 @@ class Index:
         return heatmap
 
     def plot_stacked_bar(self, df, use_date_value, taxonomic_rank):
-        print(f"df in plot_stacked bar: {df.head(50)}")
-        # Group and sum the data based on the x-axis and the taxonomic rank
-        # print(taxonomic_rank)
+        total_abundance = df.groupby(taxonomic_rank)['abundance'].sum().sort_values(ascending=False)
         x_axis = "date" if use_date_value else "sample_id"
         category_orders = {x_axis: sorted(df[x_axis].unique())} if not use_date_value else {}
-
-        # print(self.taxonomy_app.combined_color_dict)
         fig = px.bar(df, x=x_axis, y="abundance", color=taxonomic_rank, barmode="stack",
                      hover_data=df.columns, color_discrete_map=self.taxonomy_app.combined_color_dict,
                      category_orders=category_orders)
+        fig.update_layout(legend={'traceorder': 'normal'})
+        fig.data = sorted(fig.data, key=lambda trace: total_abundance[trace.name], reverse=True)
 
         fig.update_layout(
             legend=dict(

@@ -9,6 +9,9 @@ from django.views.decorators.csrf import csrf_exempt
 from users.models import NanoporeRecord
 from .models import SequencingStatistics
 from .models import UserProfile
+from django.shortcuts import render, redirect
+from .forms import FeedbackForm
+from django.contrib import messages
 
 
 @csrf_exempt
@@ -286,4 +289,21 @@ def register(request):
     context = {"form": form}
 
     return render(request, "registration/register.html", context)
+
+# USER FEEDBACK
+def submit_feedback(request):
+    if request.method == 'POST':
+        form = FeedbackForm(request.POST)
+        if form.is_valid():
+            feedback = form.save(commit=False)
+            feedback.user = request.user
+            feedback.save()
+            messages.success(request, 'Your feedback has been submitted!')
+            return redirect('users:feedback_thank_you')
+    else:
+        form = FeedbackForm()
+    return render(request, 'submit_feedback.html', {'form': form})
+
+def feedback_thank_you(request):
+    return render(request, 'feedback_thank_you.html')
 
