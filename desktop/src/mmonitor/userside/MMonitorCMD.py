@@ -66,15 +66,15 @@ class MMonitorCMD:
         else:
             print(f"Config path doesn't exist")
 
-    def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date,multi=False):
+    def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date,multi=True):
         fastq_stats = FastqStatistics(fastq_file,multi=multi)
         # Calculate statistics
         fastq_stats.quality_statistics()
         fastq_stats.read_lengths_statistics()
         quality_vs_lengths_data = fastq_stats.qualities_vs_lengths()
         gc_contents = fastq_stats.gc_content_per_sequence()
-        qual_dist = fastq_stats.quality_score_distribution()
-        q20_q30 = fastq_stats.q20_q30_scores()
+        # qual_dist = fastq_stats.quality_score_distribution()
+        # q20_q30 = fastq_stats.q20_q30_scores()
 
         data = {
             'sample_name': sample_name,
@@ -89,10 +89,10 @@ class MMonitorCMD:
             'avg_qualities': json.dumps(quality_vs_lengths_data['avg_qualities']),
             'number_of_reads': fastq_stats.number_of_reads(),
             'total_bases_sequenced': fastq_stats.total_bases_sequenced(),
-            'q20_score': q20_q30[0],
-            'q30_score': q20_q30[0],
-            'avg_quality_per_read': qual_dist[0],
-            'base_quality_avg': qual_dist[1],
+            # 'q20_score': q20_q30[0],
+            # 'q30_score': q20_q30[0],
+            # 'avg_quality_per_read': qual_dist[0],
+            # 'base_quality_avg': qual_dist[1],
             'gc_contents_per_sequence': json.dumps(gc_contents)
 
         }
