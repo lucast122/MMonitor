@@ -1,10 +1,11 @@
+import numpy as np
 from skbio.diversity import beta_diversity
 from dash.dependencies import Input, Output
 from skbio.stats import ordination
 from django_plotly_dash import DjangoDash
 import pandas as pd
 import plotly.express as px
-from users.models import NanoporeRecord
+from users.models import NanoporeRecord, SequencingStatistics
 import skbio.diversity
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
@@ -46,6 +47,31 @@ def create_colour_by_menu():
             )
         ]
     )
+
+
+def calculate_normalized_counts(self):
+    counts_df = pd.DataFrame.from_records(NanoporeRecord.objects.filter(user_id=self.user_id).values())
+    stats_df = pd.DataFrame.from_records(SequencingStatistics.objects.filter(user_id=self.user_id).values())
+
+    # Merge the counts and stats dataframes on sample_id
+    merged_df = pd.merge(counts_df, stats_df, left_on='sample_id', right_on="sample_name")
+
+    # Calculate normalized counts by dividing each count by the numebr of bases sequenced and then multiplying by
+    # 1 million to make normalized counts more similar to normal counts in value range
+    merged_df['normalized_count'] = (merged_df['count'] / merged_df['total_bases_sequenced']) * 10000000
+
+    # Selecting only necessary columns for the final DataFrame
+    normalized_counts_df = merged_df[['sample_id', 'taxonomy', 'abundance', 'count', 'normalized_count']]
+    return normalized_counts_df
+
+
+def rarefy_sample(sample, depth):
+    # print(sample)
+    if sum(sample) >= depth:
+        return np.random.choice(np.where(sample > 0)[0], size=depth, replace=False, p=sample / sum(sample))
+    else:
+        raise ValueError("Sample size is less than the specified rarefaction depth.")
+    return sample
 
 
 class Diversity:
@@ -95,7 +121,7 @@ class Diversity:
             self.unique_species = self.df['taxonomy'].unique()
             self.df_full_for_diversity = self.df.pivot_table(index='sample_id',
                                                              columns='taxonomy',
-                                                             values='abundance',
+                                                             values='count',
                                                              fill_value=0)
 
             self.sample_project_mapping = self.records.values('sample_id', 'project_id')
@@ -119,7 +145,7 @@ class Diversity:
             self.unique_counts = min(self.df.nunique()[1], 500)
 
         self._init_layout()
-        self.calculate_alpha_diversity()
+        self.calculate_alpha_diversity(use_normalized_counts=False)
         self.calculate_beta_diversity()
 
     def _init_layout(self) -> None:
@@ -218,15 +244,50 @@ class Diversity:
 
         self.app.layout = container
 
-    def calculate_alpha_diversity(self):
+    """Randomly subsample a sample to a specified depth."""
+
+    def calculate_alpha_diversity(self,use_rarefaction=False,use_normalized_counts=False):
+
         abundance_lists = self.df_full_for_diversity
+        # Rarefaction
+        if use_rarefaction:
+            min_sample_size = min(abundance_lists.sum(axis=1))
+            rarefied_counts = []
+            for sample in abundance_lists:
+                # print(sample)
+                rarefied_sample = np.zeros_like(sample)
+                subsampled_indices = rarefy_sample(sample, min_sample_size)
+                for idx in subsampled_indices:
+                    rarefied_sample[idx] += 1
+                rarefied_counts.append(rarefied_sample)
+            abundance_lists = np.array(rarefied_counts)
+        if use_normalized_counts:
+            normalized_counts_df = self.calculate_normalized_counts()
+            # print("normalized_counts_df")
+            # print(normalized_counts_df)
+            # print("unique sample_ids in normalized_counts_df")
+            # print(normalized_counts_df['sample_id'].nunique())
+            # Pivot the DataFrame similar to self.df_full_for_diversity
+            abundance_lists = normalized_counts_df.pivot_table(index='sample_id',
+                                                               columns='taxonomy',
+                                                               values='normalized_count',
+                                                               fill_value=0)
+        else:
+            abundance_lists = self.df_full_for_diversity
+
+        print("Number of unique sample IDs:", len(self.unique_sample_ids))
+        print("Number of rows in abundance lists:", abundance_lists.shape[0])
+
+        # Check if the length of unique_sample_ids matches the number of rows in abundance_lists
+        if len(self.unique_sample_ids) != abundance_lists.shape[0]:
+            raise ValueError("Mismatch in the number of samples and abundance rows")
 
         self.simpson_diversity = skbio.diversity.alpha_diversity(metric="simpson", counts=abundance_lists,
                                                                  ids=self.unique_sample_ids)
         self.shannon_diversity = skbio.diversity.alpha_diversity(metric="shannon", counts=abundance_lists,
                                                                  ids=self.unique_sample_ids)
-        print(f"simpson diversity: {self.simpson_diversity}")
-        print(f"shannon diversity: {self.shannon_diversity}")
+        # print(f"simpson diversity: {self.simpson_diversity}")
+        # print(f"shannon diversity: {self.shannon_diversity}")
 
     def calculate_beta_diversity(self):
         # Bray-Curtis is a common choice for beta diversity, but you can choose other metrics
@@ -268,3 +329,19 @@ class Diversity:
             return pd.DataFrame()  # Return an empty DataFrame if no records are found
 
         return pd.DataFrame.from_records(records.values())
+
+    def calculate_normalized_counts(self):
+        counts_df = pd.DataFrame.from_records(NanoporeRecord.objects.filter(user_id=self.user_id).values())
+        stats_df = pd.DataFrame.from_records(SequencingStatistics.objects.filter(user_id=self.user_id).values())
+
+
+        # Merge the counts and stats dataframes on sample_id
+        merged_df = pd.merge(counts_df, stats_df, left_on='sample_id', right_on="sample_name")
+
+        # Calculate normalized counts by dividing each count by the numebr of bases sequenced and then multiplying by
+        # 1 million to make normalized counts more similar to normal counts in value range
+        merged_df['normalized_count'] = (merged_df['count'] / merged_df['total_bases_sequenced']) * 10000000
+
+        # Selecting only necessary columns for the final DataFrame
+        normalized_counts_df = merged_df[['sample_id', 'taxonomy', 'abundance', 'count', 'normalized_count']]
+        return normalized_counts_df

@@ -3,8 +3,10 @@ from users.models import SequencingStatistics
 import pandas as pd
 import dash_core_components as dcc
 from dash import html
-class QC:
+import dash_mantine_components as dmc
+import dash_bootstrap_components as dbc
 
+class QC:
     def get_data(self):
         stats = SequencingStatistics.objects.filter(user_id=self.user_id)
 
@@ -29,14 +31,15 @@ class QC:
         num_plots = 7
 
         if not self.stats_df.empty:
-            qc_layout = html.Div([
+            qc_layout = dbc.Col([
+                dmc.Text("Select sample:", className='text-primary my-2', id='sample_select_text'),
                 dcc.Dropdown(
                     id='sample-dropdown-qc',
                     options=[{'label': name, 'value': name} for name in self.unique_sample_ids],
                     value=self.unique_sample_ids[0] if self.unique_sample_ids else None  # default to the first sample
                 ),
                 # Container for the two smaller plots
-                html.Div([
+                dbc.Row([
 
                     dcc.Graph(id='mean_read_length-graph', style={'width': f"{100/num_plots}%", 'display': 'inline-block'}),
                     dcc.Graph(id='mean_quality_score-graph', style={'width': f"{100/num_plots}%", 'display': 'inline-block'}),
@@ -47,13 +50,13 @@ class QC:
                     dcc.Graph(id='mean-gc-indicator-plot', style={'width': f"{100/num_plots}%", 'display': 'inline-block'}),
 
 
-                ], style={'display': 'flex', 'justifyContent': 'center'}),
+                ]),
 
                 dcc.Graph(id='mean-quality-per-base-plot'),
                 dcc.Graph(id='read-length-distribution-plot'),
                 dcc.Graph(id='gc-content-distribution-plot')
 
-                # Additional plots as needed...
+
             ])
 
         else:

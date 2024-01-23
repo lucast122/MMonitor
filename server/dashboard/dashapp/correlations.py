@@ -1,21 +1,28 @@
-from typing import Tuple, Any, List, Iterable, Dict, Union
-from django_plotly_dash import DjangoDash
+import json
+from json import loads
+from typing import Any, List, Union
+
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-from dash_table import DataTable
-import pandas as pd
-from users.models import NanoporeRecord, Metadata
-from json import loads, dumps
 import dash_mantine_components as dmc
+import pandas as pd
+from dash_iconify import DashIconify
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import plotly.express as px
+from scipy.cluster import hierarchy
+from scipy.spatial import distance
 
+from dash_table import DataTable
+from django_plotly_dash import DjangoDash
 
-def _explode_metadata(df):
-    return pd.concat([df, df['data'].apply(_parse_dict)], axis=1).drop(columns='data')
-
-
-def _parse_dict(x):
-    return pd.Series(loads(x))
+from users.models import NanoporeRecord, Metadata
 
 
 class Correlations:
@@ -28,17 +35,10 @@ class Correlations:
              - bootstrapping is slow
     """
 
-    def get_all_meta(self):
-        meta = Metadata.objects.filter(user_id=self.user_id)
-        if not meta.exists():
-            return pd.DataFrame()  # Return an empty DataFrame if no records are found
-        meta_df = pd.DataFrame.from_records(meta.values())
-        return meta_df
-
-
     def __init__(self, user_id):
         self.user_id = user_id
         self.app = DjangoDash('correlations', add_bootstrap_links=True)
+        self.correlation_matrix = None
 
         def get_data():
             records = NanoporeRecord.objects.filter(user_id=self.user_id)
@@ -53,6 +53,9 @@ class Correlations:
             return df
 
         self.nanopore_df = get_data()
+        self.meta_df = self.get_all_meta()
+        self.correlation_scores = self.compute_correlations_for_taxonomies(self.nanopore_df, self.meta_df)
+        # print(self.correlation_scores)
 
         self._methods = [
             'Pearson',
@@ -65,9 +68,12 @@ class Correlations:
             'Fisher Z Transform',
         ]
         self._table_df = None
+
         self._init_layout()
 
     def _init_layout(self) -> None:
+
+        corr_heatmap_dend = dcc.Graph(id='heatmap-dendrogram')
 
         notification_placeholder = html.Div(id='notification-output')
 
@@ -79,6 +85,24 @@ class Correlations:
         title = dmc.Center(dmc.Title("Upload a csv with metadata to perform correlation analysis for your metagenomes",
                                      className='text-primary my-2',
                                      style={'font-weight': 'bold'}))
+        download_template_button = dmc.Center(dmc.Group([dmc.Space(h=10),
+                                                         dmc.Button('Download Metadata CSV Template',
+                                                                    id='download-csv-button',
+                                                                    leftIcon=DashIconify(
+                                                                        icon="foundation:page-export-csv")),
+                                                         ]))
+
+        download_correlations_button = dmc.Center(dmc.Group([dmc.Space(h=10),
+                                                             dmc.Button('Download Taxonomy-Metadata correlations',
+                                                                        id='btn-download-corr',
+                                                                        leftIcon=DashIconify(
+                                                                            icon="foundation:page-export-csv")),
+                                                             ]))
+
+        download_template_component = dcc.Download(id='download-metadata-csv')
+
+        download_correlations_component = dcc.Download(id="download-corr-csv")
+
         upload_component = dcc.Upload(
             id='upload-data',
             children=html.Div([
@@ -100,7 +124,7 @@ class Correlations:
         )
 
         # graph dropdown menus in a flex box
-        header = dmc.Header(dmc.Text('Correlations of abundances and metadata'), height=100)
+        header_corr = dmc.Header(dmc.Text('Correlations of abundances and metadata'), height=100)
         taxonomy_dd = dcc.Dropdown(
             id='taxonomy-dd',
             options=[{'label': t, 'value': t} for t in self._taxonomies],
@@ -123,7 +147,7 @@ class Correlations:
             clearable=False,
         )
         dropdowns = html.Div(
-            [taxonomy_dd, methods_dd, tests_dd],
+            [dmc.Space(h=20), taxonomy_dd, methods_dd, tests_dd],
             style={'display': 'flex', 'justify-content': 'space-between'}
         )
 
@@ -253,12 +277,12 @@ class Correlations:
         # data table and its download element
         correlations_tb = DataTable(id='table-correlations', data=[], columns=[])
         download_tb = dcc.Download(id='download-tb')
-
+        download_buttons = dmc.Center(dmc.Group([download_template_button, download_correlations_button]))
         container = html.Div(
-            [title, upload_component, notification_placeholder, dropdowns, graph_container, header_tb, dropdowns_tb,
-             selections_tb, correlations_tb, download_tb]
+            [title, upload_component, download_correlations_component, download_buttons, notification_placeholder,
+             dropdowns, corr_heatmap_dend, header_tb, dropdowns_tb,
+             selections_tb, correlations_tb, download_tb, download_template_component])
 
-        )
         self.app.layout = dmc.MantineProvider(
             dmc.NotificationsProvider([
                 container
@@ -422,6 +446,61 @@ class Correlations:
     #         if n_clicks is None:
     #             raise PreventUpdate
     #         return dict(content=self._table_df.to_csv(index=False), filename='correlations.csv')
+
+    def compute_correlations_for_taxonomies(self, taxonomy_df, metadata_df, taxonomic_level='taxonomy'):
+        taxonomy_df = taxonomy_df.drop_duplicates(subset=['sample_id', 'taxonomy'])
+
+        if metadata_df.empty or taxonomy_df.empty:
+            print("No metadata or taxonomy data found")
+            return pd.DataFrame()
+
+        # Merging the DataFrames
+        merged_df = pd.merge(taxonomy_df, metadata_df, on=['sample_id', 'user_id'], how='right')
+
+        # Extract metadata keys from 'data' column
+        first_valid_dict = next((item for item in merged_df['data'] if isinstance(item, dict)), None)
+        if first_valid_dict is None:
+            print("No valid metadata found in 'data' column")
+            return pd.DataFrame()
+        metadata_keys = list(first_valid_dict.keys())
+
+        # Extract metadata keys into separate columns
+        for key in metadata_keys:
+            merged_df[key] = merged_df['data'].apply(lambda x: x.get(key) if isinstance(x, dict) else None)
+
+        # Initialize a list to collect correlation data
+        correlation_data = []
+
+        # Calculate correlation for each taxonomy
+        unique_taxonomies = merged_df[taxonomic_level].unique()
+        for taxonomy in unique_taxonomies:
+            # Select abundance for the current taxonomy, fill NaN with 0
+            taxonomy_abundance = merged_df[merged_df[taxonomic_level] == taxonomy]['abundance'].fillna(0)
+            row = {'taxonomy': taxonomy}
+            for meta_key in metadata_keys:
+                if pd.api.types.is_numeric_dtype(merged_df[meta_key]):
+                    # Check if there is variance in the data
+                    if taxonomy_abundance.std() != 0:
+                        row[meta_key] = taxonomy_abundance.corr(merged_df[meta_key])
+                    else:
+                        row[meta_key] = 0  # Assign 0 for zero variance
+                else:
+                    row[meta_key] = np.nan
+            correlation_data.append(row)
+
+        # Create a DataFrame from the collected data
+        correlation_matrix = pd.DataFrame(correlation_data)
+        self.correlation_matrix = correlation_matrix
+
+        return correlation_matrix
+
+    def get_all_meta(self):
+        meta = Metadata.objects.filter(user_id=self.user_id)
+        if not meta.exists():
+            print(f"Found no metadata for user id {self.user_id}")
+            return pd.DataFrame()  # Return an empty DataFrame if no records are found
+        meta_df = pd.DataFrame.from_records(meta.values())
+        return meta_df
 
 
 def _force_list(x: Union[Any, List]) -> List[Any]:

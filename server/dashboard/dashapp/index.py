@@ -4,6 +4,20 @@ import json
 import re
 import sqlite3
 import tempfile
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import plotly.figure_factory
+from dash.dependencies import Input, Output
+from scipy.cluster import hierarchy
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import plotly.express as px
+from scipy.cluster import hierarchy
+from scipy.spatial import distance
+
 from io import StringIO
 from json import loads
 from dash_iconify import DashIconify
@@ -44,9 +58,6 @@ from . import taxonomy, correlations, qc, diversity, horizon
 from .calculations.stats import scipy_correlation
 from dash_extensions import Lottie  # Assuming you're using Lottie for animations
 from dash_extensions.enrich import Dash, Output, Input, State, Trigger
-
-
-
 
 
 # def _init_mysql(user_id):
@@ -98,8 +109,8 @@ class Index:
         print(user_id)
         self.app = DjangoDash('Index', add_bootstrap_links=True)
 
-        self.colors = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
-        self.colors = self.colors + px.colors.qualitative.Plotly + px.colors.qualitative.Pastel
+        # self.colors = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
+        # self.colors = self.colors + px.colors.qualitative.Plotly + px.colors.qualitative.Pastel
 
         # self.colors = colors
 
@@ -128,8 +139,27 @@ class Index:
         self._table_df = None
         records = NanoporeRecord.objects.filter(user_id=user_id)
         self.df = pd.DataFrame.from_records(records.values())
-        self.df.replace("Not available", np.nan, inplace=True)
+        self.df = self.df.drop_duplicates(subset=['sample_id', 'taxonomy'])
+
+        self.df.loc[self.df['taxonomy'] == 'Not available', 'taxonomy'] = np.nan
+        print(self.df.head())
+        self.df.loc[self.df['taxonomy'] == 'Not Available', 'taxonomy'] = np.nan
+
         self.df.dropna(inplace=True)
+        print(self.df.head())
+
+        self.df.drop_duplicates(
+            subset=['sample_id', 'abundance', 'taxonomy', 'project_id', 'subproject', 'user_id', 'date'],
+            inplace=True)
+        # sorted_sample_ids = natsorted(self.df['sample_id'].unique())
+        # self.sample_ids = sorted_sample_ids
+        self.df_sorted = self.df.sort_values(by=['project_id','subproject','sample_id'])
+        print("df after sorting initially")
+        print(self.df_sorted.head(50))
+        print("df after sorting initially")
+
+        # self.df_sorted = self.df.set_index('sample_id').loc[sorted_sample_ids].reset_index()
+
 
         self.meta_df = self.correlations_app.get_all_meta()
         # self.df['sample_id'] = self.df['sample_id'].astype(str)
@@ -189,6 +219,9 @@ class Index:
             # },
         }
 
+        # initialize colors from taxonomy_app
+        self.colors = self.taxonomy_app.colors
+
         # Initialize Index layout
         self._init_layout()
         self.app.layout = self.layout
@@ -216,40 +249,38 @@ class Index:
         the currently selected app's page content.
         """
 
-
-
         #
-    #     location = dmc.Container(
-    #     [
-    #         dmc.Space(h=50),
-    #         dmc.Title("My Dash App", align="center"),
-    #         dmc.Space(h=20),
-    #         dmc.Group(
-    #             position="center",
-    #             children=[
-    #                 html.A(
-    #                     dmc.Button("Diversity Dashboard", variant="outline"),
-    #                     href=f"values['name']",
-    #
-    #
-    #
-    #
-    #                 ),
-    #                 # Wrap more buttons in html.A if you have other dashboard links
-    #                 # html.A(
-    #                 #     dmc.Button("Another Dashboard", variant="outline"),
-    #                 #     href="/another"
-    #                 # ),
-    #             ]
-    #         ),
-    #         dmc.Space(h=50),
-    #         # Include other components as needed
-    #     ],
-    #     style={'textAlign': 'center'}
-    #
-    #
-    # )
-    #
+        #     location = dmc.Container(
+        #     [
+        #         dmc.Space(h=50),
+        #         dmc.Title("My Dash App", align="center"),
+        #         dmc.Space(h=20),
+        #         dmc.Group(
+        #             position="center",
+        #             children=[
+        #                 html.A(
+        #                     dmc.Button("Diversity Dashboard", variant="outline"),
+        #                     href=f"values['name']",
+        #
+        #
+        #
+        #
+        #                 ),
+        #                 # Wrap more buttons in html.A if you have other dashboard links
+        #                 # html.A(
+        #                 #     dmc.Button("Another Dashboard", variant="outline"),
+        #                 #     href="/another"
+        #                 # ),
+        #             ]
+        #         ),
+        #         dmc.Space(h=50),
+        #         # Include other components as needed
+        #     ],
+        #     style={'textAlign': 'center'}
+        #
+        #
+        # )
+        #
         location = dcc.Location(id='url', refresh=True)
         navigation = html.Div([
             dcc.Link(values['name'], href=url, style={'padding': '15px 25px', 'font-size': "16px", 'color': 'white'})
@@ -282,14 +313,16 @@ class Index:
         return heatmap
 
     def plot_stacked_bar(self, df, use_date_value, taxonomic_rank):
+        print(f"df in plot_stacked bar: {df.head(50)}")
         # Group and sum the data based on the x-axis and the taxonomic rank
-
+        # print(taxonomic_rank)
         x_axis = "date" if use_date_value else "sample_id"
-        grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
+        category_orders = {x_axis: sorted(df[x_axis].unique())} if not use_date_value else {}
 
+        # print(self.taxonomy_app.combined_color_dict)
         fig = px.bar(df, x=x_axis, y="abundance", color=taxonomic_rank, barmode="stack",
-                     hover_data=df.columns)
-
+                     hover_data=df.columns, color_discrete_map=self.taxonomy_app.combined_color_dict,
+                     category_orders=category_orders)
 
         fig.update_layout(
             legend=dict(
@@ -322,7 +355,6 @@ class Index:
 
             ),
 
-
             xaxis_title="Sample IDs",
 
             yaxis_title="Taxonomy",
@@ -332,7 +364,6 @@ class Index:
         # make x-axis font size 12 and y-axis 10
         fig.update_xaxes(tickfont=dict(size=14))
         fig.update_yaxes(tickfont=dict(size=8))
-
 
         return fig
 
@@ -361,28 +392,27 @@ class Index:
         grouped_df = df.groupby([x_axis, taxonomic_rank])['abundance'].sum().reset_index()
 
         # Create the area plot with additional hover data
-        fig = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank,
-                      hover_data=df.columns)  # Include all columns as hover data
+        fig = px.area(grouped_df, x=x_axis, y="abundance", color=taxonomic_rank,color_discrete_map=self.taxonomy_app.combined_color_dict)
+                        # Include all columns as hover data
 
         # Customize hover template if necessary
-        fig.update_traces(
-            hovertemplate="<br>".join([
-                                          f"{x_axis}: %{{x}}",
-                                          f"Abundance: %{{y}}",
-                                      ] + [f"{col}: %{{customdata[{i}]}}" for i, col in enumerate(df.columns) if
-                                           col not in [x_axis, 'abundance']])
-        )
+        # fig.update_traces(
+        #     hovertemplate="<br>".join([
+        #                                   f"{x_axis}: %{{x}}",
+        #                                   f"Abundance: %{{y}}",
+        #                               ] + [f"{col}: %{{customdata[{i}]}}" for i, col in enumerate(df.columns) if
+        #                                    col not in [x_axis, 'abundance']])
+        # )
 
         # Add lines for project_id and subproject_id changes as before
 
         return fig
 
-
     def plot_scatter_3d(self, df, taxonomic_rank):
-            # Plotting code for scatter 3D goes here...
-            fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank)
-            # fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='abundance',hover_data=self.hover_data)
-            return fig1
+        # Plotting code for scatter 3D goes here...
+        fig1 = px.scatter_3d(df, x='taxonomy', y='abundance', z='sample_id', color=taxonomic_rank)
+        # fig2 = px.scatter_3d(df, x='abundance', y='taxonomy', z='sample_id', color='abundance',hover_data=self.hover_data)
+        return fig1
 
     def plot_pie(self, df, sample_value_piechart, taxonomic_rank):
         filtered_df = df[df["sample_id"] == sample_value_piechart]
@@ -430,8 +460,6 @@ class Index:
             else:
                 return "Please select an app from the menu above."
                 #
-
-
 
         # UPLOAD SQLITE CALLBACK
         @self.app.callback(
@@ -504,7 +532,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             details = f"Details for {taxon}"  # Replace with actual data retrieval logic
             return True, details
 
-
         from dash_bootstrap_templates import ThemeChangerAIO
         @self.app.callback(
             Output("sample_select_value", "value"),
@@ -556,24 +583,13 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # Simplified initialization
             fig1 = {'data': []}
             piechart_style = {'display': 'none'}
-            self.df.needs_processing = True
+            # self.df.needs_processing = True
             # Check if sorting and duplicate removal is necessary
-            if self.df.needs_processing:  # Replace with appropriate condition
-                self.df.drop_duplicates(
-                    subset=['sample_id', 'abundance', 'taxonomy', 'project_id', 'subproject', 'user_id', 'date'],
-                    inplace=True)
-                sorted_sample_ids = natsorted(self.df['sample_id'].unique(), key=self.split_alphanumeric)
-                self.sample_ids = sorted_sample_ids
-                self.df_sorted = self.df.set_index('sample_id').loc[sorted_sample_ids].reset_index()
-                self.df.needs_processing = False  # Flag to prevent reprocessing
-
-            # self.df_sorted = self.df_sorted.sort_values(
-            #     by=['project_id', 'subproject', 'sample_id', 'taxonomy', 'abundance', 'user_id', 'date'])
 
             # Efficient grouping and filtering
             self.df_selected = self.df_sorted[self.df_sorted['sample_id'].astype(str).isin(sample_select_value)]
-            self.df_selected = self.df_selected.groupby('sample_id').head(slider_value).reset_index(drop=True)
-
+            # self.df_selected = self.df_selected.groupby('sample_id').head(slider_value).reset_index(drop=True)
+            # self.df_selected = self.df_selected.sort_values(by=['sample_id','project_id'], ascending=[True, True])
 
             # Mapping of plot types to functions
             plot_functions = {
@@ -589,6 +605,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             }
 
             # Select and execute the plotting function
+            print(f"df selected before plotting: {self.df_selected.head(50)}")
             if value in plot_functions:
                 fig1 = plot_functions[value](self.df_selected, use_date_value, taxonomic_rank) if value != 'pie' \
                     else plot_functions[value](self.df_selected, sample_value_piechart, taxonomic_rank)[0]
@@ -597,36 +614,30 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             #  give distinct color based on self.colors
 
-            if value != 'heatmap':
-                for i in range(len(fig1['data'])):
-                    fig1['data'][i]['marker']['color'] = self.colors[i % len(self.colors)]
-            #     make plot bigger if not heatmap
-                fig1.update_layout(width=1800, height=600)
-
-            # also change color for px.area plot
-            if value == 'area':
-                for i in range(len(fig1['data'])):
-                    fig1['data'][i]['fillcolor'] = self.colors[i % len(self.colors)]
-
-
-            if value == 'pie':
-                fig1['data'][0]['marker']['colors'] = self.colors
-
-            # change color for scatter plot
-            if value == 'scatter':
-                fig1['data'][0]['marker']['colorscale'] = self.colors
-            # remove grey background from plot
+            # if value != 'heatmap':
+            #     for i in range(len(fig1['data'])):
+            #         fig1['data'][i]['marker']['color'] = self.colors[i % len(self.colors)]
+            #     #     make plot bigger if not heatmap
+            #
+            #
+            # # also change color for px.area plot
+            # if value == 'area':
+            #     for i in range(len(fig1['data'])):
+            #         fig1['data'][i]['fillcolor'] = self.colors[i % len(self.colors)]
+            #
+            # if value == 'pie':
+            #     fig1['data'][0]['marker']['colors'] = self.colors
+            #
+            # # change color for scatter plot
+            # if value == 'scatter':
+            #     fig1['data'][0]['marker']['colorscale'] = self.colors
+            # # remove grey background from plot
+            fig1.update_layout(width=1600, height=800)
             fig1['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
 
-
-
-
             # sort legend based on values from high to low
-            if value != 'heatmap':
-                fig1['data'] = sorted(fig1['data'], key=lambda x: sum(x['y']), reverse=True)
-
-
-
+            # if value != 'heatmap':
+            #     fig1['data'] = sorted(fig1['data'], key=lambda x: sum(x['y']), reverse=True)
 
             return fig1, piechart_style
 
@@ -643,100 +654,48 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         @self.app.callback(
             Output("download-csv", "data"),
-            [Input("btn-download", "n_clicks")]
+            [Input("btn-download-csv-taxonomy", "n_clicks")]
         )
         def download_csv(n_clicks):
-            if n_clicks is not None:
-                # Create a sample DataFrame for demonstration
+            if n_clicks is None:  # This check prevents the callback from running on app load
+                raise dash.exceptions.PreventUpdate
 
-                # Convert DataFrame to CSV string
-                csv_string = self.df_sorted.to_csv(index=False)
-
-                # Create a BytesIO object to hold the CSV data
-                csv_bytes = StringIO()
-                csv_bytes.write(csv_string)
-
-                # Seek to the beginning of the BytesIO stream
-                csv_bytes.seek(0)
-
-                # Base64 encode the CSV data
-                csv_base64 = base64.b64encode(csv_bytes.read().encode()).decode()
-
-                # Construct the download link
-                csv_href = f"data:text/csv;base64,{csv_base64}"
-
-                # Specify the filename for the download
-                filename = "data.csv"
-
-                # Return the download link and filename
-
-                return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
+            # Your existing logic for CSV download goes here
+            csv_string = self.df_sorted.to_csv(index=False)
+            csv_bytes = StringIO()
+            csv_bytes.write(csv_string)
+            csv_bytes.seek(0)
+            filename = f"mmonitor_data_user{self.user_id}.csv"
+            return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
 
         @self.app.callback(
             Output("download-counts", "data"),
-            [Input("btn-download-counts", "n_clicks")]
+            [Input("btn-download-counts-taxonomy", "n_clicks")]
         )
         def download_counts(n_clicks):
-            if n_clicks is not None:
-                # Create a sample DataFrame for demonstration
+            if n_clicks is None:
+                raise dash.exceptions.PreventUpdate
 
-                # Convert DataFrame to CSV string
-                counts_df = self.taxonomy_app.calculate_normalized_counts()
-                csv_string = counts_df.to_csv(index=False)
-                # Create a BytesIO object to hold the CSV data
-                csv_bytes = StringIO()
-                csv_bytes.write(csv_string)
-                # Seek to the beginning of the BytesIO stream
-                csv_bytes.seek(0)
-                # Base64 encode the CSV data
-                csv_base64 = base64.b64encode(csv_bytes.read().encode()).decode()
+            # Convert DataFrame to CSV string
+            counts_df = self.taxonomy_app.calculate_normalized_counts()
+            csv_string = counts_df.to_csv(index=False)
+            # Create a BytesIO object to hold the CSV data
+            csv_bytes = StringIO()
+            csv_bytes.write(csv_string)
+            # Seek to the beginning of the BytesIO stream
+            csv_bytes.seek(0)
+            # Base64 encode the CSV data
+            csv_base64 = base64.b64encode(csv_bytes.read().encode()).decode()
 
-                # Construct the download link
-                csv_href = f"data:text/csv;base64,{csv_base64}"
+            # Construct the download link
+            csv_href = f"data:text/csv;base64,{csv_base64}"
 
-                # Specify the filename for the download
-                filename = "counts.csv"
+            # Specify the filename for the download
+            filename = f"mmonitor_counts_user{self.user_id}.csv"
 
-                # Return the download link and filename
-                return dcc.send_data_frame(counts_df.to_csv, filename=filename)
+            # Return the download link and filename
+            return dcc.send_data_frame(counts_df.to_csv, filename=filename)
 
-        # @self.app.callback(
-
-        # Output('graph3', 'figure'),
-        # Input('sample_select_value', 'value')
-        # )
-        # def update_diversity_graph(sample_select_value):
-        #     # A list of all sample_ids to iterate over
-        #     sample_ids = self.df_sorted['sample_id'].unique()
-
-        #     # Values to hold calculated results
-        #     richness_values = []
-        #     evenness_values = []
-        #     shannon_values = []
-
-        #     for sample_id in self.taxonomy_app.unique_sample_ids:
-        #         df_sample = self.df_sorted.loc[self.df_sorted['sample_id'] == sample_id]
-
-        #         # calculating diversity measures
-        #         richness_values.append(richness(df_sample))
-        #         evenness_values.append(evenness(df_sample))
-        #         shannon_values.append(shannon_diversity(df_sample))
-
-        #     # creating figure
-        #     fig = go.Figure()
-
-        #     fig.add_trace(go.Scatter(x=sample_ids, y=richness_values, mode='lines', name='Richness'))
-        #     fig.add_trace(go.Scatter(x=sample_ids, y=evenness_values, mode='lines', name='Evenness'))
-        #     fig.add_trace(go.Scatter(x=sample_ids, y=shannon_values, mode='lines', name='Shannon Diversity'))
-
-        #     fig.update_layout(
-        #         title="Diversity Measures Across Samples",
-        #         xaxis_title="Sample IDs",
-        #         yaxis_title="Diversity Measure Value",
-        #         legend_title="Diversity Measure",
-        #     )
-
-        #     return fig
 
         """
 
@@ -787,7 +746,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 diversity_df_without_categories = self.diversity_app.shannon_diversity.reset_index()
             diversity_df.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
             diversity_df_without_categories.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
-            print(diversity_df_without_categories)
+            # print(diversity_df_without_categories)
             diversity_df_selected = diversity_df_without_categories[
                 diversity_df_without_categories['sample_id'].astype(str).isin(sample_select_value)]
             diversity_df['Project'] = diversity_df['sample_id'].map(self.diversity_app.sample_to_project_dict)
@@ -802,7 +761,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig2['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
 
             return fig, fig2
-
 
             # BETA DIVERSITY
 
@@ -820,7 +778,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         )
         def generate_pcoa_figure(selected_samples, toggle_3d, project_clicks, subproject_clicks, kmeans_clicks,
                                  sample_date_clicks, k_value):
-
 
             # Default n_clicks to 0 if they are None
             project_clicks = project_clicks or 0
@@ -859,7 +816,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                                                k in selected_samples}
             selected_sample_to_subproject_dict = {k: v for k, v in selected_sample_to_subproject_dict.items() if
                                                   k in selected_samples}
-
 
             if (kmeans_clicks > project_clicks and kmeans_clicks > subproject_clicks and kmeans_clicks >
                     sample_date_clicks):
@@ -903,7 +859,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig.update_layout(margin=dict(l=0, r=0, b=0, t=100))
             fig.update_layout(width=1500, height=850)
             fig['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
-
 
             return fig
 
@@ -1076,38 +1031,150 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         """
 
+        # @self.app.callback(
+        #     Output('heatmap-dendrogram', 'figure'),
+        #     Input('heatmap-dendrogram', 'relayoutData'),
+        #     Input("btn-download-corr", "n_clicks")
+        # )
+        # def update_heatmap_dendrogram(relayoutData):
+        #     # Check if relayoutData is None
+        #     if relayoutData is None:
+        #         return None
+        #     # Check if relayoutData contains zoom or selection information
+        #     if 'xaxis.range' in relayoutData:
+        #         xaxis_range = relayoutData['xaxis.range']
+        #         yaxis_range = relayoutData['yaxis.range']
+        #
+        #         # Use xaxis_range and yaxis_range to update the displayed portion of the heatmap
+        #         # You can filter or zoom in on specific data based on the user's interaction
+        #
+        #     correlation_matrix = self.correlations_app.correlation_matrix
+        #
+        #     # correlation_matrix = correlation_matrix.apply(pd.to_numeric, errors='coerce')
+        #     correlation_matrix = correlation_matrix.fillna(0)
+        #     print(correlation_matrix)
+
+            # Compute hierarchical clustering
+            # distances = 1 - correlation_matrix.abs()
+            # row_linkage = hierarchy.linkage(1 - correlation_matrix.abs(), method='average', optimal_ordering=True)
+            # row_dendrogram = hierarchy.dendrogram(row_linkage, no_plot=True)
+            # row_order = row_dendrogram['leaves']
+
+            # print("row_order:", row_order)  # Print row_order for debugging
+
+            # Check the dimensions of correlation_matrix
+            # print("correlation_matrix shape:", correlation_matrix.shape)
+
+            # Create a new correlation matrix with reordered rows and columns
+            # heatmap_data = correlation_matrix.iloc[row_order, row_order]
+
+            # Create the heatmap using seaborn and plotly
+            # sns.set(font_scale=0.7)  # Adjust font size if needed
+            # fig = px.imshow(correlation_matrix)
+            # fig.update_layout(xaxis_showticklabels=False, yaxis_showticklabels=False)
+            # return fig
+
+        @self.app.callback(
+            Output("download-corr-csv", "data"),
+            [Input("btn-download-corr", "n_clicks")]
+            , prevent_initial_call=True)
+        def download_correlations_csv(n_clicks):
+            if n_clicks is None:
+                return 0, None
+
+            # Assuming correlation_matrix is your DataFrame with correlations
+
+            correlation_matrix = self.correlations_app.compute_correlations_for_taxonomies(self.df,
+                                                                                           self.correlations_app.get_all_meta())
+
+            # Generate CSV content as a string
+            csv_string = correlation_matrix.to_csv(index=False, encoding="utf-8")
+
+            # Create a BytesIO object to hold the CSV data
+            csv_bytes = StringIO()
+            csv_bytes.write(csv_string)
+
+            # Seek to the beginning of the BytesIO stream
+            csv_bytes.seek(0)
+
+            # Base64 encode the CSV data
+            csv_base64 = base64.b64encode(csv_bytes.read().encode()).decode()
+
+            # Construct the download link
+            csv_href = f"data:text/csv;base64,{csv_base64}"
+
+            # Specify the filename for the download
+            filename = "correlations.csv"
+
+            # Return the download link and filename
+
+            return dcc.send_data_frame(correlation_matrix.to_csv, filename=filename)
+
+        @self.app.callback(
+            Output('download-metadata-csv', 'data'),
+            [Input('download-csv-button', 'n_clicks')],
+            prevent_initial_call=True
+        )
+        def generate_csv(n_clicks):
+            if n_clicks:
+                # Create the CSV content in-memory using StringIO
+                buffer = io.StringIO()
+                create_csv_template(self.df, buffer)
+                buffer.seek(0)
+                csv_string = buffer.getvalue()
+
+                # Use send_string to trigger the download
+                return dcc.send_string(csv_string, "metadata_template.csv")
+
+        # Function to create CSV template
+        def create_csv_template(dataframe, buffer):
+            # Extracting unique sample_ids
+            unique_samples = dataframe['sample_id'].unique()
+
+            # Creating a new DataFrame with the required columns
+            template_df = pd.DataFrame(unique_samples, columns=['sample_id'])
+            template_df['meta_1'] = ''
+            template_df['meta_2'] = ''
+            template_df['meta_3'] = ''
+
+            # Writing the DataFrame to a buffer instead of a file
+            template_df.to_csv(buffer, index=True)
+
         def create_dmc_notification(message, notification_type='success'):
             return dmc.Notification(id='notifcation-output',
-                message=message,
-                action='show',
-                color='green' if notification_type == 'success' else 'red',
+                                    message=message,
+                                    action='show',
+                                    color='green' if notification_type == 'success' else 'red',
 
-                icon=DashIconify(icon="mdi:bell-check") if notification_type =='success' else DashIconify(icon="mdi:bell-cancel")
+                                    icon=DashIconify(
+                                        icon="mdi:bell-check") if notification_type == 'success' else DashIconify(
+                                        icon="mdi:bell-cancel")
 
-            )
+                                    )
 
         # METADATA UPLOAD CALLBACK
 
         def process_dataframe(df):
             row_count = 0
             for _, row in df.iterrows():
-                print(row)
+                # print(row)
                 sample_id = row['sample_id']
                 metadata_fields = {key: value for key, value in row.items() if key not in ['sample_id']}
 
                 # Create new Metadata entry
-                metadata_entry = Metadata().create_metadata(sample_id=sample_id,data=metadata_fields,
+                metadata_entry = Metadata().create_metadata(sample_id=sample_id, data=metadata_fields,
                                                             user_id=self.user_id)
-                metadata_entry.create_metadata(metadata_entry,sample_id,self.user_id)
-                # metadata_entry.save(update_fields=)
-                print(metadata_entry)
+                metadata_entry.create_metadata(metadata_entry, sample_id, self.user_id)
+                metadata_entry.save()
+                # print(metadata_entry)
                 row_count += 1
             return row_count
 
         @self.app.callback(
             Output('notification-output', 'children'),
             Input('upload-data', 'contents'),
-            State('upload-data', 'filename'))
+            State('upload-data', 'filename')
+        )
         def upload_file(list_of_contents, list_of_names):
             if list_of_contents is not None:
                 total_rows_processed = 0
@@ -1116,11 +1183,15 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                         # Split the content into metadata and base64 encoded data
                         content_type, content_string = content.split(',')
 
-                        # Decode the base64 string
-                        decoded = base64.b64decode(content_string)
+                        # Add the necessary padding to the base64 string
+                        padding = '=' * (-len(content_string) % 4)
+                        content_string_padded = content_string + padding
 
-                        # Use Pandas to read the CSV data
-                        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+                        # Decode the base64 string
+                        decoded = base64.b64decode(content_string_padded)
+
+                        # Use Pandas to read the CSV data with semicolon as separator
+                        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=';', dtype={'sample_id': str})
 
                         # Process the DataFrame
                         total_rows_processed += process_dataframe(df)
@@ -1132,19 +1203,16 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                     return create_dmc_notification(f'Error processing file: {str(e)}', 'error')
             return None
 
-
-        
-
             # callback to update correlation graphs
-        # @self.app.callback(
-        #     Output('graph-score', 'figure'),
-        #     Output('graph-test', 'figure'),
-        #     Input('taxonomy-dd', 'value'),
-        #     Input('methods-dd', 'value'),
-        #     Input('tests-dd', 'value')
-        # )
-        # def _update_graphs(tax: str, method: str, test: str) -> Tuple[Figure, Figure]:
-        #     species = [x for x in tax] if tax else []
+            # @self.app.callback(
+            #     Output('graph-score', 'figure'),
+            #     Output('graph-test', 'figure'),
+            #     Input('taxonomy-dd', 'value'),
+            #     Input('methods-dd', 'value'),
+            #     Input('tests-dd', 'value')
+            # )
+            # def _update_graphs(tax: str, method: str, test: str) -> Tuple[Figure, Figure]:
+            #     species = [x for x in tax] if tax else []
 
             # if not species:  # add this condition to handle empty list
             #     return None, None, None, None, None, None
@@ -1168,7 +1236,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # species_str = replace_brackets(species_str)
             # print(f"species string after")
             # print(species_str)
-            df = self.get_abundance_meta_by_taxonomy(species_str)
+            # df = self.get_abundance_meta_by_taxonomy(species_str)
             # metadata_columns = [col for col in df.columns if col not in ['sample_id', 'abundance', 'meta_id', 'project_id']]
 
             # for each metadata calculate the correlation and probability
@@ -1186,7 +1254,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             # y_axis_tuple = None
             # try:
-            y_axis_tuple = None
+            # y_axis_tuple = None
 
             # y_axis_tuple = [scipy_correlation(df['abundance'], df[meta], test, method) for meta in
             #                 self.metadata_columns]
@@ -1209,26 +1277,26 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             # return fig_score, fig_test
 
-        # @self.app.callback(
-        #     Output('table-correlations', 'columns'),
-        #     Output('table-correlations', 'data'),
-        #     Output('taxonomy-dd-tb', 'value'),
-        #     Input('apply-btn-tb', 'n_clicks'),
-        #     Input('select-all-btn-tb', 'n_clicks'),
-        #     Input('clear-selection-btn-tb', 'n_clicks'),
-        #     State('taxonomy-dd-tb', 'value'),
-        #     State('methods-dd-tb', 'value'),
-        #     State('tests-dd-tb', 'value'),
-        #     State('table-correlations', 'columns'),
-        #     State('table-correlations', 'data'),
-        # )
-        # def _update_table(x: int, y: int, z: int,
-        #                   taxonomies: Union[str, List[str]],
-        #                   methods: Union[str, List[str]],
-        #                   tests: Union[str, List[str]],
-        #                   tb_columns: Any,
-        #                   tb_data: Any,
-        #                   ) -> Tuple[Iterable, Dict, List]:
+            # @self.app.callback(
+            #     Output('table-correlations', 'columns'),
+            #     Output('table-correlations', 'data'),
+            #     Output('taxonomy-dd-tb', 'value'),
+            #     Input('apply-btn-tb', 'n_clicks'),
+            #     Input('select-all-btn-tb', 'n_clicks'),
+            #     Input('clear-selection-btn-tb', 'n_clicks'),
+            #     State('taxonomy-dd-tb', 'value'),
+            #     State('methods-dd-tb', 'value'),
+            #     State('tests-dd-tb', 'value'),
+            #     State('table-correlations', 'columns'),
+            #     State('table-correlations', 'data'),
+            # )
+            # def _update_table(x: int, y: int, z: int,
+            #                   taxonomies: Union[str, List[str]],
+            #                   methods: Union[str, List[str]],
+            #                   tests: Union[str, List[str]],
+            #                   tb_columns: Any,
+            #                   tb_data: Any,
+            #                   ) -> Tuple[Iterable, Dict, List]:
             """
             Populate the data table with correlation scores and their probabilities
             according to the dropdown selections. This table contains data more suited
@@ -1291,88 +1359,88 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # for each selected taxonomy
             # for tax in taxonomies:
             #
-                # request corresponding abundances from database
-                # tax_df = self.get_abundance_by_taxonomy(tax)
-                # tax_df['sample_id'] = tax_df['sample_id'].astype(str)
-                # print(f"Number of records in tax_df for taxonomy {taxonomy}: {len(tax_df)}")
-                # if tax_df.empty:
-                    # print(f"tax_df is empty for taxonomy {taxonomy}")
-                    # continue
+            # request corresponding abundances from database
+            # tax_df = self.get_abundance_by_taxonomy(tax)
+            # tax_df['sample_id'] = tax_df['sample_id'].astype(str)
+            # print(f"Number of records in tax_df for taxonomy {taxonomy}: {len(tax_df)}")
+            # if tax_df.empty:
+            # print(f"tax_df is empty for taxonomy {taxonomy}")
+            # continue
 
-                # self.meta_df['sample_id'] = self.meta_df['sample_id'].astype(str)
-                # print("ASDF")
-                # print(tax_df['sample_id'].dtype)
-                # print(self.meta_df['sample_id'].dtype)
+            # self.meta_df['sample_id'] = self.meta_df['sample_id'].astype(str)
+            # print("ASDF")
+            # print(tax_df['sample_id'].dtype)
+            # print(self.meta_df['sample_id'].dtype)
 
-                # merged_df = tax_df.merge(self.meta_df, on='sample_id', how='outer', suffixes=('_t', '_m'))
+            # merged_df = tax_df.merge(self.meta_df, on='sample_id', how='outer', suffixes=('_t', '_m'))
 
-                # merged_df = merged_df.dropna(subset=['abundance'])
-                # if merged_df.empty:
-                #     print(f"merged_df is empty for taxonomy {tax}")
-                #     continue
+            # merged_df = merged_df.dropna(subset=['abundance'])
+            # if merged_df.empty:
+            #     print(f"merged_df is empty for taxonomy {tax}")
+            #     continue
 
-                # for each selected method
-                # for method in methods:
+            # for each selected method
+            # for method in methods:
 
-                    # prepare the row containing correlation scores per metadata
-                    # and the rows containing the corresponding probabilities
-                    # of the correlation score per metadata according to the selected tests
-                    # score_row = {'Taxonomy': tax, 'Method or Test': method}
-                    # test_rows = {t: {'Taxonomy': tax, 'Method or Test': ' '.join([method, t])} for t in tests}
+            # prepare the row containing correlation scores per metadata
+            # and the rows containing the corresponding probabilities
+            # of the correlation score per metadata according to the selected tests
+            # score_row = {'Taxonomy': tax, 'Method or Test': method}
+            # test_rows = {t: {'Taxonomy': tax, 'Method or Test': ' '.join([method, t])} for t in tests}
 
-                    # for each metadata available in the database
-                    # for meta in meta_cols:
-                    #     merged_df_meta = merged_df.dropna(subset=[meta])
-                    #     abundance_series = merged_df_meta['abundance']
-                    #
-                    #     if merged_df_meta.empty:
-                            # print(f"merged_df_meta is empty for metadata {meta}")
-                            # continue
-                        # all_zero = (abundance_series == 0).all().all()
-                        # if len(abundance_series) > 1 or all_zero:
-                        #     continue
+            # for each metadata available in the database
+            # for meta in meta_cols:
+            #     merged_df_meta = merged_df.dropna(subset=[meta])
+            #     abundance_series = merged_df_meta['abundance']
+            #
+            #     if merged_df_meta.empty:
+            # print(f"merged_df_meta is empty for metadata {meta}")
+            # continue
+            # all_zero = (abundance_series == 0).all().all()
+            # if len(abundance_series) > 1 or all_zero:
+            #     continue
 
-                        # if (abundance_series != 0).sum() <= 2:
-                        #     continue
+            # if (abundance_series != 0).sum() <= 2:
+            #     continue
 
-                        # calculate the correlation score and its probability
-                        # according to the selected tests
-                        # print("blaa")
-                        # print(taxonomy)
-                        # print(meta)
-                        # print(merged_df['abundance'])
+            # calculate the correlation score and its probability
+            # according to the selected tests
+            # print("blaa")
+            # print(taxonomy)
+            # print(meta)
+            # print(merged_df['abundance'])
 
-                        # print(f"META: {meta}")
+            # print(f"META: {meta}")
 
-                        # score, test_scores = scipy_correlation(abundance_series, merged_df_meta[meta],
-                        #                                        tests, method)
+            # score, test_scores = scipy_correlation(abundance_series, merged_df_meta[meta],
+            #                                        tests, method)
 
-                        # heatmap_df.loc[f"{tax}_{method}", f"{method}_{meta}"] = score
+            # heatmap_df.loc[f"{tax}_{method}", f"{method}_{meta}"] = score
 
-                        # Create new row
-                        # Append the row to the DataFrame
-                        # Append the row to the DataFrame
+            # Create new row
+            # Append the row to the DataFrame
+            # Append the row to the DataFrame
 
-                        # print("Final Heatmap DF:\n", heatmap_df)
+            # print("Final Heatmap DF:\n", heatmap_df)
 
-                        # populate the row containing correlation scores per metadata
-                        # score_row[meta] = score
+            # populate the row containing correlation scores per metadata
+            # score_row[meta] = score
 
-                        # then populate the rows containing the corresponding probabilities
-                        # of the correlation score per metadata according to the selected tests
-                        # for test, test_score in test_scores.items():
-                        #     test_rows[test][meta] = test_score
-                        #     test_score_df = pd.DataFrame([test_scores[test]], columns=[meta],
-                        #                                  index=[f"{tax}_{method}_{test}"])
-                        #     heatmap_df = pd.concat([heatmap_df, test_score_df])
+            # then populate the rows containing the corresponding probabilities
+            # of the correlation score per metadata according to the selected tests
+            # for test, test_score in test_scores.items():
+            #     test_rows[test][meta] = test_score
+            #     test_score_df = pd.DataFrame([test_scores[test]], columns=[meta],
+            #                                  index=[f"{tax}_{method}_{test}"])
+            #     heatmap_df = pd.concat([heatmap_df, test_score_df])
 
-                    # finally append the correlation row and the probability rows to the dataframe
-                    # df = pd.concat([df, pd.DataFrame([score_row])], ignore_index=True)
-                    # for test, test_row in test_rows.items():
-                    #     df = pd.concat([df, pd.DataFrame([test_row])], ignore_index=True)
-                    # self._heatmap_df = heatmap_df
-                    #
-                    # self._heatmap_df.index = replace_brackets(self._heatmap_df.index)
+            # finally append the correlation row and the probability rows to the dataframe
+            # df = pd.concat([df, pd.DataFrame([score_row])], ignore_index=True)
+            # for test, test_row in test_rows.items():
+            #     df = pd.concat([df, pd.DataFrame([test_row])], ignore_index=True)
+            # self._heatmap_df = heatmap_df
+            #
+            # self._heatmap_df.index = replace_brackets(self._heatmap_df.index)
 
             # return data for the dash data table according to
             # https://dash.plotly.com/datatable
@@ -1469,14 +1537,14 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             fig = go.Figure()
 
-            # Mean Quality as a solid line
-            fig.add_trace(go.Scatter(
-                x=list(range(1, len(truncated_avg_qualities) + 1)),  # 1-based index for base position
-                y=truncated_avg_qualities,
-                mode='lines',
-                name='Mean Quality',
-                line=dict(color='black')
-            ))
+            # # Mean Quality as a solid line
+            # fig.add_trace(go.Scatter(
+            #     x=list(range(1, len(truncated_avg_qualities) + 1)),  # 1-based index for base position
+            #     y=truncated_avg_qualities,
+            #     mode='lines',
+            #     name='Mean Quality',
+            #     line=dict(color='black')
+            # ))
 
             # Lowess smoothed line as a dashed line
             smoothed = lowess(truncated_avg_qualities, range(len(truncated_avg_qualities)), frac=0.1)
@@ -1485,11 +1553,11 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 y=smoothed[:, 1],
                 mode='lines',
                 name='Smoothed Mean Quality',
-                line=dict(dash='dash', color='yellow')
+                line=dict(dash='dash', color='blue')
             ))
 
             fig.update_layout(
-                title='Mean Quality per Base',
+                title='Smoothed Mean Quality per Base',
                 xaxis_title='Base Position',
                 yaxis_title='Mean Quality',
                 xaxis=dict(showgrid=False),
@@ -1556,9 +1624,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin , # Reduce left margin
-            plot_bgcolor = 'rgba(0,0,0,0)')
-
+                margin=stat_indicator_plots_margin,  # Reduce left margin
+                plot_bgcolor='rgba(0,0,0,0)')
 
             return fig
 
@@ -1715,7 +1782,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 autosize=False,
                 width=stat_indicator_plots_height,  # Adjust the width as desired
                 height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin , # Reduce left margin
+                margin=stat_indicator_plots_margin,  # Reduce left margin
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
             )
