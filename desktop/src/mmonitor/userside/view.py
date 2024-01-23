@@ -605,7 +605,7 @@ class GUI(ctk.CTk):
                 project_name = self.input_window.multi_sample_input["project_names"][index]
                 subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
                 sample_date = self.input_window.multi_sample_input["dates"][index]
-                self.emu_runner.run_emu(files, sample_name)
+                self.emu_runner.run_emu(files, sample_name, 0.1)
                 self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                     sample_date)
 
