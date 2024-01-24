@@ -21,8 +21,6 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from flatten_dict import unflatten
 
-from build_mmonitor_pyinstaller import ROOT
-
 # static global variables
 CIGAR_OPS = [1, 2, 4, 10]
 CIGAR_OPS_ALL = [0, 1, 2, 4]
@@ -421,8 +419,8 @@ def generate_alignments(in_file_list, out_basename, database, minimap_type, thre
     print(f"sam_align_file: {sam_align_file}")
     db_sequence_file = os.path.join(database, 'species_taxid.fasta')
 
-    subprocess.check_output("{}/lib/minimap2/minimap2 -ax {} -t {} -N {} -p .9 -K {} {} {} -o {}".
-                            format(ROOT, minimap_type, threads, N, K,
+    subprocess.check_output("minimap2 -ax {} -t {} -N {} -p .9 -K {} {} {} -o {}".
+                            format(minimap_type, threads, N, K,
                                    db_sequence_file, input_file, sam_align_file),
                             shell=True)
 
