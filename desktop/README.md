@@ -14,7 +14,7 @@ This shall serve as a small example on how to use MMonitor with some test data. 
    `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/`  
    `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/src/`  
    
-6. Start the GUI using `python MMonitor/desktop/src/mmonitor/__main__.py`
+6. Start the GUI using `python MMonitor/desktop/src/mmonitor/__main__.py` If you get an error telling you that some module was not you probably didn't export the PYTHONPATH correctly. The command uses a relative path to the folder that you downloaded, so maybe change it to the full absolute path if the relative path doesn't work.
 7. After starting the app the main window should pop up. Click user authentication and change the username and password to the name and password you chose on the website.
 8. Click 'Process sequencing data' and select 'Quick taxonomy 16s nanopore' then click 'continue'.
 9. The 'Sample Data Input' window should open. Now click 'Add multiple samples from CSV'.
