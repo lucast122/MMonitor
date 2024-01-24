@@ -56,3 +56,38 @@ KEGG: View the KEGG metabolic maps created by the analysis pipeline if all funct
 Gene browser: Check out your assembled metagenomes using the gene browser nNot tested yet, may not work on every system).
 
 Be sure to press 'Quit' to terminate the app, as it also terminates the dash server.
+
+## Tutorial
+
+This shall serve as a small example on how to use MMonitor with some test data. We will be doing taxonomic analysis of 6 16S rRNA samples using a small coverage, followed by an evaluation using the MMonitor dashboard including some basic statistics and metadata correlations.
+
+1. Go to the website www.mmonitor.de and register a new user. Remember the username and password for later.
+2. Clone this repository:
+   `git clone https://github.com/lucast122/MMonitor`
+3. There should be a filled called 'sample_list.csv' in the MMonitor/desktop/mmonitor_tutorial subfolder. Change the paths in the 'sample folder' column so they match the actual path of the files on your    computer. For example in the row describing sample1 you should enter the full path to the folder sample 1, do the same for the other samples.   
+4. Create a new conda environment, install the required packages and change PYTHONPATH:  
+   `conda create --name mmonitor python=3.11`  
+   `conda activate mmonitor`  
+   `pip install -r MMonitor/desktop/requirements.txt`  
+   `conda install -c bioconda minimap2`  
+   `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/`  
+   `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/src/`  
+   
+6. Start the GUI using `python MMonitor/desktop/src/mmonitor/__main__.py`
+7. After starting the app the main window should pop up. Click user authentication and change the username and password to the name and password you chose on the website.
+8. Click 'Process sequencing data' and select 'Quick taxonomy 16s nanopore' then click 'continue'.
+9. The 'Sample Data Input' window should open. Now click 'Add multiple samples from CSV'.
+10. In the file selection window select the sample_list.csv that you changes earlier.
+11. You should receive the message 'Processing 6 samples. This may take a while.' if everything worked. If you receive an error message check the file paths in the csv again and make sure they are   
+    correct.
+12. Click 'submit' and check the console. Analysis should start now. If you receive an error message make sure that minimap2 is installed an on your sytem PATH. Wait for the analysis to finish, you  
+    should see a popup window saying 'Analysis complete'.
+13. Go back to the website, login with your credentials and click on 'Dashboard'.
+14. Check out the taxonomy of the samples in the taxonomy dashboard. Try out different plot types and different taxonomic ranks by using the dropdown selections.
+15. Go to diversity and check the alpha diversity of the samples.
+16. Go to QC and check basic statistics of the samples.
+17. Go to Correlations. Upload the 'metadata.csv' from the folder 'mmonitor_tutorial'. If the metadata parsed correctly you should get a notification telling you that 6 metadata entries were parsed.
+18. Refresh the page and click 'Download Taxonomy-metadata Correlations' to download a CSV file containing the correlation between the taxonomic profiles and the metadata. Check out the resulting   
+    correlations to see if any taxa correlate with the metadata.
+19. If at any stage something didn't work please report the error using the 'Submit feedback' function. Please also report general feedback and other issues you had using the software.
+
