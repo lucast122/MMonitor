@@ -65,13 +65,13 @@ This shall serve as a small example on how to use MMonitor with some test data. 
 2. Clone this repository:
    `git clone https://github.com/lucast122/MMonitor`
 3. There should be a filled called 'sample_list.csv' in the MMonitor/desktop/mmonitor_tutorial subfolder. Change the paths in the 'sample folder' column so they match the actual path of the files on your    computer. For example in the row describing sample1 you should enter the full path to the folder sample 1, do the same for the other samples.   
-4. Create a new conda environment, install the required packages and change PYTHONPATH:
-   `conda create --name mmonitor python=3.11`
-   `conda activate mmonitor`
-   `pip install -r MMonitor/desktop/requirements.txt`
-   `conda install -c bioconda minimap2`
-   `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/`
-   `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/src/`
+4. Create a new conda environment, install the required packages and change PYTHONPATH:  
+   `conda create --name mmonitor python=3.11`  
+   `conda activate mmonitor`  
+   `pip install -r MMonitor/desktop/requirements.txt`  
+   `conda install -c bioconda minimap2`  
+   `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/`  
+   `export PYTHONPATH=$PYTHONPATH:MMonitor/desktop/src/`  
    
 6. Start the GUI using `python MMonitor/desktop/src/mmonitor/__main__.py`
 7. After starting the app the main window should pop up. Click user authentication and change the username and password to the name and password you chose on the website.
