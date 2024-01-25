@@ -4,60 +4,33 @@ import json
 import re
 import sqlite3
 import tempfile
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-import plotly.figure_factory
-from dash.dependencies import Input, Output
-from scipy.cluster import hierarchy
-
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import plotly.express as px
-from scipy.cluster import hierarchy
-from scipy.spatial import distance
-
 from io import StringIO
 from json import loads
-from dash_iconify import DashIconify
+from typing import Any, List, Union
 
-from typing import Tuple, Any, List, Iterable, Dict, Union
-from skbio.stats.ordination import pcoa
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash_mantine_components import Modal, Button
-from dash_mantine_components import Container, Group, Paper
-
-from dash_extensions import Lottie
-from dash import dcc, html
-from dash.dependencies import Input, Output
-from sklearn.cluster import KMeans
-import matplotlib.pyplot as pltpc
+import dash_mantine_components as dmc
 import numpy as np
 import pandas as pd
-import dash_mantine_components as dmc
 import plotly.express as px
 import plotly.graph_objects as go
-from dash.dependencies import Input, Output, State
+from dash import dcc, html
 from dash.exceptions import PreventUpdate
+from dash_extensions.enrich import Output, Input, State
+from dash_iconify import DashIconify
 # from dash_bootstrap_templates import load_figure_template
-from dash_extensions import WebSocket
 from django_plotly_dash import DjangoDash
-from natsort import natsorted
-from pandas import DataFrame
-from plotly.graph_objects import Figure
 from scipy.ndimage.filters import gaussian_filter
 from scipy.stats import zscore
+from skbio.stats.ordination import pcoa
+from sklearn.cluster import KMeans
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from users.models import NanoporeRecord, Metadata
 from users.models import SequencingStatistics
 from . import taxonomy, correlations, qc, diversity, horizon
-from .calculations.stats import scipy_correlation
-from dash_extensions import Lottie  # Assuming you're using Lottie for animations
-from dash_extensions.enrich import Dash, Output, Input, State, Trigger
 
 
 # def _init_mysql(user_id):
@@ -530,7 +503,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             details = f"Details for {taxon}"  # Replace with actual data retrieval logic
             return True, details
 
-        from dash_bootstrap_templates import ThemeChangerAIO
         @self.app.callback(
             Output("sample_select_value", "value"),
             [Input("project-dropdown", "value"),
@@ -1502,13 +1474,23 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
          configuration variables
         """
         stat_indicator_plots_margin = dict(t=0, b=0, l=0, r=0)
-        stat_indicator_plots_fontsize = 30
-        stat_indicator_plots_title_fontsize = 15
+        stat_indicator_plots_fontsize = 24
+        stat_indicator_plots_title_fontsize = 20
 
-        stat_indicator_plots_height = 200
-        stat_indicator_plots_width = 120
 
         ...
+
+        # overview plot
+        @self.app.callback(
+            Output('average-read-length-plot', 'figure'),
+            # Assuming 'average-read-length-plot' is the ID for the new plot
+            [Input('some-input', 'value')]
+            # Replace 'some-input' and 'value' with the actual ID and property of the triggering element
+        )
+        def update_average_read_length(input_value):
+            # Logic to update the plot based on the input
+            # For a general overview, we might not need to use the input_value
+            return self.qc_app.get_mean_read_length_plot()
 
         # MEAN QUALITY PER BASE PLOT
         @self.app.callback(
@@ -1588,9 +1570,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             ))
             fig.update_layout(
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,  # Reduce left margin
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)')
 
@@ -1613,16 +1592,13 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig.add_trace(go.Indicator(
                 mode="number",
                 value=mean_quality_score,
-                title={"text": "Mean Quality Score", "font": {"size": stat_indicator_plots_title_fontsize}},
+                title={"text": "Mean Quality", "font": {"size": stat_indicator_plots_title_fontsize}},
                 number={"font": {"size": stat_indicator_plots_fontsize}}
 
             ))
             fig.update_layout(
                 # ... (other layout settings)
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,  # Reduce left margin
                 plot_bgcolor='rgba(0,0,0,0)')
 
             return fig
@@ -1640,7 +1616,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig = go.Figure(go.Indicator(
                 mode="number",
                 value=stats_for_sample.number_of_reads,
-                title={"text": "Number of Reads", "font": {"size": stat_indicator_plots_title_fontsize}},
+                title={"text": "#Reads", "font": {"size": stat_indicator_plots_title_fontsize}},
                 number={"font": {"size": stat_indicator_plots_fontsize}}
 
             ))
@@ -1649,9 +1625,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig.update_layout(
                 # ... (other layout settings)
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
 
@@ -1672,19 +1645,15 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig = go.Figure(go.Indicator(
                 mode="number",
                 value=stats_for_sample.total_bases_sequenced,
-                title={"text": "Total Bases Sequenced", "font": {"size": stat_indicator_plots_title_fontsize}},
+                title={"text": "Total Bases", "font": {"size": stat_indicator_plots_title_fontsize}},
 
                 number={"font": {"size": stat_indicator_plots_fontsize}}
 
             ))
 
-            # Remove the plot's axis for a cleaner look
             fig.update_layout(
                 # ... (other layout settings)
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
 
@@ -1705,7 +1674,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig = go.Figure(go.Indicator(
                 mode="number",
                 value=stats_for_sample.q20_score,
-                title={"text": "Q20 Score", "font": {"size": stat_indicator_plots_title_fontsize}},
+                title={"text": "Q20", "font": {"size": stat_indicator_plots_title_fontsize}},
                 number={"font": {"size": stat_indicator_plots_fontsize}}
 
             ))
@@ -1714,9 +1683,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig.update_layout(
                 # ... (other layout settings)
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
 
@@ -1737,7 +1703,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig = go.Figure(go.Indicator(
                 mode="number",
                 value=stats_for_sample.q30_score,
-                title={"text": "Q30 Score", "font": {"size": stat_indicator_plots_title_fontsize}},
+                title={"text": "Q30", "font": {"size": stat_indicator_plots_title_fontsize}},
                 number={"font": {"size": stat_indicator_plots_fontsize}}
 
             ))
@@ -1746,9 +1712,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             fig.update_layout(
                 # ... (other layout settings)
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
 
@@ -1778,9 +1741,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             ))
             fig.update_layout(
                 autosize=False,
-                width=stat_indicator_plots_height,  # Adjust the width as desired
-                height=stat_indicator_plots_width,
-                margin=stat_indicator_plots_margin,  # Reduce left margin
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
             )
