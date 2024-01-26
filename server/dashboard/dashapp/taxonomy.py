@@ -1,24 +1,22 @@
 import base64
 from io import StringIO
 from typing import Tuple, List, Any, Dict
-from dash_ag_grid import AgGrid
-from dash_iconify import DashIconify
 
-from users.models import SequencingStatistics
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
+import dash_mantine_components as dmc
 import pandas as pd
 import plotly.express as px
 from dash import dash_table
 from dash import html
 from dash.dependencies import Input, Output
-from dash_bootstrap_templates import ThemeChangerAIO
+from dash_ag_grid import AgGrid
+from dash_iconify import DashIconify
 from django_plotly_dash import DjangoDash
 from plotly.graph_objects import Figure
-import dash_mantine_components as dmc
 
 from users.models import NanoporeRecord
-import skbio.diversity
+from users.models import SequencingStatistics
 
 
 class Taxonomy:
@@ -102,6 +100,8 @@ class Taxonomy:
                                                              columns='taxonomy',
                                                              values='abundance',
                                                              fill_value=0)
+            self.df.to_csv('/home/minion-computer/df.csv')
+            self.df_full_for_diversity.to_csv('/home/minion-computer/pivot.csv')
 
             sample_project_mapping = self.records.values('sample_id', 'project_id')
             self.sample_to_project_dict = {item['sample_id']: item['project_id'] for item in sample_project_mapping}
