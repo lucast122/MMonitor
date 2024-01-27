@@ -27,6 +27,8 @@ class FastqStatistics:
             print(f"Loaded file in {end_time - start_time} seconds")
 
     def load_files_threaded(self, file_paths, num_threads):
+        print(f"Loading files: {file_paths}")
+
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             futures = []
             for file_path in file_paths:
@@ -34,9 +36,12 @@ class FastqStatistics:
             for future in futures:
                 future.result()
 
-    def load_file(self, file_path=None):
+    def load_file(self, file_path):
+
+        print(f"Attempting to load file: {file_path}")
         if file_path is None:
             file_path = self.file_path
+
 
         is_gzipped = file_path.endswith(".gz")
         open_func = gzip.open if is_gzipped else open
