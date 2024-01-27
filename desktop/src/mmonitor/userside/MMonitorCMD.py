@@ -3,7 +3,7 @@ import csv
 import gzip
 import json
 import os
-
+import sys
 import numpy as np
 
 from build_mmonitor_pyinstaller import ROOT
@@ -12,7 +12,10 @@ from mmonitor.userside.InputWindow import get_files_from_folder
 from src.mmonitor.database.django_db_interface import DjangoDBInterface
 from src.mmonitor.userside.CentrifugeRunner import CentrifugeRunner
 from src.mmonitor.userside.EmuRunner import EmuRunner
-
+from Bio import SeqIO
+import gzip
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 class MMonitorCMD:
     def __init__(self):
@@ -24,36 +27,9 @@ class MMonitorCMD:
         self.db_config = {}
         self.django_db = DjangoDBInterface(self.args.config)
 
-    def parse_arguments(self):
-        parser = argparse.ArgumentParser(description='MMonitor command line tool')
-        parser.add_argument('-a', '--analysis', required=True, choices=['taxonomy-wgs', 'taxonomy-16s', 'stats'],
-                            help='Type of analysis to perform')
-        parser.add_argument('-c', '--config', required=True, type=str, help='Path to JSON config file')
-
-        group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument('-m', '--multicsv', type=str, help='Path to CSV containing information for multiple samples')
-        group.add_argument('-i', '--input', type=str, help='Path to folder containing sequencing data')
-
-        parser.add_argument('-s', '--sample', type=str, help='Sample name')
-        parser.add_argument('-d', '--date', type=str, help='Sample date')
-        parser.add_argument('-p', '--project', type=str, help='Project name')
-        parser.add_argument('-u', '--subproject', type=str, help='Subproject name')
-        parser.add_argument('-b', '--barcodes', action="store_true",
-                            help='Use barcode column from CSV for handling multiplexing')
-        parser.add_argument("--overwrite", action="store_true",
-                            help="Enable to overwrite existing records. If not specified, defaults to False.")
-
-        parser.add_argument('-q', '--qc', action="store_true",
-                            help='Calculate quality control statistics for input samples.'
-                                 ' Enable this to fill QC app with data. Increases time the analysis takes.')
-        parser.add_argument('-x', '--update', action="store_true", help='Only update counts and abundances'
-                                                                        ' Enable this if you want to send count and abundances to the MMonitor webserver DB. '
-                                                                        ' Can be useful, e.g. when the tsv files from emu changed after analysis.')
-        parser.add_argument('-n', '--minabundance', type=float, default=0.5,
-                            help='Minimal abundance to be considered for 16s taxonomy')
-
-        return parser.parse_args()
-
+    import argparse
+    import os
+    from datetime import datetime
     def load_config(self):
         if os.path.exists(self.args.config):
             try:
@@ -327,7 +303,7 @@ class MMonitorCMD:
             # self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
 
             self.centrifuge_runner.run_centrifuge(files, sample_name, cent_db_path)
-            self.centrifuge_runner.make_kraken_report(cent_db_path)
+            self.centrifuge_runner
 
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
             if self.args.qc:
@@ -339,12 +315,14 @@ class MMonitorCMD:
             self.load_from_csv()
             print("Processing multiple samples")
             concat_files_list = []
+            all_file_paths = []
             sample_names_to_process = []
             project_names = []
             subproject_names = []
             sample_dates = []
             for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
+                all_file_paths.append(files)
                 sample_name = self.multi_sample_input["sample_names"][index]
                 # when a sample is already in the database and user does not want to overwrite quit now
                 if not self.args.overwrite:
@@ -356,7 +334,7 @@ class MMonitorCMD:
                 sample_names_to_process.append(sample_name)
                 concat_file_name = f"{os.path.dirname(files[0])}/{sample_name}_concatenated.fastq.gz"
                 concat_files_list.append(concat_file_name)
-                self.concatenate_fastq_files(files, concat_file_name)
+
 
                 project_name = self.multi_sample_input["project_names"][index]
                 subproject_name = self.multi_sample_input["subproject_names"][index]
@@ -366,18 +344,29 @@ class MMonitorCMD:
                 subproject_names.append(subproject_name)
                 sample_dates.append(sample_date)
 
+            for idx, files in enumerate(all_file_paths):
+
+                CentrifugeRunner.concatenate_fastq_parallel(files, concat_files_list[idx])
+
             centrifuge_tsv_path = os.path.join(ROOT, "src", "resources", "centrifuge.tsv")
             print(f"Creating centrifuge tsv...")
-            self.centrifuge_runner.create_centrifuge_input_file(self.multi_sample_input["sample_names"],
+            CentrifugeRunner.create_centrifuge_input_file(self.multi_sample_input["sample_names"],
                                                                 concat_files_list,
                                                                 centrifuge_tsv_path)
             print(f"Running centrifuge for multiple samples from tsv {centrifuge_tsv_path}...")
-            self.centrifuge_runner.run_centrifuge_multi_sample(centrifuge_tsv_path, cent_db_path)
+            CentrifugeRunner.run_centrifuge_multi_sample(centrifuge_tsv_path, cent_db_path)
+
+            CentrifugeRunner.make_kraken_report_from_tsv(centrifuge_tsv_path, cent_db_path)
 
             print(f"Removing concatenated files...")
             # remove concatenated files as they are no longer needed ... TODO: make this uniform in the whole code
             for concat_file in concat_files_list:
                 os.remove(concat_file)
+
+
+
+
+
             print(f"Adding all samples to database...")
             for idx, sample in enumerate(sample_names_to_process):
                 add_sample_to_databases(sample, project_names[idx], subproject_names[idx], sample_dates[idx])
@@ -401,14 +390,46 @@ class MMonitorCMD:
                     for line in input2:
                         output.write(line)
 
+class OutputLogger:
+    def __init__(self, log_file_path):
+        self.original_stdout = sys.stdout  # Save the original stdout
+        self.original_stderr = sys.stderr  # Save the original stderr
+        self.log_file_path = log_file_path
+
+    def start_logging(self):
+        """
+        Redirects stdout and stderr to a log file.
+        """
+        log_file = open(self.log_file_path, 'w')
+        sys.stdout = log_file
+        sys.stderr = log_file
+
+    def stop_logging(self):
+        """
+        Restores the original stdout and stderr, and closes the log file.
+        """
+        sys.stdout.close()
+        sys.stderr = self.original_stderr
+        sys.stdout = self.original_stdout
+
+
+# Example usage
 
 if __name__ == "__main__":
     command_runner = MMonitorCMD()
     print(command_runner.args)
     command_runner.load_config()
+
+    logger = OutputLogger(os.path.join(ROOT, 'src', 'resources', 'mmonitor_log.txt'))
+    # logger.start_logging()
+
+    # Your script's operations here. All stdout will be written to 'output_log.txt'.
+
     if command_runner.args.analysis == "taxonomy-16s":
         command_runner.taxonomy_nanopore_16s()
     if command_runner.args.analysis == "taxonomy-wgs":
         command_runner.taxonomy_nanopore_wgs()
     if command_runner.args.analysis == "stats":
         command_runner.update_only_statistics()
+
+    # logger.stop_logging()

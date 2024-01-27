@@ -18,7 +18,7 @@ def get_files_from_folder(folder_path):
     # We will use os.walk for recursive search
     for dirpath, dirnames, filenames in os.walk(folder_path):
         for file in filenames:
-            if file.endswith((".fastq", ".fq", ".fasta", ".fastq.gz")):
+            if file.endswith((".fastq", ".fq", ".fasta", ".fastq.gz")) and "concatenated" not in file:
                 files.append(os.path.join(dirpath, file))
 
     # If no files were found, log an error
@@ -223,6 +223,7 @@ class InputWindow(ctk.CTkToplevel):
     def fetch_files_from_folder(self, sample_folder):
         files = [f for f in get_files_from_folder(sample_folder) if
                  f.endswith(("fastq", "fasta", "fq", "fa", 'fastq.gz', "fasta.gz", "fa.gz", "fq.gz"))]
+
         return files
 
     def update_file_display(self, files):

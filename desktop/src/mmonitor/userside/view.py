@@ -515,7 +515,7 @@ class GUI(ctk.CTk):
                 subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
                 sample_date = self.input_window.multi_sample_input["dates"][index]
                 self.centrifuge_runner.run_centrifuge(files, sample_name, centrifuge_index_path)
-                self.centrifuge_runner.make_kraken_report(centrifuge_index_path)
+                make_kraken_report(centrifuge_index_path)
 
                 self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
                                     sample_date)
