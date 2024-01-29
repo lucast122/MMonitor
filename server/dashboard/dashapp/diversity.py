@@ -1,23 +1,15 @@
-import numpy as np
-from skbio.diversity import beta_diversity
-from dash.dependencies import Input, Output
-from skbio.stats import ordination
-from django_plotly_dash import DjangoDash
-import pandas as pd
-import plotly.express as px
-from users.models import NanoporeRecord, SequencingStatistics
-import skbio.diversity
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
-from dash import html
-from dash_extensions import Lottie
-from dash import dcc, html
-from dash.dependencies import Input, Output
 import dash_mantine_components as dmc
-import dash_mantine_components as dmc
-import dash_mantine_components as dmc
-from dash import callback, html, Input, Output, dcc
-from dash_mantine_components import MantineProvider
+import numpy as np
+import pandas as pd
+import skbio.diversity
+from dash import html, dcc
+from django_plotly_dash import DjangoDash
+from skbio.diversity import beta_diversity
+from skbio.stats import ordination
+
+from users.models import NanoporeRecord, SequencingStatistics
 
 
 def create_colour_by_menu():
@@ -290,7 +282,10 @@ class Diversity:
         # print(f"shannon diversity: {self.shannon_diversity}")
 
     def calculate_beta_diversity(self):
-        # Bray-Curtis is a common choice for beta diversity, but you can choose other metrics
+        # calculate bray curtis index
+        print("df_full_for")
+        print(self.df_full_for_diversity)
+
         self.beta_diversity_matrix = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
         self.pcoa_results = ordination.pcoa(self.beta_diversity_matrix)
 

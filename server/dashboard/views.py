@@ -1,27 +1,18 @@
-from os.path import isfile, join
+from os.path import join
 
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.contrib.sessions.models import Session
-from django.contrib.auth.models import User
+from django.shortcuts import render
 
-from .dashapp.database.mmonitor_db_mysql import MMonitorDBInterfaceMySQL
-from .dashapp.calculations.horizon_r import generate_image
 from .dashapp.index import Index
 
 
 @login_required
 def get_user_id(request):
     # Get the session ID from the URL parameters
-    session_id = request.GET.get('session_id', None)
-
-    if session_id:
-        # If a session ID was provided, get the session
-        session = Session.objects.get(session_key=session_id)
-        user_id = session.get_decoded().get('_auth_user_id')
-
+    if request.user.is_authenticated:
+        user_id = request.user.id
         # If a user ID was found, return it
         if user_id:
             return JsonResponse({'user_id': user_id})
