@@ -9,8 +9,6 @@ from json import loads
 from typing import Any, List, Union
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import dash_mantine_components as dmc
 import numpy as np
 import pandas as pd
@@ -743,7 +741,12 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                 columns=self.diversity_app.beta_diversity_matrix.ids
             )
             if selected_samples:
+                # remove samples that have no distances to avoid errors
+                selected_samples = list(
+                    set(self.diversity_app.samples_with_valid_distances).intersection(selected_samples))
                 distance_matrix_df = distance_matrix_df.loc[selected_samples, selected_samples]
+            print(f"samples_with_valid_distances: {self.diversity_app.samples_with_valid_distances}")
+            print(f"selected samples in index after removing invalid ones: {selected_samples}")
 
             # Now perform PCoA with skbio - this needs to be done after each filter operation if the samples change
             pcoa_results = pcoa(distance_matrix_df)

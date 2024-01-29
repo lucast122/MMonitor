@@ -7,9 +7,25 @@ import skbio.diversity
 from dash import html, dcc
 from django_plotly_dash import DjangoDash
 from skbio.diversity import beta_diversity
+
+
+from skbio import DistanceMatrix
+
+
 from skbio.stats import ordination
 
-from users.models import NanoporeRecord, SequencingStatistics
+
+
+
+import skbio.diversity
+import dash_bootstrap_components as dbc
+from dash_extensions import Lottie
+from dash import dcc, html
+import dash_mantine_components as dmc
+import dash_mantine_components as dmc
+import dash_mantine_components as dmc
+from dash import html, Output, dcc
+
 
 
 def create_colour_by_menu():
@@ -110,23 +126,20 @@ class Diversity:
                 'subproject').distinct()
             self.unique_subprojects = [item['subproject'] for item in self.unique_subprojects]
             self.unique_species = self.df['taxonomy'].unique()
-            self.unique_species = self.df['taxonomy'].unique()
+
             self.df_full_for_diversity = self.df.pivot_table(index='sample_id',
                                                              columns='taxonomy',
                                                              values='count',
                                                              fill_value=0)
+            self.df_normalized_counts = self.calculate_normalized_counts()
+            # self.df_normalized_counts_full = self.df_normalized_counts.pivot_table(index='sample_id',
+            #                                                  columns='taxonomy',
+            #                                                  values='normalized_count',
+            #                                                  fill_value=0)
 
-            self.sample_project_mapping = self.records.values('sample_id', 'project_id')
-            self.sample_to_project_dict = {item['sample_id']: item['project_id'] for item in
-                                           self.sample_project_mapping}
+            # print(f"df_full_for_diversirt (pivot table of taxonomies) {self.df_full_for_diversity}")
 
-            self.sample_subproject_mapping = self.records.values('sample_id', 'subproject')
-            self.sample_to_subproject_dict = {item['sample_id']: item['subproject']
-                                              for item in self.sample_subproject_mapping}
 
-            self.sample_date_mapping = self.records.values('sample_id', 'date')
-            self.sample_to_date_dict = {item['sample_id']: item['date'] for item in
-                                        self.sample_date_mapping}
 
             # self.df_full_for_diversity.columns = self.df_full_for_diversity.columns.droplevel(0)
 
@@ -138,7 +151,20 @@ class Diversity:
 
         self._init_layout()
         self.calculate_alpha_diversity(use_normalized_counts=False)
-        self.calculate_beta_diversity()
+
+        self.pcoa_results, self.beta_diversity_matrix, self.samples_with_valid_distances = self.calculate_beta_diversity()
+
+        self.sample_project_mapping = self.records.values('sample_id', 'project_id')
+        self.sample_to_project_dict = {item['sample_id']: item['project_id'] for item in
+                                       self.sample_project_mapping}
+
+        self.sample_subproject_mapping = self.records.values('sample_id', 'subproject')
+        self.sample_to_subproject_dict = {item['sample_id']: item['subproject']
+                                          for item in self.sample_subproject_mapping}
+
+        self.sample_date_mapping = self.records.values('sample_id', 'date')
+        self.sample_to_date_dict = {item['sample_id']: item['date'] for item in
+                                    self.sample_date_mapping}
 
     def _init_layout(self) -> None:
 
@@ -283,11 +309,33 @@ class Diversity:
 
     def calculate_beta_diversity(self):
         # calculate bray curtis index
-        print("df_full_for")
-        print(self.df_full_for_diversity)
-
         self.beta_diversity_matrix = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
         self.pcoa_results = ordination.pcoa(self.beta_diversity_matrix)
+        dm = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
+        df = dm.to_data_frame()
+        print(f"dm after conversion: {dm}")
+        print(f"df after conversion: {df}")
+
+        rows_to_drop = df.index[df.isna().any(axis=1)]
+        print(f"rows to drop: {rows_to_drop}")
+        cols_to_drop = df.columns[df.isna().any(axis=0)]
+        print(f"cols to drop: {cols_to_drop}")
+        # Finding intersecting set of indices to keep
+        print(f"df.index: {df.index}")
+        print(f"rows to drop: {rows_to_drop}")
+        indices_to_keep = set(df.index) - set(rows_to_drop)
+
+        indices_to_keep = indices_to_keep.intersection(set(df.columns) - set(cols_to_drop))
+
+        print(f"indices to keep {indices_to_keep}")
+        # Dropping rows and columns outside the intersecting set
+        df_clean = df.loc[list(indices_to_keep), list(indices_to_keep)]
+        # Rebuilding the DistanceMatrix
+        clean_dm = DistanceMatrix(df_clean.values, ids=list(indices_to_keep))
+        print(f"clean_dm: {clean_dm}")
+        pcoa_results = ordination.pcoa(clean_dm)
+        return pcoa_results, clean_dm, indices_to_keep
+
 
     def create_dropdown(self, dropdown_id, options, label_text, value=None, multi_select=False):
         """ Helper function to create dropdown elements. """
