@@ -1,17 +1,22 @@
+import base64
+import json
+
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.core.serializers import serialize
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 
-from users.models import NanoporeRecord
+from .forms import FeedbackForm
+from .models import NanoporeRecord  # Adjust the import according to your model's location
 from .models import SequencingStatistics
 from .models import UserProfile
-from django.shortcuts import render, redirect
-from .forms import FeedbackForm
-from django.contrib import messages
 
 
 @csrf_exempt
@@ -48,7 +53,8 @@ def add_sequencing_statistics(request):
                 q30_score=data.get('q30_score'),
                 avg_quality_per_read=json.dumps(data.get('avg_quality_per_read', [])),
                 base_quality_avg=json.dumps(data.get('base_quality_avg', {})),
-                gc_contents_per_sequence=data.get('gc_contents_per_sequence', "[]"),  # Default to empty list if not provided
+                gc_contents_per_sequence=data.get('gc_contents_per_sequence', "[]"),
+                # Default to empty list if not provided
 
                 user=user
             )
@@ -64,7 +70,6 @@ def add_nanopore_record(request):
     print(f"Request body: {request.body}")
     print(f"Request headers: {request.headers}")
 
-
     if request.method == "POST":
         # Get the username and password from the Authorization header
         auth_header = request.headers.get('Authorization')
@@ -76,7 +81,6 @@ def add_nanopore_record(request):
         user = authenticate(request, username=username, password=password)
         if user is None:
             return JsonResponse({"error": "Invalid username or password"}, status=400)
-
 
         print("POST request received at /users/add_nanopore_record/")
         try:
@@ -129,11 +133,6 @@ def get_user_id(request):
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
 
-from django.contrib.auth import authenticate
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import base64
-import json
 
 
 @csrf_exempt
@@ -219,7 +218,6 @@ def get_unique_sample_ids(request):
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
 
-
 def create_mysql_user(username, password):
     from django.conf import settings
     import mysql.connector
@@ -254,6 +252,7 @@ def profile_view(request):
     user_profile = UserProfile.objects.get(user=request.user)
     # Now user_profile contains the data for the currently logged-in user only
 
+
 def redirect_to_dash(request):
     # Get the Django session ID
     session_id = request.session.session_key
@@ -279,8 +278,6 @@ def register(request):
             new_user.save()
             UserProfile.objects.create(user=new_user, some_field="default value")
 
-
-
             # Login and redirect to homepage
             login(request, new_user)
             return redirect("main:index")
@@ -289,6 +286,7 @@ def register(request):
     context = {"form": form}
 
     return render(request, "registration/register.html", context)
+
 
 # USER FEEDBACK
 def submit_feedback(request):
@@ -304,6 +302,33 @@ def submit_feedback(request):
         form = FeedbackForm()
     return render(request, 'submit_feedback.html', {'form': form})
 
+
 def feedback_thank_you(request):
     return render(request, 'feedback_thank_you.html')
 
+
+def chart_data_api(request):
+    chart_data_queryset = NanoporeRecord.objects.all()
+    chart_data_json = serialize('json', chart_data_queryset)
+    print(chart_data_json)
+    return JsonResponse(chart_data_json, safe=False)
+
+#
+# def dashboard_view(request):
+#     # Prepare your data for the chart
+#     chart_data_queryset = NanoporeRecord.objects.all()
+#
+#     # Serialize the queryset to JSON
+#     chart_data_json = serialize('json', chart_data_queryset)
+#
+#     print("Serialized chart data: ", chart_data_json)
+#
+#     request.session['chart_data'] = chart_data_json
+#     request.session.save()  # Ensure session data is saved
+#
+#     # Debug: Log the session ID and data after saving
+#     print("Session ID: ", request.session.session_key)
+#     print("Session Data: ", request.session['chart_data'])
+#
+#     # Render your template with the chart data
+#     return render(request, 'base.html', {'chart_data': chart_data_json})

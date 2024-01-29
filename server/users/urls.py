@@ -14,6 +14,7 @@ urlpatterns = [
     path('add_sequencing_statistics/', views.add_sequencing_statistics, name='add_sequencing_statistics'),
     path('get_unique_sample_ids/', views.get_unique_sample_ids, name='get_unique_sample_ids'),
     path('feedback/submit/', views.submit_feedback, name='submit_feedback'),
-    path('feedback/thank-you/', views.feedback_thank_you, name='feedback_thank_you')
+    path('feedback/thank-you/', views.feedback_thank_you, name='feedback_thank_you'),
+    path('api/chart-data/', views.chart_data_api, name='chart_data_api')
 
 ]

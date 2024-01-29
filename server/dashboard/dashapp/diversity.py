@@ -1,12 +1,22 @@
+import dash_bootstrap_components as dbc
+import dash_core_components as dcc
+import dash_mantine_components as dmc
 import numpy as np
+import pandas as pd
+import skbio.diversity
+from dash import html, dcc
+from django_plotly_dash import DjangoDash
 from skbio.diversity import beta_diversity
+
+
 from skbio import DistanceMatrix
 
+
 from skbio.stats import ordination
-from django_plotly_dash import DjangoDash
-import pandas as pd
-import plotly.express as px
-from users.models import NanoporeRecord, SequencingStatistics
+
+
+
+
 import skbio.diversity
 import dash_bootstrap_components as dbc
 from dash_extensions import Lottie
@@ -15,6 +25,7 @@ import dash_mantine_components as dmc
 import dash_mantine_components as dmc
 import dash_mantine_components as dmc
 from dash import html, Output, dcc
+
 
 
 def create_colour_by_menu():
@@ -298,6 +309,8 @@ class Diversity:
 
     def calculate_beta_diversity(self):
         # calculate bray curtis index
+        self.beta_diversity_matrix = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
+        self.pcoa_results = ordination.pcoa(self.beta_diversity_matrix)
         dm = beta_diversity("braycurtis", self.df_full_for_diversity, self.unique_sample_ids)
         df = dm.to_data_frame()
         print(f"dm after conversion: {dm}")

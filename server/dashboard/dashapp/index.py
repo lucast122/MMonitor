@@ -48,26 +48,6 @@ class Index:
     It contains the main layout and callbacks.
     """
 
-    def create_navigation(self):
-        # Create a Mantine styled navigation menu
-        return dmc.Navbar(
-            [
-                dmc.Group(
-
-                    align="center",
-                    children=[
-                        html.A(
-                            dmc.Text(values['name'], variant="text", size="lg",
-                                     style={'textDecoration': 'none', 'color': 'white'}),
-                            href=url,
-                            style={'padding': '10px', 'display': 'block'}
-                        )
-                        for url, values in self._apps.items()
-                    ]
-                )
-            ],
-            style={'backgroundColor': '#15242B', 'width': '100%'}
-        )
 
     """
     Landing page of the dash application.
@@ -156,11 +136,11 @@ class Index:
                 'app': self.taxonomy_app.app,
                 'instance': self.taxonomy_app
             },
-            # '/dashapp/horizon': {
-            #     'name': 'Horizon',
-            #     'app': self.horizon_app.app,
-            #     'instance': self.horizon_app
-            # },
+            '/dashapp/horizon': {
+                'name': 'Horizon',
+                'app': self.horizon_app.app,
+                'instance': self.horizon_app
+            },
 
             '/dashapp/diversity': {
                 'name': 'Diversity',
