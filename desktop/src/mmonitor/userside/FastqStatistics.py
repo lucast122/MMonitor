@@ -1,17 +1,47 @@
 import gzip
-import time
-from concurrent.futures import ThreadPoolExecutor
-
+from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 from Bio import SeqIO
+import time
+import json
+
+def process_fastq_file(file_path):
+    sequences_temp = []
+    qualities_temp = []
+    local_gc_counts = []
+    local_lengths = []
+    local_q20_counts = []
+    local_q30_counts = []
+
+    is_gzipped = file_path.endswith(".gz")
+    with (gzip.open(file_path, 'rt') if is_gzipped else open(file_path, 'r')) as f:
+        for record in SeqIO.parse(f, "fastq"):
+            seq = str(record.seq)
+            sequences_temp.append(seq)
+            quality_scores = np.array(record.letter_annotations["phred_quality"], dtype=int)
+            qualities_temp.append(quality_scores)
+            local_gc_counts.append(seq.count('G') + seq.count('C'))
+            local_lengths.append(len(seq))
+            local_q20_counts.append((quality_scores >= 20).sum())
+            local_q30_counts.append((quality_scores >= 30).sum())
+
+    return {
+        'sequences': sequences_temp,
+        'qualities': qualities_temp,
+        'gc_counts': local_gc_counts,
+        'lengths': local_lengths,
+        'q20_counts': local_q20_counts,
+        'q30_counts': local_q30_counts
+    }
 
 
 class FastqStatistics:
 
-    def __init__(self, file_paths, multi=False, num_threads=64):
+    def __init__(self, file_paths, multi=True, num_threads=64):
         self.file_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        self.sequences = []  # Keep if sequence data needed beyond statistics
-        self.qualities = []  # Converted to numpy arrays for efficient processing
+        # Initialize lists and numpy arrays for aggregated data
+        self.sequences = []
+        self.qualities = []
         self.lengths = np.array([], dtype=int)
         self.gc_counts = np.array([], dtype=int)
         self.q20_counts = np.array([], dtype=int)
@@ -20,24 +50,38 @@ class FastqStatistics:
         self.load_files(multi, num_threads)
 
     def load_files(self, multi, num_threads):
-        start_time = time.time()
         if multi:
-            self.load_files_threaded(num_threads)
+            self.load_files_parallel(num_threads)
         else:
             for file_path in self.file_paths:
-                self.load_file(file_path)
+                result = process_fastq_file(file_path)
+                self.aggregate_results(result)
+
+    def load_files_parallel(self, num_threads):
+        start_time = time.time()
+        with ProcessPoolExecutor(max_workers=num_threads) as executor:
+            results = list(executor.map(process_fastq_file, self.file_paths))
+        for result in results:
+            self.aggregate_results(result)
         end_time = time.time()
         print(f"Loaded files in {end_time - start_time} seconds")
 
-    def load_files_threaded(self, num_threads):
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            executor.map(self.load_file, self.file_paths)
+    def aggregate_results(self, result):
+        # Aggregate results here, similar to the load_file method adjustments
+        self.sequences.extend(result['sequences'])
+        self.qualities.extend(result['qualities'])
+        self.lengths = np.concatenate([self.lengths, np.array(result['lengths'], dtype=int)])
+        self.gc_counts = np.concatenate([self.gc_counts, np.array(result['gc_counts'], dtype=int)])
+        self.q20_counts = np.concatenate([self.q20_counts, np.array(result['q20_counts'], dtype=int)])
+        self.q30_counts = np.concatenate([self.q30_counts, np.array(result['q30_counts'], dtype=int)])
+        self.total_bases += np.sum(result['lengths'])
+
 
     def load_file(self, file_path):
         sequences_temp = []
         qualities_temp = []
-        lengths_temp = []
-        gc_counts_temp = []
+        local_gc_counts = []
+        local_lengths = []
 
         is_gzipped = file_path.endswith(".gz")
         with (gzip.open(file_path, 'rt') if is_gzipped else open(file_path, 'r')) as f:
@@ -46,14 +90,15 @@ class FastqStatistics:
                 sequences_temp.append(seq)  # Optional
                 quality_scores = np.array(record.letter_annotations["phred_quality"], dtype=int)
                 qualities_temp.append(quality_scores)
-                lengths_temp.append(len(seq))
-                gc_counts_temp.append(seq.count('G') + seq.count('C'))
+                local_gc_counts.append(seq.count('G') + seq.count('C'))
+                local_lengths.append(len(seq))
 
         # Update class arrays after processing each file to minimize discrepancies
         self.sequences.extend(sequences_temp)
         self.qualities.extend(qualities_temp)
-        self.lengths = np.concatenate((self.lengths, np.array(lengths_temp, dtype=int)))
-        self.gc_counts = np.concatenate((self.gc_counts, np.array(gc_counts_temp, dtype=int)))
+        self.gc_counts = np.concatenate([self.gc_counts, np.array(local_gc_counts)])
+        self.lengths = np.concatenate([self.lengths, np.array(local_lengths)])
+        assert len(self.gc_counts) == len(self.lengths), "Mismatch in gc_counts and lengths array sizes"
 
     def number_of_reads(self):
         return len(self.sequences)
@@ -98,5 +143,5 @@ class FastqStatistics:
         }
 
     def gc_content_per_sequence(self):
-        gc_contents = (self.gc_counts / self.lengths) * 100
+        gc_contents = (self.gc_counts.sum() / self.lengths) * 100
         return gc_contents.tolist()

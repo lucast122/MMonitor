@@ -17,6 +17,19 @@ import gzip
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 
+class NumpyEncoder(json.JSONEncoder):
+    """ Custom encoder for numpy data types """
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NumpyEncoder, self).default(obj)
+
+
 class MMonitorCMD:
     def __init__(self):
         self.use_multiplexing = None
@@ -110,24 +123,24 @@ class MMonitorCMD:
         # qual_dist = fastq_stats.quality_score_distribution()
         # q20_q30 = fastq_stats.q20_q30_scores()
 
+
+
         data = {
             'sample_name': sample_name,
             'project_id': project_name,
             'subproject_id': subproject_name,
             'date': sample_date,
-            'mean_gc_content': fastq_stats.gc_content(),
-            'mean_read_length': np.mean(fastq_stats.lengths),
-            'median_read_length': np.median(fastq_stats.lengths),
-            'mean_quality_score': np.mean([np.mean(q) for q in fastq_stats.qualities]),
-            'read_lengths': json.dumps(quality_vs_lengths_data['read_lengths']),
-            'avg_qualities': json.dumps(quality_vs_lengths_data['avg_qualities']),
-            'number_of_reads': fastq_stats.number_of_reads(),
-            'total_bases_sequenced': fastq_stats.total_bases_sequenced(),
-            # 'q20_score': q20_q30[0],
-            # 'q30_score': q20_q30[0],
-            # 'avg_quality_per_read': qual_dist[0],
-            # 'base_quality_avg': qual_dist[1],
-            'gc_contents_per_sequence': json.dumps(gc_contents)
+            'mean_gc_content': float(fastq_stats.gc_content()),  # Ensure float
+            'mean_read_length': float(np.mean(fastq_stats.lengths)),  # Convert with float()
+            'median_read_length': float(np.median(fastq_stats.lengths)),  # Convert with float()
+            'mean_quality_score': float(np.mean([np.mean(q) for q in fastq_stats.qualities])),  # Ensure float
+            'read_lengths': json.dumps(quality_vs_lengths_data['read_lengths'], cls=NumpyEncoder),
+            # Use custom encoder if needed
+            'avg_qualities': json.dumps(quality_vs_lengths_data['avg_qualities'], cls=NumpyEncoder),
+            # Use custom encoder if needed
+            'number_of_reads': int(fastq_stats.number_of_reads()),  # Ensure int
+            'total_bases_sequenced': int(fastq_stats.total_bases_sequenced()),  # Ensure int
+            'gc_contents_per_sequence': json.dumps(gc_contents, cls=NumpyEncoder)
 
         }
 
