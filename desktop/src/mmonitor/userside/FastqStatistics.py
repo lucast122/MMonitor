@@ -34,18 +34,26 @@ class FastqStatistics:
             executor.map(self.load_file, self.file_paths)
 
     def load_file(self, file_path):
+        sequences_temp = []
+        qualities_temp = []
+        lengths_temp = []
+        gc_counts_temp = []
+
         is_gzipped = file_path.endswith(".gz")
         with (gzip.open(file_path, 'rt') if is_gzipped else open(file_path, 'r')) as f:
             for record in SeqIO.parse(f, "fastq"):
                 seq = str(record.seq)
-                self.sequences.append(seq)  # Optional, based on need
+                sequences_temp.append(seq)  # Optional
                 quality_scores = np.array(record.letter_annotations["phred_quality"], dtype=int)
-                self.qualities.append(quality_scores)
-                self.lengths = np.append(self.lengths, len(seq))
-                self.gc_counts = np.append(self.gc_counts, seq.count('G') + seq.count('C'))
-                self.q20_counts = np.append(self.q20_counts, np.sum(quality_scores >= 20))
-                self.q30_counts = np.append(self.q30_counts, np.sum(quality_scores >= 30))
-        self.total_bases += self.lengths.sum()
+                qualities_temp.append(quality_scores)
+                lengths_temp.append(len(seq))
+                gc_counts_temp.append(seq.count('G') + seq.count('C'))
+
+        # Update class arrays after processing each file to minimize discrepancies
+        self.sequences.extend(sequences_temp)
+        self.qualities.extend(qualities_temp)
+        self.lengths = np.concatenate((self.lengths, np.array(lengths_temp, dtype=int)))
+        self.gc_counts = np.concatenate((self.gc_counts, np.array(gc_counts_temp, dtype=int)))
 
     def number_of_reads(self):
         return len(self.sequences)
@@ -59,7 +67,10 @@ class FastqStatistics:
         return q20_percentage, q30_percentage
 
     def gc_content(self):
-        return (self.gc_counts.sum() / self.total_bases) * 100
+        if self.total_bases > 0:
+            return (self.gc_counts.sum() / self.total_bases) * 100
+        else:
+            return 0  # or some other appropriate value indicating no GC content could be calculated
 
     def read_lengths_statistics(self):
         if len(self.lengths) == 0:
