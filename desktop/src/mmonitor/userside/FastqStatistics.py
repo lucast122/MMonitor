@@ -1,159 +1,91 @@
 import gzip
 import time
-from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 from Bio import SeqIO
-from concurrent.futures import ThreadPoolExecutor
+
 
 class FastqStatistics:
 
-    def __init__(self, file_path, multi=False, num_threads=64):
-        print(f"Calculating statistics for {file_path}")
-        self.file_path = file_path
-        self.sequences = []
-        self.qualities = []
-        self.lengths = []
-        self.gc_contents = []
+    def __init__(self, file_paths, multi=False, num_threads=64):
+        self.file_paths = file_paths if isinstance(file_paths, list) else [file_paths]
+        self.sequences = []  # Keep if sequence data needed beyond statistics
+        self.qualities = []  # Converted to numpy arrays for efficient processing
+        self.lengths = np.array([], dtype=int)
+        self.gc_counts = np.array([], dtype=int)
+        self.q20_counts = np.array([], dtype=int)
+        self.q30_counts = np.array([], dtype=int)
+        self.total_bases = 0
+        self.load_files(multi, num_threads)
 
+    def load_files(self, multi, num_threads):
+        start_time = time.time()
         if multi:
-            start_time = time.time()
-            self.load_files_threaded(self.file_path, num_threads)
-            end_time = time.time()
-            print(f"Loaded files in {end_time - start_time} seconds")
+            self.load_files_threaded(num_threads)
         else:
-            start_time = time.time()
-            self.load_file()
-            end_time = time.time()
-            print(f"Loaded file in {end_time - start_time} seconds")
+            for file_path in self.file_paths:
+                self.load_file(file_path)
+        end_time = time.time()
+        print(f"Loaded files in {end_time - start_time} seconds")
 
-    def load_files_threaded(self, file_paths, num_threads):
-        print(f"Loading files: {file_paths}")
-
+    def load_files_threaded(self, num_threads):
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = []
-            for file_path in file_paths:
-                futures.append(executor.submit(self.load_file, file_path))
-            for future in futures:
-                future.result()
+            executor.map(self.load_file, self.file_paths)
 
     def load_file(self, file_path):
-
-        print(f"Attempting to load file: {file_path}")
-        if file_path is None:
-            file_path = self.file_path
-
-
         is_gzipped = file_path.endswith(".gz")
-        open_func = gzip.open if is_gzipped else open
-        mode = 'rt' if is_gzipped else 'r'
-
-        with open_func(file_path, mode) as f:
+        with (gzip.open(file_path, 'rt') if is_gzipped else open(file_path, 'r')) as f:
             for record in SeqIO.parse(f, "fastq"):
-                self.sequences.append(record.seq)
-                self.qualities.append(record.letter_annotations["phred_quality"])
-                self.lengths.append(len(record.seq))
-
-        if not self.qualities:
-            raise ValueError("Quality scores list is empty!")
+                seq = str(record.seq)
+                self.sequences.append(seq)  # Optional, based on need
+                quality_scores = np.array(record.letter_annotations["phred_quality"], dtype=int)
+                self.qualities.append(quality_scores)
+                self.lengths = np.append(self.lengths, len(seq))
+                self.gc_counts = np.append(self.gc_counts, seq.count('G') + seq.count('C'))
+                self.q20_counts = np.append(self.q20_counts, np.sum(quality_scores >= 20))
+                self.q30_counts = np.append(self.q30_counts, np.sum(quality_scores >= 30))
+        self.total_bases += self.lengths.sum()
 
     def number_of_reads(self):
-        start_time = time.time()
-        result = len(self.sequences)
-        end_time = time.time()
-        print(f"Number of reads calculated in {end_time - start_time} seconds")
-        return result
+        return len(self.sequences)
 
     def total_bases_sequenced(self):
-        start_time = time.time()
-        result = sum(self.lengths)
-        end_time = time.time()
-        print(f"Total bases sequenced calculated in {end_time - start_time} seconds")
-        return result
+        return self.total_bases
 
     def q20_q30_scores(self):
-        start_time = time.time()
-        total_bases = sum(self.lengths)
-        q20_bases = sum(1 for quality in self.qualities for q in quality if q >= 20)
-        q30_bases = sum(1 for quality in self.qualities for q in quality if q >= 30)
-        q20_percentage = (q20_bases / total_bases) * 100
-        q30_percentage = (q30_bases / total_bases) * 100
-        end_time = time.time()
-        print(f"Q20/Q30 scores calculated in {end_time - start_time} seconds")
+        q20_percentage = (self.q20_counts.sum() / self.total_bases) * 100
+        q30_percentage = (self.q30_counts.sum() / self.total_bases) * 100
         return q20_percentage, q30_percentage
 
-    def quality_score_distribution(self):
-        start_time = time.time()
-        # Average quality per read
-        avg_quality_per_read = [np.mean(quality) for quality in self.qualities]
-
-        # Base quality distribution for each base position
-        base_quality_distribution = defaultdict(list)
-        for quality in self.qualities:
-            for i, q in enumerate(quality):
-                base_quality_distribution[i].append(q)
-
-        threshold = len(self.qualities) * 0.5  # only distribution for bases that are covered at least by 50% of reads
-        base_quality_avg = {position: np.mean(qualities)
-                            for position, qualities in base_quality_distribution.items()
-                            if len(qualities) >= threshold}
-
-        end_time = time.time()
-        print(f"Quality score distribution calculated in {end_time - start_time} seconds")
-        return avg_quality_per_read, base_quality_avg
-
     def gc_content(self):
-        start_time = time.time()
-        total_bases = sum(self.lengths)
-        g_count = sum(seq.count('G') for seq in self.sequences)
-        c_count = sum(seq.count('C') for seq in self.sequences)
-        gc_percentage = (g_count + c_count) / total_bases
-        end_time = time.time()
-        print(f"GC content calculated in {end_time - start_time} seconds")
-        return gc_percentage
+        return (self.gc_counts.sum() / self.total_bases) * 100
 
     def read_lengths_statistics(self):
-        start_time = time.time()
-        lengths = [len(seq) for seq in self.sequences]
-        result = {
-            'min_length': min(lengths),
-            'max_length': max(lengths),
-            'mean_length': np.mean(lengths),
-            'median_length': np.median(lengths)
+        if len(self.lengths) == 0:
+            return {}
+        return {
+            'min_length': np.min(self.lengths),
+            'max_length': np.max(self.lengths),
+            'mean_length': np.mean(self.lengths),
+            'median_length': np.median(self.lengths)
         }
-        end_time = time.time()
-        print(f"Read lengths statistics calculated in {end_time - start_time} seconds")
-        return result
 
     def quality_statistics(self):
-        if not self.qualities:
-            raise ValueError("Quality scores list is empty!")
-
-        start_time = time.time()
-        all_quality_scores = [score for sublist in self.qualities for score in sublist]
-        result = {
-            'min_quality': min(all_quality_scores),
-            'max_quality': max(all_quality_scores),
-            'mean_quality': sum(all_quality_scores) / len(all_quality_scores),
+        all_quality_scores = np.concatenate(self.qualities)
+        return {
+            'min_quality': np.min(all_quality_scores),
+            'max_quality': np.max(all_quality_scores),
+            'mean_quality': np.mean(all_quality_scores),
         }
-        end_time = time.time()
-        print(f"Quality statistics calculated in {end_time - start_time} seconds")
-        return result
 
     def qualities_vs_lengths(self):
-        start_time = time.time()
-        avg_qualities = [sum(quals) / len(quals) for quals in self.qualities]
-        result = {
-            'read_lengths': self.lengths,
+        avg_qualities = [np.mean(quals) for quals in self.qualities]
+        return {
+            'read_lengths': self.lengths.tolist(),
             'avg_qualities': avg_qualities
         }
-        end_time = time.time()
-        print(f"Qualities vs. lengths calculated in {end_time - start_time} seconds")
-        return result
 
     def gc_content_per_sequence(self):
-        start_time = time.time()
-        self.gc_contents = [(seq.count('G') + seq.count('C')) / len(seq) for seq in self.sequences]
-        end_time = time.time()
-        print(f"GC content per sequence calculated in {end_time - start_time} seconds")
-        return self.gc_contents
-
+        gc_contents = (self.gc_counts / self.lengths) * 100
+        return gc_contents.tolist()
