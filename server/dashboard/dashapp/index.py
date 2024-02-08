@@ -4,6 +4,7 @@ import json
 import re
 import sqlite3
 import tempfile
+import zipfile
 from io import StringIO
 from json import loads
 from typing import Any, List, Union
@@ -16,6 +17,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 from dash import dcc, html
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State
@@ -24,8 +26,6 @@ from dash_iconify import DashIconify
 from django_plotly_dash import DjangoDash
 from scipy.ndimage.filters import gaussian_filter
 from scipy.stats import zscore
-from skbio.stats.ordination import pcoa
-from sklearn.cluster import KMeans
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from users.models import NanoporeRecord, Metadata
@@ -75,6 +75,7 @@ class Index:
         self.qc_app = qc.QC(user_id)
         self.diversity_metric = None
 
+        self.tax_fig = None
         pd.set_option('display.max_columns', None)
         pd.set_option('display.max_rows', None)
 
@@ -279,8 +280,7 @@ class Index:
             legend=dict(
                 orientation="v",
                 y=1,
-                x=1
-            ),
+                x=1),
         )
 
         return fig
@@ -530,6 +530,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         )
         def plot_selected_taxonomy(value, taxonomic_rank, sample_value_piechart, slider_value, sample_select_value,
                                    use_date_value):
+
             # Simplified initialization
             fig1 = {'data': []}
             piechart_style = {'display': 'none'}
@@ -538,7 +539,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
             # Efficient grouping and filtering
             self.df_selected = self.df_sorted[self.df_sorted['sample_id'].astype(str).isin(sample_select_value)]
-            # self.df_selected = self.df_selected.groupby('sample_id').head(slider_value).reset_index(drop=True)
+            self.df_selected = self.df_selected.groupby('sample_id').head(slider_value).reset_index(drop=True)
             # self.df_selected = self.df_selected.sort_values(by=['sample_id','project_id'], ascending=[True, True])
 
             # Mapping of plot types to functions
@@ -582,13 +583,14 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # if value == 'scatter':
             #     fig1['data'][0]['marker']['colorscale'] = self.colors
             # # remove grey background from plot
-            fig1.update_layout(width=1600, height=800)
+            fig1.update_layout(height=750, legend=dict(font=dict(size=14)), xaxis=dict(tickfont=dict(size=14)),
+                               yaxis=dict(tickfont=dict(size=14)))
             fig1['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
 
             # sort legend based on values from high to low
             # if value != 'heatmap':
             #     fig1['data'] = sorted(fig1['data'], key=lambda x: sum(x['y']), reverse=True)
-
+            self.tax_fig = fig1
             return fig1, piechart_style
 
         # Add a new callback that updates the header's style based on the dropdown's value
@@ -653,18 +655,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
 
         """
 
-        # @self.app.callback(
-        #     Output("loading-output-1", "children"),
-        #     [Input('beta_diversity_3d_pcoa', "loading_state")]
-        # )
-        # def update_loading_state(loading_state):
-        #     if loading_state.is_loading:
-        #         # Show the Lottie animation when the graph is loading
-        #         return [Lottie(options=options, width="10%", height="10%", url=url),
-        #                 dcc.Graph(id='beta_diversity_3d_pcoa')]
-        #     else:
-        #         # Hide the Lottie animation when the graph is not loading
-        #         return dcc.Graph(id='beta_diversity_3d_pcoa')
         @self.app.callback(
             [Output("menu-text", "children"),
              Output('project-clicks', 'data'),
@@ -688,28 +678,7 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             Input('diversity_metric_dropdown', 'value')
         )
         def plot_alpha_diversities(sample_select_value, alpha_diversity_metric):
-            if alpha_diversity_metric == "Simpson":
-                diversity_df = self.diversity_app.simpson_diversity.reset_index()
-                diversity_df_without_categories = self.diversity_app.simpson_diversity.reset_index()
-            else:
-                diversity_df = self.diversity_app.shannon_diversity.reset_index()
-                diversity_df_without_categories = self.diversity_app.shannon_diversity.reset_index()
-            diversity_df.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
-            diversity_df_without_categories.columns = ['sample_id', f"{alpha_diversity_metric}Diversity"]
-            # print(diversity_df_without_categories)
-            diversity_df_selected = diversity_df_without_categories[
-                diversity_df_without_categories['sample_id'].astype(str).isin(sample_select_value)]
-            diversity_df['Project'] = diversity_df['sample_id'].map(self.diversity_app.sample_to_project_dict)
-
-            fig = px.box(diversity_df, x='Project', y=f"{alpha_diversity_metric}Diversity",
-                         title=f'Alpha Diversity ({alpha_diversity_metric} Index) across Sample Categories')
-
-            fig2 = px.line(diversity_df_selected, x="sample_id", y=f"{alpha_diversity_metric}Diversity",
-                           title=f'Alpha Diversity ({alpha_diversity_metric} Index) across selected samples')
-            self.diversity_metric = alpha_diversity_metric
-            fig['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
-            fig2['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
-
+            fig, fig2 = self.diversity_app.create_alpha_diversity_plots(sample_select_value, alpha_diversity_metric)
             return fig, fig2
 
             # BETA DIVERSITY
@@ -728,148 +697,11 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         )
         def generate_pcoa_figure(selected_samples, toggle_3d, project_clicks, subproject_clicks, kmeans_clicks,
                                  sample_date_clicks, k_value):
-
-            # Default n_clicks to 0 if they are None
-            project_clicks = project_clicks or 0
-            subproject_clicks = subproject_clicks or 0
-            kmeans_clicks = kmeans_clicks or 0
-            sample_date_clicks = sample_date_clicks or 0
-
-            dimensions = 3 if toggle_3d else 2
-            # Convert the DistanceMatrix to a DataFrame if necessary
-            distance_matrix_df = pd.DataFrame(
-                self.diversity_app.beta_diversity_matrix.data,
-                index=self.diversity_app.beta_diversity_matrix.ids,
-                columns=self.diversity_app.beta_diversity_matrix.ids
-            )
-            if selected_samples:
-                distance_matrix_df = distance_matrix_df.loc[selected_samples, selected_samples]
-
-            # Now perform PCoA with skbio - this needs to be done after each filter operation if the samples change
-            pcoa_results = pcoa(distance_matrix_df)
-
-            # Extract the PCoA scores
-            pcoa_scores = pcoa_results.samples
-
-            text_data = distance_matrix_df.columns
-
-            # Determine coloring based on the last button clicked
-
-            selected_sample_to_project_dict = {item['sample_id']: item['project_id'] for item in
-                                               self.diversity_app.sample_project_mapping}
-
-            selected_sample_to_subproject_dict = {item['sample_id']: item['subproject']
-                                                  for item in self.diversity_app.sample_subproject_mapping}
-
-            # include only selected samples
-            selected_sample_to_project_dict = {k: v for k, v in selected_sample_to_project_dict.items() if
-                                               k in selected_samples}
-            selected_sample_to_subproject_dict = {k: v for k, v in selected_sample_to_subproject_dict.items() if
-                                                  k in selected_samples}
-
-            if (kmeans_clicks > project_clicks and kmeans_clicks > subproject_clicks and kmeans_clicks >
-                    sample_date_clicks):
-                # Perform K-means clustering
-                kmeans = KMeans(n_clusters=k_value, random_state=0).fit(pcoa_scores.iloc[:, :dimensions])
-                pcoa_scores['ColorCategory'] = kmeans.labels_
-                color = 'ColorCategory'
-            elif project_clicks > subproject_clicks and project_clicks > sample_date_clicks:
-                color = selected_sample_to_project_dict
-            elif subproject_clicks > sample_date_clicks:
-                color = selected_sample_to_subproject_dict
-            else:
-                color = self.diversity_app.sample_to_date_dict
-
-            # Select the appropriate number of dimensions
-            if dimensions == 3:
-                fig = px.scatter_3d(
-                    pcoa_scores,
-                    x='PC1',
-                    y='PC2',
-                    z='PC3',
-                    text=text_data,  # Add sample names as hover text
-                    labels={'PC1': 'PC1', 'PC2': 'PC2', 'PC3': 'PC3'},
-                    title="3D PCoA Plot of inter sample beta diversity",
-                    color=color
-                )
-            else:  # Default to 2D
-                fig = px.scatter(
-                    pcoa_scores,
-                    x='PC1',
-                    y='PC2',
-                    text=text_data,  # Add sample names as hover text
-                    labels={'PC1': 'PC1', 'PC2': 'PC2'},
-                    title="2D PCoA Plot of inter sample beta diversity",
-                    color=color
-                )
-
-            # Customize the figure as needed
-            fig.update_traces(marker=dict(size=10), textposition="top center",
-                              selector=dict(mode='markers+text'))  # Adjust marker size as needed
-            fig.update_layout(margin=dict(l=0, r=0, b=0, t=100))
-            fig.update_layout(width=1500, height=850)
-            fig['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
-
+            fig = self.diversity_app.create_beta_pcoa_figure(selected_samples, toggle_3d, project_clicks,
+                                                             subproject_clicks, kmeans_clicks, sample_date_clicks,
+                                                             k_value)
             return fig
 
-        # @self.app.callback(
-        #     Output('beta_diversity_plot', 'figure'),
-        #     [
-        #         Input('sample_select_value', 'value')
-        #
-        #     ]
-        # )
-        # def update_beta_diversity_plot(selected_samples):
-        #     if not selected_samples:
-        #         return {}  # Return an empty plot if no samples are selected
-        #
-        #     # Filter the beta diversity matrix based on selected samples
-        #     filtered_matrix = self.diversity_app.beta_diversity_matrix.filter(selected_samples)
-        #
-        #     # Create a 2D ordination plot (like PCoA) using the filtered matrix
-        #     # PCoA is a common way to visualize beta diversity
-        #     # You can use skbio or other libraries to perform PCoA
-        #     pcoa_results = pcoa(filtered_matrix)
-        #
-        #     fig = px.scatter(
-        #         x=pcoa_results.samples['PC1'],
-        #         y=pcoa_results.samples['PC2'],
-        #         text=selected_samples
-        #     )
-        #     fig.update_layout(title="Beta Diversity (PCoA)", xaxis_title="PC1", yaxis_title="PC2")
-        #     return fig
-
-        # 3D PCOA BETA DIVERISTY
-
-        # @self.app.callback(
-        #     Output('beta_diversity_3d_pcoa', 'figure'),
-        #     [Input('sample_select_value', 'value')]
-        # )
-        # # def update_beta_diversity_3d_pcoa(selected_samples):
-        #     if not selected_samples:
-        #         return {}  # Return an empty plot if no samples are selected
-        #
-        #     # Filter the PCoA results for the selected samples
-        #     filtered_samples = self.diversity_app.pcoa_results.samples.loc[selected_samples]
-        #
-        #     # Make sure to use the correct column names for x, y, z
-        #     fig = px.scatter_3d(
-        #         filtered_samples,
-        #         x='PC1',  # First principal coordinate
-        #         y='PC2',  # Second principal coordinate
-        #         z='PC3',  # Third principal coordinate
-        #         text=selected_samples,
-        #         labels={'PC1': 'PC1', 'PC2': 'PC2', 'PC3': 'PC3'}
-        #     )
-        #     fig.update_layout(
-        #         title="3D PCoA Plot of Beta Diversity",
-        #         scene=dict(
-        #             xaxis_title='PC1',
-        #             yaxis_title='PC2',
-        #             zaxis_title='PC3'
-        #         )
-        #     )
-        #     return fig
 
         @self.app.callback(
             Output('alpha_diversity_boxplot', 'figure'),
@@ -900,46 +732,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             [Input('sample_select_value', 'value')]
         )
         def update_beta_diversity_heatmap(selected_samples):
-            # Convert the DistanceMatrix to a DataFrame first
-            beta_matrix_df = distance_matrix_to_dataframe(self.diversity_app.beta_diversity_matrix)
-
-            # Now you can use .loc since beta_matrix_df is a DataFrame
-            if selected_samples:
-                # Filter the DataFrame based on selected samples
-                filtered_matrix = beta_matrix_df.loc[selected_samples, selected_samples]
-            else:
-                filtered_matrix = beta_matrix_df  # Use the full DataFrame if no samples are selected
-
-            # Create the heatmap
-            fig = px.imshow(
-                filtered_matrix,
-                labels=dict(x="Sample", y="Sample", color="Beta Diversity"),
-                x=filtered_matrix.columns,
-                y=filtered_matrix.columns,
-                color_continuous_scale='balance'  # Feel free to choose a different color scale
-            )
-
-            # Update layout for better readability and aesthetics
-            fig.update_layout(
-                title="Beta Diversity Heatmap",
-                xaxis=dict(tickangle=-90, tickfont=dict(size=12)),  # Adjust font size if needed
-                yaxis=dict(tickmode='array', tickvals=filtered_matrix.index, tickfont=dict(size=12)),
-                # Adjust font size if needed
-                coloraxis_colorbar=dict(title="Diversity Score"),
-                width=1600,  # Adjust the width
-                height=900,  # Adjust the height
-                margin=dict(l=50, r=50, b=50, t=50)
-            )
-
+            fig = self.diversity_app.create_beta_diversity_heatmap(selected_samples)
             return fig
-
-        # Convert DistanceMatrix to DataFrame for heatmap plotting
-        def distance_matrix_to_dataframe(distance_matrix):
-            # Convert to a square matrix and then to a DataFrame
-            matrix_df = pd.DataFrame(distance_matrix.data,
-                                     index=distance_matrix.ids,
-                                     columns=distance_matrix.ids)
-            return matrix_df
 
         @self.app.callback(
             Output("download-diversity-csv", "data"),
@@ -1776,6 +1570,45 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                               paper_bgcolor='rgba(0,0,0,0)')
 
             return fig
+
+        # DOWLNOAD SVG CALLBACKS ----- DOWLNOAD SVG CALLBACKS ----- DOWLNOAD SVG CALLBACKS ----- DOWLNOAD SVG CALLBACKS -----
+        @self.app.callback(
+            Output("download-svg-diversity", "data"),
+            [Input("btn-download-svg-diversity", "n_clicks")],
+            prevent_initial_call=True
+        )
+        def download_all_svgs_diversity(n_clicks):
+            plot_names = ['alpha_boxplot', 'alpha_lineplot', 'beta_heatmap', 'beta_pcoa']
+            # Memory file for our zip.
+            zip_buffer = io.BytesIO()
+            figs = []
+            figs.extend([self.diversity_app.alpha_fig1, self.diversity_app.alpha_fig2,
+                         self.diversity_app.beta_fig1, self.diversity_app.beta_fig2])
+
+            for idx, fig in enumerate(figs):
+                if fig is None:
+                    raise PreventUpdate
+                with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
+                    zip_file.writestr(f"{plot_names[idx]}.svg", pio.to_image(fig, format='svg'))
+
+            # Important: Go to the beginning of the BytesIO buffer.
+            zip_buffer.seek(0)
+
+            # Use dcc.send_bytes which sends the contents of a BytesIO or file-like object.
+            return dcc.send_bytes(zip_buffer.getvalue(), "plots.zip")
+
+        @self.app.callback(
+            Output("download-svg-taxonomy", "data"),
+            [Input("btn-download-taxonomy-svg", "n_clicks")],
+            prevent_initial_call=True
+        )
+        def download_svg_taxonomy(n_clicks):
+            svg_data = pio.to_image(self.tax_fig, format='svg', width=1500)
+            svg_bytes = io.BytesIO(svg_data)
+
+            # Use send_bytes to send the SVG data
+            return dcc.send_bytes(svg_bytes.getvalue(), "taxonomy.svg")
+
     #
     # def get_abundance_meta_by_taxonomy(self, tax) -> pd.DataFrame:
     #     if not tax:  # add this condition to handle empty list
