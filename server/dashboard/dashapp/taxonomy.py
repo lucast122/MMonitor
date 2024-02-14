@@ -59,8 +59,6 @@ class Taxonomy:
             '#f5f5dc', '#afeeee', '#ee82ee', '#98fb98', '#7fffd4', '#e6e6fa', '#ffc0cb'
         ]
 
-
-
         self.unique_sample_ids = None
         self.unique_samples = None
         self.unique_counts = None
@@ -86,7 +84,11 @@ class Taxonomy:
 
             self.unique_subprojects = NanoporeRecord.objects.filter(user_id=self.user_id).values(
                 'subproject').distinct()
+            self.unique_dates = NanoporeRecord.objects.filter(user_id=self.user_id).values(
+                'date').distinct()
+
             self.unique_subprojects = [item['subproject'] for item in self.unique_subprojects]
+            self.unique_dates = [item['date'] for item in self.unique_dates]
             self.unique_species = self.df['taxonomy'].unique()
             self.unique_genera = self.df['tax_genus'].unique()
             self.unique_families = self.df['tax_family'].unique()
@@ -107,11 +109,11 @@ class Taxonomy:
 
             # Get the number of unique values in each column
             # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
-            self.unique_counts = min(self.df.nunique()[1], 100)
+            self.unique_counts = min(self.df.nunique()[1], 500)
 
         unique_species = self.df_sorted['taxonomy'].unique()
         self.species_colors = {species: color for species, color in
-                          zip(unique_species, self.colors * (len(unique_species) // len(self.colors) + 1))}
+                               zip(unique_species, self.colors * (len(unique_species) // len(self.colors) + 1))}
 
         def assign_color_to_taxonomy(df, taxonomy, color_dict):
             taxonomy_colors = {}
@@ -187,6 +189,20 @@ class Taxonomy:
                             options=[{'label': 'All Subprojects', 'value': 'ALL'}] +
                                     [{'label': subproject, 'value': subproject} for subproject in
                                      self.unique_subprojects],
+                            value=None
+                        ),
+                    ],
+                    width=2, style={'padding-left': 0}
+                ),
+                dbc.Col(
+                    [
+                        dmc.Text("Select Samples by date:", id='date-dropdown-text',
+                                 className='text-primary my-2'),
+                        dcc.Dropdown(
+                            id='date-dropdown',
+                            options=[{'label': 'All Dates', 'value': 'ALL'}] +
+                                    [{'label': date, 'value': date} for date in
+                                     self.unique_dates],
                             value=None
                         ),
                     ],
@@ -345,7 +361,6 @@ class Taxonomy:
                        id="btn-download-csv-taxonomy",
                        color='blue'
 
-
                        ))
 
         # DashIconify(icon="foundation:page-export-csv"), id="btn-download", size='lg', style={"margin-left":'20px'}))
@@ -368,7 +383,7 @@ class Taxonomy:
                                          id="btn-download-taxonomy-svg",
                                          color='blue'
 
-                                            )
+                                         )
         download_component_counts = dcc.Download(id="download-counts")
         download_slider_components = dbc.Col(dmc.Group(
             [download_button, download_button_counts, download_button_svg, download_component_counts,
@@ -495,7 +510,6 @@ class Taxonomy:
 
     def _init_callbacks(self) -> None:
         return
-
 
     def calculate_normalized_counts(self):
         counts_df = pd.DataFrame.from_records(NanoporeRecord.objects.filter(user_id=self.user_id).values())
