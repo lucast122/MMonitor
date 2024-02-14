@@ -15,15 +15,17 @@ def process_fastq_file(file_path):
 
     is_gzipped = file_path.endswith(".gz")
     with (gzip.open(file_path, 'rt') if is_gzipped else open(file_path, 'r')) as f:
+        read_count = 0  # Initialize read count
         for record in SeqIO.parse(f, "fastq"):
+            if read_count >= 20:  # Adjust the threshold as needed
+                break  # Stop reading if the threshold is exceeded
             seq = str(record.seq)
-            sequences_temp.append(seq)
+            sequences_temp.append(seq)  # Optional
             quality_scores = np.array(record.letter_annotations["phred_quality"], dtype=int)
             qualities_temp.append(quality_scores)
             local_gc_counts.append(seq.count('G') + seq.count('C'))
             local_lengths.append(len(seq))
-            local_q20_counts.append((quality_scores >= 20).sum())
-            local_q30_counts.append((quality_scores >= 30).sum())
+            read_count += 1  # Increment read count
 
     return {
         'sequences': sequences_temp,
@@ -77,28 +79,6 @@ class FastqStatistics:
         self.total_bases += np.sum(result['lengths'])
 
 
-    def load_file(self, file_path):
-        sequences_temp = []
-        qualities_temp = []
-        local_gc_counts = []
-        local_lengths = []
-
-        is_gzipped = file_path.endswith(".gz")
-        with (gzip.open(file_path, 'rt') if is_gzipped else open(file_path, 'r')) as f:
-            for record in SeqIO.parse(f, "fastq"):
-                seq = str(record.seq)
-                sequences_temp.append(seq)  # Optional
-                quality_scores = np.array(record.letter_annotations["phred_quality"], dtype=int)
-                qualities_temp.append(quality_scores)
-                local_gc_counts.append(seq.count('G') + seq.count('C'))
-                local_lengths.append(len(seq))
-
-        # Update class arrays after processing each file to minimize discrepancies
-        self.sequences.extend(sequences_temp)
-        self.qualities.extend(qualities_temp)
-        self.gc_counts = np.concatenate([self.gc_counts, np.array(local_gc_counts)])
-        self.lengths = np.concatenate([self.lengths, np.array(local_lengths)])
-        assert len(self.gc_counts) == len(self.lengths), "Mismatch in gc_counts and lengths array sizes"
 
     def number_of_reads(self):
         return len(self.sequences)

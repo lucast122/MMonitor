@@ -39,7 +39,9 @@ def convert_date_format(date_str):
 
 
 class DjangoDBInterface:
+
     def __init__(self, db_config: str):
+        self.port = 8020
         try:
             with open(db_config, 'r') as file:
                 self._db_config = json.load(file)
@@ -49,7 +51,7 @@ class DjangoDBInterface:
         self._connection = None
 
     def get_user_id(self, username: str, password: str):
-        django_url = f"http://{self._db_config['host']}:8021/users/get_user_id/"
+        django_url = f"http://{self._db_config['host']}:{self.port}/users/get_user_id/"
         response = pyrequests.post(django_url, data={'username': username, 'password': password})
         if response.status_code == 200:
             return response.json()['user_id']
@@ -57,7 +59,7 @@ class DjangoDBInterface:
             return None
 
     def get_unique_sample_ids(self):
-        django_url = f"http://{self._db_config['host']}:8021/users/get_unique_sample_ids/"
+        django_url = f"http://{self._db_config['host']}:{self.port}/users/get_unique_sample_ids/"
         response = pyrequests.post(django_url,
                                    data={'username': self._db_config['user'], 'password': self._db_config['password']})
         if response.status_code == 200:
@@ -129,7 +131,7 @@ class DjangoDBInterface:
         # Send all records in one request
         try:
             response = pyrequests.post(
-                f"http://{self._db_config['host']}:8021/users/overwrite_nanopore_record/",
+                f"http://{self._db_config['host']}:{self.port}/users/overwrite_nanopore_record/",
                 json=records,  # Send the list of records
                 auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
             )
@@ -156,6 +158,7 @@ class DjangoDBInterface:
         df['Sample'] = sample_name
         df['Sample_date'] = date
         df = df[df['Rank'] == "S"]
+        df = df[df['abundance'] > 1]
         df = df.drop(columns='Rank')
 
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
@@ -202,7 +205,7 @@ class DjangoDBInterface:
         # print(f"Sending record: {records}")
         try:
             response = pyrequests.post(
-                f"http://{self._db_config['host']}:8021/users/overwrite_nanopore_record/",
+                f"http://{self._db_config['host']}:{self.port}/users/overwrite_nanopore_record/",
                 json=records,  # Send the list of records
                 auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
             )
@@ -224,7 +227,7 @@ class DjangoDBInterface:
         # print(f"Sending record: {record_data}")
         try:
             response = pyrequests.post(
-                f"http://{self._db_config['host']}:8021/users/add_sequencing_statistics/",
+                f"http://{self._db_config['host']}:{self.port}/users/add_sequencing_statistics/",
                 json=record_data,
                 auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
             )
