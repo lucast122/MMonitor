@@ -95,6 +95,14 @@ class Correlations:
 
         download_correlations_component = dcc.Download(id="download-corr-csv")
 
+        svg_download_button = dmc.Center(dmc.Group([dmc.Space(h=10),
+                                                    dmc.Button("Download all plots as SVG",
+                                                               id="btn-download-svg-correlations",
+                                                               style={'margin-top': '20px', 'margin-left': '10px'},
+                                                               leftIcon=DashIconify(icon="bi:filetype-svg")),
+                                                    ]))
+        svg_download_component = dcc.Download(id="download-svg-diversity")
+
         upload_component = dcc.Upload(
             id='upload-data',
             children=html.Div([
@@ -280,9 +288,11 @@ class Correlations:
             figure=self.create_heatmap()  # Call the function to generate the heatmap figure
         ))
 
-        download_buttons = dmc.Center(dmc.Group([download_template_button, download_correlations_button]))
+        download_buttons = dmc.Center(dmc.Group([download_template_button, download_correlations_button,
+                                                 svg_download_button]))
         container = html.Div(
             [title, upload_component, download_correlations_component, download_buttons, notification_placeholder,
+             svg_download_component,
              corr_heatmap_dend,
              bottom_text
              # ,dropdowns, corr_heatmap_dend, header_tb, dropdowns_tb,
@@ -338,6 +348,7 @@ class Correlations:
 
         # Create a DataFrame from the collected data
         correlation_matrix = pd.DataFrame(correlation_data)
+
         self.correlation_matrix = correlation_matrix
 
         return correlation_matrix
@@ -353,26 +364,27 @@ class Correlations:
     def create_heatmap(self):
         if self.correlation_matrix is None or self.correlation_matrix.empty:
             return go.Figure()  # Return an empty figure if no data is available
+        self.correlation_matrix = self.correlation_matrix.dropna(axis=0)
+        matrix_for_heatmap = self.correlation_matrix.set_index('taxonomy')
+        # print(f"correlation matrix: {self.correlation_matrix}")
+        # print(f"Correlation Matrix Shape: {self.correlation_matrix.shape}")
+        # print(f"Taxonomies: {len(self.correlation_matrix['taxonomy'])}")
 
-        # Check the shape of the correlation matrix
-        print(f"Correlation Matrix Shape: {self.correlation_matrix.shape}")
-        print(f"Taxonomies: {len(self.correlation_matrix['taxonomy'])}")
-
-        print(self.correlation_matrix)
-        matrix_for_hetmap = self.correlation_matrix.set_index('taxonomy')
         fig = go.Figure(
-            data=go.Heatmap(z=matrix_for_hetmap.values, x=matrix_for_hetmap.columns, y=matrix_for_hetmap.index,
+            data=go.Heatmap(z=matrix_for_heatmap.values, x=matrix_for_heatmap.columns,
+                            y=[f'<i>{elem}</i> ' for elem in matrix_for_heatmap.index],
                             colorscale='Portland'))
         fig.update_layout(
-            xaxis=dict(type='category'),
-            yaxis=dict(type='category'),
-            height=len(self._taxonomies) * 10,
-            width=len(self.meta_df.columns) * 100 + 200,
+            xaxis=dict(type='category', automargin=True, tickfont=dict(size=14)),
+            yaxis=dict(type='category', automargin=True, tickfont=dict(size=14)),
+            height=len(self._taxonomies) * 20,
+            width=len(self.meta_df.columns) * 100 + 500,
             title='Heatmap of taxonomy-metadata correlations',
             xaxis_title='Metadata',
             yaxis_title='Taxonomy',
-            legend_title=f'{self.corr_method} correlation'
-
+            legend_title=f'{self.corr_method} correlation',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(size=14)
         )
         return fig
 

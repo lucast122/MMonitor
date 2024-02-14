@@ -1,6 +1,5 @@
 import base64
-from io import StringIO
-from typing import Tuple, List, Any, Dict
+from typing import Tuple, List, Any
 
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
@@ -9,11 +8,9 @@ import pandas as pd
 import plotly.express as px
 from dash import dash_table
 from dash import html
-from dash.dependencies import Input, Output
 from dash_ag_grid import AgGrid
 from dash_iconify import DashIconify
 from django_plotly_dash import DjangoDash
-from plotly.graph_objects import Figure
 
 from users.models import NanoporeRecord
 from users.models import SequencingStatistics
@@ -100,8 +97,6 @@ class Taxonomy:
                                                              columns='taxonomy',
                                                              values='abundance',
                                                              fill_value=0)
-            self.df.to_csv('/home/minion-computer/df.csv')
-            self.df_full_for_diversity.to_csv('/home/minion-computer/pivot.csv')
 
             sample_project_mapping = self.records.values('sample_id', 'project_id')
             self.sample_to_project_dict = {item['sample_id']: item['project_id'] for item in sample_project_mapping}
@@ -112,7 +107,7 @@ class Taxonomy:
 
             # Get the number of unique values in each column
             # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
-            self.unique_counts = min(self.df.nunique()[1], 500)
+            self.unique_counts = min(self.df.nunique()[1], 100)
 
         unique_species = self.df_sorted['taxonomy'].unique()
         self.species_colors = {species: color for species, color in
@@ -153,7 +148,7 @@ class Taxonomy:
             dbc.Row([
                 dbc.Col(
                     [
-                        dmc.Text("Samples to plot:", className='text-primary my-2', id='sample_select_text',
+                        dmc.Text("Samples to plot:", className='text-primary my-2', id='sample_select_text', size='lg',
                                  style={'width': '100%'}),
                         dcc.Dropdown(
                             id='sample_select_value',
@@ -243,6 +238,12 @@ class Taxonomy:
                 ),
             ])
         ], fluid=True)
+        css_style = """
+        .legend text {
+            font-style: italic !important;
+        }
+        """
+        encoded_css = base64.b64encode(css_style.encode()).decode()
 
         graph_container = html.Div(
             [
@@ -250,23 +251,12 @@ class Taxonomy:
                 html.Div(
                     [
                         dcc.Graph(
-                            id='graph1',
-                            figure={
-                                'data': [],  # Replace with your data
-                                'layout': {
-
-
-                                    'height': '800px'
-                                    # Add the rest of your layout properties here...
-                                }
-                            },
-
-                        ),
-                        html.Div(
-                            dcc.Markdown("**Figure 1**: Abundance of each sample"),
-                            style={"textAlign": "center", "margin-top": "1px"}  # Adjust "10px" as needed
-                        )
-                    ], style={'width': '100%', "padding": "5px"})
+                            id='graph1'
+                        ), html.Link(
+                        rel='stylesheet',
+                        href=f'data:text/css;base64,{encoded_css}'
+                    )
+                    ])
                 # ),
                 #
                 # html.Div(
@@ -301,26 +291,29 @@ class Taxonomy:
             justify="center", style={'display': 'none'}, id='header_pie_chart_sample_select_dbc')
 
         slider_header = dbc.Row(
-            dbc.Col(dmc.Text(children='Number of taxa to display:', className='text-primary my-2'),
+            dbc.Col(dmc.Text(children='Max number of taxa to display per sample:', className='text-primary my-2',
+                             size='lg'),
                     width={'size': 12, 'offset': 0}), justify="start")
 
         unique_counts_value = self.unique_counts if self.unique_counts else 10
         slider = html.Div([
             dbc.Row(
                 dbc.Col(
-                    dcc.Slider(
+                    dmc.Slider(
                         id='slider',
                         min=1,
-
                         max=unique_counts_value,
                         value=unique_counts_value,
-                        marks={
-                            i: str(i) if i in [1, unique_counts_value // 2, unique_counts_value] else ""
+                        marks=[
+                            {"value": i,
+                             "label": str(i) if i in [1, unique_counts_value // 2, unique_counts_value] else None}
                             for i in range(1, unique_counts_value + 1)
-                        },
-                        step=1
+                        ],
+                        step=1,
+                        labelAlwaysOn=True,  # To always display the label, similar to how marks are shown in dcc.Slider
+                        style={"width": "80%"}  # To make the slider span the screen width
                     ),
-                    width={'size': 4, 'offset': 0}  # centering the slider by offsetting it 3 units
+
                 ),
                 justify='start'
             ),
@@ -357,6 +350,7 @@ class Taxonomy:
 
         # DashIconify(icon="foundation:page-export-csv"), id="btn-download", size='lg', style={"margin-left":'20px'}))
         download_component = dcc.Download(id="download-csv")
+        download_component_svg = dcc.Download(id="download-svg-taxonomy")
 
         download_button_counts = dmc.Button('Export Counts',
                                             leftIcon=DashIconify(icon="foundation:page-export-csv", width=20),
@@ -365,11 +359,20 @@ class Taxonomy:
                                             id="btn-download-counts-taxonomy",
                                             color='blue'
 
+                                            )
+
+        download_button_svg = dmc.Button('Export Fig as SVG',
+                                         leftIcon=DashIconify(icon="foundation:page-export", width=20),
+                                         size="lg",
+                                         variant="filled",
+                                         id="btn-download-taxonomy-svg",
+                                         color='blue'
 
                                             )
         download_component_counts = dcc.Download(id="download-counts")
         download_slider_components = dbc.Col(dmc.Group(
-            [download_button, download_button_counts, download_component_counts, download_component]))
+            [download_button, download_button_counts, download_button_svg, download_component_counts,
+             download_component, download_component_svg]))
         container = dbc.Container(
 
             [
@@ -491,133 +494,8 @@ class Taxonomy:
         return fig1, piechart_style
 
     def _init_callbacks(self) -> None:
-        """
-        Initialize the callbacks for the app.
+        return
 
-        The callbacks include updating the figures when the dropdown value, piechart value, or slider value changes,
-        and downloading the CSV when the download button is clicked.
-        """
-
-        # this updates the graph based on the samples selected
-        print("init callbacks in taxonomy pie called")
-
-        @self.app.callback(
-            Output('graph1', 'figure'),
-            Output('graph2', 'figure'),
-            # this output hides the pie chart number input when no pie chart is plotted
-            Output('number_input_piechart', 'style'),
-            # hides 2nd plot for pie chart
-            Output('graph2', 'style'),
-            Output('markdown-caption', 'style'),
-            Input('dropdown', 'value'),
-            Input('number_input_piechart', 'value'),
-            Input('slider', 'value'),
-            Input('sample_select_value', 'value')
-
-        )
-        def plot_selected_figure(value, sample_value_piechart, slider_value, sample_select_value) -> Tuple[
-            Figure, Figure, Dict[str, str]]:
-            """
-            Update the figures based on the selected value from the dropdown menu, the selected sample value for the piechart,
-            and the selected number of taxa from the slider.
-
-            Args:
-            value (str): The selected value from the dropdown menu.
-            sample_value_piechart (str): The selected sample value for the piechart.
-            slider_value (int): The selected number of taxa from the slider.
-            sample_select_value: (str) output of multi select dropdown (selected samples)
-
-            Returns:
-                Tuple[Figure, Figure, Dict[str, str]]: A tuple containing two figures for the graphs and a dict for the piechart style.
-            """
-            # fallback values
-            # Check if sample_select_value is None or empty list
-
-            # if not value or not sample_value_piechart or not slider_value or not sample_select_value:
-            #     raise PreventUpdate
-
-            fig1 = {'data': []}
-            fig2 = {'data': []}
-            piechart_style = {'display': 'none'}
-
-            fig2_style = {'display': 'block'}
-
-            # request necessary data from database
-            # q = "SELECT sample_id, taxonomy, abundance FROM mmonitor"
-            # df = self._sql.query_to_dataframe(q)
-            df_sorted = self.df.sort_values("abundance", ascending=False)
-            df_grouped = df_sorted.groupby("sample_id")
-            result_df = pd.DataFrame()
-            for name, group in df_grouped:
-                # get most abundant for slider_value number of selected taxa for each sample to display in taxonomy plots
-                sample_rows = group.head(slider_value)
-                result_df = pd.concat([result_df, sample_rows])
-
-            result_df = result_df.reset_index(drop=True)
-            self.result_df = result_df
-            self.df_selected = self.result_df[self.result_df['sample_id'].astype(str).isin(sample_select_value)]
-
-            if value == 'stackedbar':
-                fig1 = self.plot_stacked_bar(self.df_selected)
-
-            elif value == 'groupedbar':
-                fig1 = self.plot_grouped_bar(self.df_selected)
-
-            elif value == 'scatter':
-                fig1, fig2, fig2_style = self.plot_scatter(self.df_selected)
-
-            elif value == 'area':
-                fig1, fig2_style = self.plot_area(self.df_selected)
-
-            elif value == 'scatter3d':
-                fig1, fig2 = self.plot_scatter_3d(self.df_selected)
-
-            elif value == "pie":
-                fig1, piechart_style, fig2_style = self.plot_pie(self.result_df, sample_value_piechart)
-
-            return fig1, fig2, piechart_style, fig2_style, fig2_style
-            # fig2_style,fig2_style 2nd fi2_style used for hiding markdown caption
-
-        # Add a new callback that updates the header's style based on the dropdown's value
-        @self.app.callback(
-            Output('header_pie_chart_sample_select_dbc', 'style'),
-            Input('dropdown', 'value')
-        )
-        def show_hide_element(value):
-            if value == "pie":
-                return {'display': 'block'}  # Show the header if 'pie' is selected
-            else:
-                return {'display': 'none'}  # Hide the header for other options
-
-        @self.app.callback(
-            Output("download-csv", "data"),
-            [Input("btn-download", "n_clicks")]
-        )
-        def download_csv(n_clicks):
-            if n_clicks is not None:
-                # Create a sample DataFrame for demonstration
-
-                # Convert DataFrame to CSV string
-                csv_string = self.df_sorted.to_csv(index=False)
-
-                # Create a BytesIO object to hold the CSV data
-                csv_bytes = StringIO()
-                csv_bytes.write(csv_string)
-
-                # Seek to the beginning of the BytesIO stream
-                csv_bytes.seek(0)
-
-                # Base64 encode the CSV data
-                csv_base64 = base64.b64encode(csv_bytes.read().encode()).decode()
-
-                # Construct the download link
-                csv_href = f"data:text/csv;base64,{csv_base64}"
-
-                # Specify the filename for the download
-                filename = "data.csv"
-
-                # Return the download link and filename
-                return dcc.send_data_frame(self.df_sorted.to_csv, filename=filename)
 
     def calculate_normalized_counts(self):
         counts_df = pd.DataFrame.from_records(NanoporeRecord.objects.filter(user_id=self.user_id).values())
