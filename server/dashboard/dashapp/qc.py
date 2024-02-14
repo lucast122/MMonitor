@@ -1,45 +1,20 @@
-import ast
-import hashlib
+import json
+import random
 
 import dash_core_components as dcc
 import dash_mantine_components as dmc
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objs as go
 from django_plotly_dash import DjangoDash
 
 from users.models import SequencingStatistics
 
 
-def string_to_list(string_repr):
-    return ast.literal_eval(string_repr)
-
-
-def subsample(read_lengths):
-    # If read_lengths is longer than 200, return a random sample of 200 elements
-    if len(read_lengths) > 200:
-        return pd.Series(read_lengths).sample(n=200, random_state=42, replace=True).tolist()
-    else:
-        return read_lengths
-
-
 class QC:
     def __init__(self, user_id):
         self.user_id = user_id
         self.app = DjangoDash('qc', add_bootstrap_links=True)
-        self.colors = [
-            '#556b2f', '#6b8e23', '#006400', '#708090',
-            '#8b0000', '#3cb371', '#bc8f8f', '#663399', '#008080', '#bdb76b', '#4682b4',
-            '#000080', '#9acd32', '#20b2aa', '#cd5c5c', '#32cd32', '#daa520', '#8fbc8f',
-            '#8b008b', '#b03060', '#d2b48c', '#ff0000', '#ff8c00', '#ffd700', '#ffff00',
-            '#c71585', '#00ff00', '#ba55d3', '#00ff7f', '#4169e1', '#e9967a', '#dc143c',
-            '#00ffff', '#00bfff', '#f4a460', '#0000ff', '#a020f0', '#adff2f', '#ff7f50',
-            '#ff00ff', '#db7093', '#eee8aa', '#6495ed', '#dda0dd', '#87ceeb', '#ff1493',
-            '#f5f5dc', '#afeeee', '#ee82ee', '#98fb98', '#7fffd4', '#e6e6fa', '#ffc0cb'
-        ]
         self._init_layout()
-
-        # 55 distinct colors generated using https://mokole.com/palette.html (input: 55, 5% 90%, 1000 loops)
 
     def get_data(self):
         stats = SequencingStatistics.objects.filter(user_id=self.user_id)
@@ -109,27 +84,78 @@ class QC:
         if not self.stats.exists():
             return go.Figure()
 
-        # Apply the string_to_list function to convert the strings to lists
-        self.stats_df['read_lengths'] = self.stats_df['read_lengths'].apply(string_to_list)
+        samples_read_lengths = self.stats_df[['sample_name', 'read_lengths', 'project_id']]
 
-        # Create a list of dictionaries to store flattened data
-        flattened_data = []
+        # Initialize dictionaries to hold aggregated read lengths data
+        read_lengths_data = {}
+        project_colors = {}
+        project_legend_added = {}  # Track which project_id has been added to the legend for name adjustments
 
-        # Iterate over rows of the DataFrame and append flattened data
-        for _, row in self.stats_df.iterrows():
-            sample_name = row['sample_name']
-            read_lengths = row['read_lengths']
-            project_id = row['project_id']
-            flattened_data.extend(
-                [{'sample_name': sample_name, 'read_lengths': rl, 'project_id': project_id} for rl in read_lengths])
+        sample_size = 1000  # Target number of read lengths to sample for each plot
 
-        # Create the DataFrame from the list of dictionaries
-        flattened_data_df = pd.DataFrame(flattened_data)
+        # Process and aggregate read lengths data efficiently
+        for _, sample in samples_read_lengths.iterrows():
+            sample_name = sample['sample_name']
+            project_id = sample['project_id']
+            try:
+                # Convert string representation of list to actual list and convert each item to int
+                read_lengths_list = [int(length) for length in json.loads(sample['read_lengths'])]
+            except json.JSONDecodeError:
+                continue  # Skip samples with parsing errors
 
-        # Create the box plot
-        fig = px.box(flattened_data_df, x='sample_name', y='read_lengths', color='project_id', points=False,
-                     range_y=[0, 4000])
-        fig.add_hline(y=1550, line_dash="dot", line_color="grey")
+            # Downsample read lengths if there are more than sample_size read lengths
+            if len(read_lengths_list) > sample_size:
+                read_lengths_list = random.sample(read_lengths_list, sample_size)
+
+            # Aggregate read lengths for the same sample
+            if sample_name in read_lengths_data:
+                read_lengths_data[sample_name].extend(read_lengths_list)
+            else:
+                read_lengths_data[sample_name] = read_lengths_list
+
+            # Assign a color for each project_id, but only if it hasn't been assigned yet
+            if project_id not in project_colors:
+                project_colors[project_id] = self._get_color_for_project_id(project_id)
+
+        # Prepare data for boxplot, ensuring one box per sample_name and adjusting legend for project_id
+        boxplot_data = []
+        for sample_name, lengths in read_lengths_data.items():
+            # Find project_id for the current sample
+            project_id = \
+            samples_read_lengths.loc[samples_read_lengths['sample_name'] == sample_name, 'project_id'].iloc[0]
+
+            # Determine if this project_id has been added to the legend
+            if project_id not in project_legend_added:
+                name_for_legend = str(project_id)  # Use project_id for the first sample's legend entry
+                project_legend_added[project_id] = True
+                showlegend = True
+            else:
+                name_for_legend = sample_name  # Use sample_name for hover text, but don't add to legend
+                showlegend = False  # Don't show in legend to avoid duplicates
+
+            box = go.Box(
+                y=lengths,
+                boxpoints=False,
+                name=name_for_legend,
+                legendgroup=str(project_id),  # Use project_id as legendgroup identifier
+                marker=dict(color=project_colors[project_id]),
+                showlegend=showlegend,
+                text=sample_name,  # Use sample_name for hover text
+                hoverinfo='text+y',  # Show sample_name and y value on hover
+            )
+            boxplot_data.append(box)
+
+        # Create a horizontal line trace for the 16S rRNA gene length
+        line_trace = go.Scatter(
+            x=[0],  # Placeholder x-value
+            y=[1550],  # Placeholder y-value for the 16S rRNA gene length
+            mode='lines',
+            line=dict(color='royalblue', width=2, dash='dot'),
+            name='16S rRNA Gene Length',
+            showlegend=True
+        )
+
+        fig = go.Figure(data=boxplot_data + [line_trace])
 
         fig.update_layout(
             title='Read Length Distribution per Sample',
@@ -137,26 +163,25 @@ class QC:
             yaxis_title='Read Length',
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            legend_title='Project ID',
-            height=850,
-
-            font=dict(size=20)  # Adjust the font size here
+            legend_title='Project ID'
         )
 
         return fig
 
     def _get_color_for_project_id(self, project_id):
-        """
-        Generates a consistent color for a given project_id based on a hash function.
-        """
-        # Define a palette of colors to cycle through. Add more colors for a larger variety.
-        color_palette = self.colors
+        # You can define a color mapping based on project_id here
+        # For simplicity, let's just assign random colors
+        return f'rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})'
 
-        # Use a hash function to ensure consistency between runs
-        hash_value = int(hashlib.sha256(project_id.encode('utf-8')).hexdigest(), 16)
-        color_index = hash_value % len(color_palette)  # Map the hash value to an index in the palette
+    def _get_color_for_project_id(self, project_id):
+        # You can define a color mapping based on project_id here
+        # For simplicity, let's just assign random colors
+        return f'rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})'
 
-        return color_palette[color_index]
+    def _get_color_for_project_id(self, project_id):
+        # You can define a color mapping based on project_id here
+        # For simplicity, let's just assign random colors
+        return f'rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})'
 
     def get_aggregated_mean_quality_score_plot(self):
         if not self.stats.exists():

@@ -151,7 +151,7 @@ class Diversity:
             # get number of unique taxonomies for creation of slider. limit max taxa to plot to 100
             self.unique_counts = min(self.df.nunique()[1], 500)
 
-
+        self._init_layout()
         self.calculate_alpha_diversity(use_normalized_counts=False)
 
         self.pcoa_results, self.beta_diversity_matrix, self.samples_with_valid_distances = self.calculate_beta_diversity()
@@ -168,7 +168,6 @@ class Diversity:
         self.sample_to_date_dict = {item['sample_id']: item['date'] for item in
                                     self.sample_date_mapping}
         self.diversity_metric = None
-        self._init_layout()
 
     def _init_layout(self) -> None:
 
@@ -194,8 +193,7 @@ class Diversity:
              # Beta diversity heatmap section
              html.Div(
 
-                 dcc.Graph(id='beta_diversity_heatmap',
-                           figure=self.create_beta_diversity_heatmap(self.unique_sample_ids)),
+                 dcc.Graph(id='beta_diversity_heatmap'),
                  style={"padding": "5px"}
              ),
              # PCoA plot container
@@ -391,7 +389,6 @@ class Diversity:
     def calculate_normalized_counts(self):
         counts_df = pd.DataFrame.from_records(NanoporeRecord.objects.filter(user_id=self.user_id).values())
         stats_df = pd.DataFrame.from_records(SequencingStatistics.objects.filter(user_id=self.user_id).values())
-        print(f"stats_df {stats_df}")
 
         # Merge the counts and stats dataframes on sample_id
         merged_df = pd.merge(counts_df, stats_df, left_on='sample_id', right_on="sample_name")

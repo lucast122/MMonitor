@@ -486,12 +486,9 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
         @self.app.callback(
             Output("sample_select_value", "value"),
             [Input("project-dropdown", "value"),
-             Input("subproject-dropdown", "value"),
-             Input("date-dropdown", "value")]
+             Input("subproject-dropdown", "value")]
         )
-        def select_samples_by_x(selected_project, selected_subproject, selected_date):
-            selected_date_dt = pd.to_datetime(selected_date)
-
+        def select_samples_by_project_and_subproject(selected_project, selected_subproject):
             global trigger_id
             ctx = dash.callback_context
 
@@ -513,16 +510,6 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
                     filtered_df = self.df
                 else:
                     filtered_df = self.df[self.df['subproject'] == selected_subproject]
-
-            elif trigger_id == "date-dropdown":
-                if selected_date == "ALL":
-                    filtered_df = self.df
-                else:
-                    filtered_df = self.df[self.df['date'] == selected_date_dt.date()]
-                    print(f"type of self.df['date']: {type(self.df['date'][0])}")
-                    print(f" self.df['date']: {self.df['date'][0]}")
-                    print(f"type of selected_date: {type(selected_date)}")
-                    print(f" selected_date: {selected_date}")
 
             else:
                 return []
@@ -596,8 +583,8 @@ TAXONOMY callbacks -----  Taxonomy callbacks ----- Taxonomy callbacks ----- Taxo
             # if value == 'scatter':
             #     fig1['data'][0]['marker']['colorscale'] = self.colors
             # # remove grey background from plot
-            fig1.update_layout(height=800, legend=dict(font=dict(size=18)), xaxis=dict(tickfont=dict(size=18)),
-                               yaxis=dict(tickfont=dict(size=20)))
+            fig1.update_layout(height=750, legend=dict(font=dict(size=14)), xaxis=dict(tickfont=dict(size=14)),
+                               yaxis=dict(tickfont=dict(size=14)))
             fig1['layout']['plot_bgcolor'] = 'rgba(0,0,0,0)'
 
             # sort legend based on values from high to low
