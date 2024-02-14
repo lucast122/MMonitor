@@ -156,6 +156,7 @@ class DjangoDBInterface:
         df['Sample'] = sample_name
         df['Sample_date'] = date
         df = df[df['Rank'] == "S"]
+        df = df[df['abundance'] > 1]
         df = df.drop(columns='Rank')
 
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
