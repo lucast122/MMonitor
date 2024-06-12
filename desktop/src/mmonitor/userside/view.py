@@ -2,6 +2,7 @@ import gzip
 import hashlib
 import json
 import os
+import sys
 import tarfile
 import time
 import tkinter as tk
@@ -13,7 +14,7 @@ from tkinter import *
 from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
-
+from tkinter import messagebox, scrolledtext
 import customtkinter as ctk
 import numpy as np
 from CTkMessagebox import CTkMessagebox
@@ -22,7 +23,6 @@ from customtkinter import CTkImage
 from future.moves.tkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
-
 # from mmonitor.Tooltip import ToolTip
 from build_mmonitor_pyinstaller import ROOT, IMAGES_PATH
 from mmonitor.dashapp.index import Index
@@ -36,10 +36,16 @@ from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
 from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
 
+
+import tkinter as tk
+from tkinter import messagebox, scrolledtext
+import customtkinter as ctk
+import sys
+import traceback
 # Global constants for version and dimensions
 VERSION = "v1.0.1 beta"
 MAIN_WINDOW_X: int = 300
-MAIN_WINDOW_Y: int = 600
+MAIN_WINDOW_Y: int = 900
 
 # Module description
 
@@ -48,6 +54,14 @@ This file represents the basic gui for the desktop app. It is the entry point fo
 for the user to create projects, select files and run MMonitor's computational engine (centrifuge at this moment)
 """
 
+def compute_sha256(file_path):
+    """Compute the sha256 checksum of a file. Used to check if index files like emu_db index have been downloaded correctly"""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        # Read and update hash string value in blocks of 4K
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 def require_project(func):
     """Decorator that ensures that a database was selected or created by the user."""
@@ -61,15 +75,17 @@ def require_project(func):
 
     return func_wrapper
 
+class RedirectText:
+    def __init__(self, widget):
+        self.widget = widget
 
-def compute_sha256(file_path):
-    """Compute the sha256 checksum of a file. Used to check if index files like emu_db index have been downloaded correctly"""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        # Read and update hash string value in blocks of 4K
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+    def write(self, text):
+        self.widget.insert(tk.END, text)
+        self.widget.see(tk.END)
+
+    # def flush(self):
+    #     passdef
+
 
 
 class GUI(ctk.CTk):
@@ -84,6 +100,22 @@ class GUI(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+
+        # Create a console for logging
+        self.console_frame = ctk.CTkFrame(self)
+        self.console_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        
+        self.console_text = scrolledtext.ScrolledText(self.console_frame, wrap=tk.WORD, height=10)
+        self.console_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.console_scrollbar = ctk.CTkScrollbar(self.console_frame, command=self.console_text.yview)
+        self.console_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.console_text.config(yscrollcommand=self.console_scrollbar.set)
+        
+        # Redirect stdout and stderr to the console
+        sys.stdout = RedirectText(self.console_text)
+        sys.stderr = RedirectText(self.console_text)
+
         self.pipeline_popup = None
         self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
         self.progress_bar_exists = False
@@ -550,8 +582,8 @@ class GUI(ctk.CTk):
             'total_bases_sequenced': fastq_stats.total_bases_sequenced(),
             'q20_score': fastq_stats.q20_q30_scores()[0],
             'q30_score': fastq_stats.q20_q30_scores()[1],
-            'avg_quality_per_read': fastq_stats.quality_score_distribution()[0],
-            'base_quality_avg': fastq_stats.quality_score_distribution()[1],
+            # 'avg_quality_per_read': fastq_stats.quality_score_distribution()[0],
+            # 'base_quality_avg': fastq_stats.quality_score_distribution()[1],
             'gc_contents_per_sequence': json.dumps(gc_contents)
 
         }

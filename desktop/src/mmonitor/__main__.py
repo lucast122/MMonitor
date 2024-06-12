@@ -12,9 +12,6 @@ if base_path not in sys.path:
 
 
 print(ROOT)
-print(f"Before adding folder to sys.path: {sys.path}")
-
-print(f"After adding folder to sys.path: {sys.path}")
 
 def main():
     GUI().start_app()

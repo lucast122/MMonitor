@@ -8,7 +8,7 @@ import numpy as np
 
 from build_mmonitor_pyinstaller import ROOT
 from mmonitor.userside.FastqStatistics import FastqStatistics
-from mmonitor.userside.InputWindow import get_files_from_folder
+
 from src.mmonitor.database.django_db_interface import DjangoDBInterface
 from src.mmonitor.userside.CentrifugeRunner import CentrifugeRunner
 from src.mmonitor.userside.EmuRunner import EmuRunner
@@ -16,7 +16,7 @@ from Bio import SeqIO
 import gzip
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
-
+from datetime import date, datetime
 class NumpyEncoder(json.JSONEncoder):
     """ Custom encoder for numpy data types """
     def default(self, obj):
@@ -31,6 +31,26 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 class MMonitorCMD:
+    @staticmethod
+    def get_files_from_folder(folder_path):
+        """
+        Gets a path to a folder, checks if path contains sequencing files with specified endings and returns list
+        containing paths to sequencing files.
+        """
+        files = []
+
+        # We will use os.walk for recursive search
+        for dirpath, dirnames, filenames in os.walk(folder_path):
+            for file in filenames:
+                if file.endswith((".fastq", ".fq", ".fasta", ".fastq.gz")) and "concatenated" not in file:
+                    files.append(os.path.join(dirpath, file))
+
+        # If no files were found, log an error
+        if not files:
+            print(f"No sequencing files (.fastq, .fq found at {folder_path}")
+
+        return files
+
     def __init__(self):
         self.use_multiplexing = None
         self.multi_sample_input = None
@@ -84,7 +104,6 @@ class MMonitorCMD:
 
     import argparse
     import os
-    from datetime import datetime
 
     def valid_file(self, path):
         if not os.path.isfile(path):
@@ -150,7 +169,10 @@ class MMonitorCMD:
     # returns true if sample_name is in db and false if not
     def check_sample_in_db(self, sample_id):
         samples_in_db = self.django_db.get_unique_sample_ids()
-        return sample_id in samples_in_db
+        if samples_in_db is not None:
+            return sample_id in samples_in_db
+        else:
+            return []
 
     def update_only_statistics(self):
 
@@ -169,6 +191,8 @@ class MMonitorCMD:
             for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
                 files = file_path_list
                 sample_name = self.multi_sample_input["sample_names"][index]
+
+                print(f"processing sample {sample_name}")
                 project_name = self.multi_sample_input["project_names"][index]
                 subproject_name = self.multi_sample_input["subproject_names"][index]
                 sample_date = self.multi_sample_input["dates"][index]
@@ -179,17 +203,20 @@ class MMonitorCMD:
     def taxonomy_nanopore_16s(self):
         global sample_name, project_name, subproject_name, sample_date
 
+
         def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
             emu_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}/"
             self.django_db.update_django_with_emu_out(emu_out_path, "species", sample_name, project_name, sample_date,
                                                       subproject_name, self.args.overwrite)
             print(self.args.overwrite)
 
+
         if not os.path.exists(os.path.join(ROOT, "src", "resources", "emu_db", "taxonomy.tsv")):
             print("emu db not found")
 
         if not self.args.multicsv:
             sample_name = str(self.args.sample)
+            print(f"Analyzing amplicon data for sample {sample_name}.")
             # when a sample is already in the database and user does not want to overwrite quit now
             if not self.args.overwrite:
                 if self.check_sample_in_db(sample_name):
@@ -315,8 +342,7 @@ class MMonitorCMD:
                         error_messages.append(error_message)
                         continue
 
-                files = get_files_from_folder(folder_path)
-                print(files)
+                files = self.get_files_from_folder(folder_path)
 
                 # Extract attributes from CSV and check for errors
                 required_columns = ["sample_name", "date", "project_name", "subproject_name"]
@@ -344,6 +370,9 @@ class MMonitorCMD:
 
     def taxonomy_nanopore_wgs(self):
         cent_db_path = os.path.join(ROOT, 'src', 'resources', 'dec_22')
+        today = datetime.now()
+        # Format the date as "year month day"
+        default_date = today.strftime("%Y-%m-%d")
 
         def add_sample_to_databases(sample_name, project_name, subproject_name, sample_date):
             kraken_out_path = f"{ROOT}/src/resources/pipeline_out/{sample_name}_kraken_out"
@@ -364,24 +393,29 @@ class MMonitorCMD:
             subproject_name = str(self.args.subproject)
             # sample_date = self.args.date.strftime('%Y-%m-%d')  # Convert date to string format
             sample_date = self.args.date  # Convert date to string format
+            if sample_date is None:
+                sample_date = default_date
 
-            files = self.args.input
-            files = get_files_from_folder(files)
+            files = self.get_files_from_folder(self.args.input)
             if self.args.update:
                 print("Update parameter specified. Will only update results from file.")
                 add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
                 return
+            # concat_file_name = f"{os.path.dirname(files[0])}/{sample_name}_concatenated.fastq.gz"
+            if files[0].endswith(".gz"):
+                concat_file_name = f"{os.path.dirname(files[0])}/{sample_name}_concatenated.fastq.gz"
+                CentrifugeRunner.concatenate_gzipped_files(files,concat_file_name)
+            else:
+                concat_file_name = f"{os.path.dirname(files[0])}/{sample_name}_concatenated.fastq"
+                CentrifugeRunner.concatenate_fastq_fast(files, concat_file_name, False)
 
-            # self.emu_runner.run_emu(files, sample_name, self.args.minabundance)
-
-            self.centrifuge_runner.run_centrifuge(files, sample_name, cent_db_path)
-            self.centrifuge_runner
-
+            self.centrifuge_runner.run_centrifuge(concat_file_name, sample_name, cent_db_path)
             add_sample_to_databases(sample_name, project_name, subproject_name, sample_date)
             if self.args.qc:
                 self.add_statistics(self.centrifuge_runner.concat_file_name, sample_name, project_name, subproject_name,
                                     sample_date)
                 print("adding statistics")
+            os.remove(concat_file_name)
 
         else:
             self.load_from_csv()
@@ -396,6 +430,7 @@ class MMonitorCMD:
                 files = file_path_list
                 all_file_paths.append(files)
                 sample_name = self.multi_sample_input["sample_names"][index]
+                print(f"Analyzing amplicon data for sample {sample_name}.")
                 # when a sample is already in the database and user does not want to overwrite quit now
                 if not self.args.overwrite:
                     if self.check_sample_in_db(sample_name):
@@ -404,7 +439,10 @@ class MMonitorCMD:
                         continue
 
                 sample_names_to_process.append(sample_name)
-                concat_file_name = f"{os.path.dirname(files[0])}/{sample_name}_concatenated.fastq.gz"
+                if files[index].endswith(".gz"):
+                    concat_file_name = f"{os.path.dirname(files[index])}/{sample_name}_concatenated.fastq.gz"
+                else:
+                    concat_file_name = f"{os.path.dirname(files[index])}/{sample_name}_concatenated.fastq"
                 concat_files_list.append(concat_file_name)
 
 
@@ -417,10 +455,17 @@ class MMonitorCMD:
                 sample_dates.append(sample_date)
 
             for idx, files in enumerate(all_file_paths):
+                sample_name = self.multi_sample_input["sample_names"][idx]
+                print(f"Analyzing amplicon data for sample {sample_name}.")
                 total_files = len(all_file_paths)
                 print(f"Concatenating fastq files... ({idx + 1}/{total_files})")
-                CentrifugeRunner.concatenate_fastq_parallel(files, concat_files_list[idx])
-
+                if files[idx].endswith(".gz"):
+                    concat_file_name = f"{os.path.dirname(files[idx])}/{sample_name}_concatenated.fastq.gz"
+                    CentrifugeRunner.concatenate_gzipped_files(files,concat_file_name)
+                else:
+                    concat_file_name = f"{os.path.dirname(files[idx])}/{sample_name}_concatenated.fastq"
+                    CentrifugeRunner.concatenate_fastq_fast(files, concat_file_name, False)
+                concat_files_list.append(concat_file_name)
             centrifuge_tsv_path = os.path.join(ROOT, "src", "resources", "centrifuge.tsv")
             print(f"Creating centrifuge tsv...")
             CentrifugeRunner.create_centrifuge_input_file(self.multi_sample_input["sample_names"],
@@ -451,18 +496,6 @@ class MMonitorCMD:
             print(f"Removing concatenated files...")
             for concat_file in concat_files_list:
                 os.remove(concat_file)
-
-    @staticmethod
-    def concatenate_fastq_files(input_files, output_file):
-        print(f"concatenating {input_files} to {output_file}")
-        with gzip.open(output_file, 'wt') as output:
-            for input_file in input_files:
-                is_gzipped = input_file.endswith(".gz")
-                open_func = gzip.open if is_gzipped else open
-                mode = 'rt' if is_gzipped else 'r'
-                with open_func(input_file, mode) as input2:
-                    for line in input2:
-                        output.write(line)
 
 class OutputLogger:
     def __init__(self, log_file_path):

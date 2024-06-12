@@ -41,7 +41,7 @@ def convert_date_format(date_str):
 class DjangoDBInterface:
 
     def __init__(self, db_config: str):
-        self.port = 8020
+        self.port = 8021
         try:
             with open(db_config, 'r') as file:
                 self._db_config = json.load(file)
@@ -89,14 +89,25 @@ class DjangoDBInterface:
                 f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
             return
 
-        df = pd.read_csv(
-            f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
-            sep='\t',
-            header=None,
-            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
-            names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
-                   'Clade', 'Subspecies', "count"]
-        )
+        try:
+            df = pd.read_csv(
+                f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
+                sep='\t',
+                header=None,
+                usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
+                names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
+                       'Clade', 'Subspecies', "count"]
+            )
+        except FileNotFoundError as e:
+            df = pd.read_csv(
+                f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
+                sep='\t',
+                header=None,
+                usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
+                names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
+                       'Clade', 'Subspecies', "count"]
+            )
+
         df.fillna("Not Available", inplace=True)
         df.sort_values('Abundance', ascending=False, inplace=True)
         df = df.iloc[1:]  # Skipping the first row, assuming it's headers or unwanted data
