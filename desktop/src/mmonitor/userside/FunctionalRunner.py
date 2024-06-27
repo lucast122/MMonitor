@@ -12,28 +12,32 @@ import requests
 from build_mmonitor_pyinstaller import ROOT
 
 """
-This is a runner for a functional annotation pipeline. As input it takes raw nanopore reads, then assembles them with
-flye then corrects the assembly with racon and medaka. The final assembly then gets aligned to a database, e.g. the
-annotree database using DIAMOND, binned using MEGAN and finally the seperate bins are annotated using PROKKA
+This is a runner for a functional analysis pipeline. As input it takes raw nanopore reads, then assembles them with
+flye then corrects the assembly medaka, bins with metabat2, assigns taxonomy with gtdb-tk, annotatts MAGs with gtdb-tk
+and finally runs KEGG pathway analysis on annotated MAGs using keggcharter
 """
 
 
-class FunctionalAnalysisRunner():
+class FunctionalRunner:
+
 
     def __init__(self):
 
         self.logger = logging.getLogger('timestamp')
         self.cpus = multiprocessing.cpu_count()  # get number of cpu cores available
-        self.assembly_out = f"{os.path.abspath('.')}/pipeline_out/"
+
         self.working_directory = os.getcwd()
         # get absolute path of all tools used and safe as class variable
         # os.chdir("../../lib/")
         self.flye_path = os.path.abspath(f"{ROOT}/lib/Flye-2.9/bin/flye")
+        self.resources_path = os.path.join(ROOT,"src","resources")
+
+
         print(self.flye_path)
         self.minimap_path = os.path.abspath("Flye-2.9/lib/minimap2/python/minimap2.py")
         print(self.minimap_path)
         os.chdir(self.working_directory)
-        # all kegg ids to input into keggcharter. TODO: put them in a file and parse them instead having them in the code
+        # all kegg ids to input into keggcharter. TODO: put them in a file and parse instead of hardcoding here
         self.kegg_ids = [10, 20, 30, 40, 51, 52, 53, 61, 62, 71, 73, 100, 120, 121, 130, 140, 190, 195, 196, 220, 230,
                          232, 240, 250, 253, 254,
                          260, 261, 270, 280, 281, 290, 300, 310, 311, 330, 331, 332, 333, 340, 350, 360, 361, 362, 363,
@@ -103,7 +107,7 @@ class FunctionalAnalysisRunner():
             subprocess.call(['medaka_cocnsensus', '-h'], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
         except FileNotFoundError:
             self.logger.error(
-                "Make sure that medaka is installed and on the sytem path. For more info visit https://github.com/fenderglass/Flye/blob/flye/docs/INSTALL.md"
+                "Make sure that medaka is installed and on the sytem path. For more info visit https://github.com/nanoporetech/medaka"
                 "If you have troubles installing on ubuntu try running ")
             self.logger.error("bzip2 g++ zlib1g-dev libbz2-dev liblzma-dev libffi-dev libncurses5-dev")
             self.logger.error("libcurl4-gnutls-dev libssl-dev curl make cmake wget python3-all-dev")
@@ -116,15 +120,110 @@ class FunctionalAnalysisRunner():
             self.logger.error(
                 "Make sure that racon is installed and on the system path. For more info visit https://github.com/bbuchfink/diamond")
 
-    #
 
-    def run_flye(self, read_file_path, sample_name):
-        if not path.exists("pipeline_out"):
-            os.system("mkdir pipeline_out")
+    def run_flye(self, read_file_path, sample_name, hq, meta):
+        print("Running flye for assembly...")
 
-        # create output dir if it doesn't exist
-        cmd = f'flye --nano-raw {read_file_path} --out-dir {self.assembly_out}{sample_name} -t {self.cpus} --meta'
-        os.system(cmd)
+        output_dir = os.path.join(self.resources_path, "pipeline_out")
+        print(output_dir)
+
+
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        # Select the appropriate Flye parameter for the input reads
+        read_type = "--nano-hq" if hq else "--nano-raw"
+
+        # Construct Flye command
+        flye_cmd = [
+            "flye",
+            read_type, read_file_path,
+            "--out-dir", os.path.join(output_dir, sample_name),
+            "-t", str(self.cpus)
+        ]
+
+        # Append --meta if meta is True
+        if meta:
+            flye_cmd.append("--meta")
+
+        # Execute Flye command
+        try:
+            result = subprocess.run(flye_cmd, check=True, text=True, capture_output=True)
+            print("Flye command executed successfully:", result.stdout)
+            return os.path.join(output_dir, sample_name, "assembly.fasta")
+        except subprocess.CalledProcessError as e:
+            print("Error executing Flye command:", e.stderr)
+
+
+    def run_metabat2_pipeline(self, contig_file, read_file, dir_path):
+        output_dir = os.path.join(dir_path, "metabat_bins")
+
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        sam_files = []
+        bam_files = []
+
+        # Align reads to contigs using minimap2
+        sam_file = os.path.join(dir_path, os.path.basename(read_file)) + ".sam"
+        minimap2_cmd = [
+            "minimap2",
+            "-ax", "map-ont", contig_file,
+            read_file,
+            "-o", sam_file
+        ]
+        try:
+            print(f"minimap2 cmd: {minimap2_cmd}")
+            result = subprocess.run(minimap2_cmd, check=True, text=True, capture_output=True)
+            print("Aligned reads to assembly", result.stdout)
+            sam_files.append(sam_file)
+            print(sam_files)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing minimap2 command for {read_file}:", e.stderr)
+            return
+
+        # convert to bam, sort and index resulting sam file
+        for sam_file in sam_files:
+            bam_file = sam_file.replace(".sam", ".bam")
+            sorted_bam_file = bam_file.replace(".bam", ".sorted.bam")
+
+            samtools_view_cmd = ["samtools", "view", "-bS", sam_file, "-o", bam_file]
+            samtools_sort_cmd = ["samtools", "sort", bam_file, "-o", sorted_bam_file]
+            samtools_index_cmd = ["samtools", "index", sorted_bam_file]
+
+            try:
+                subprocess.run(samtools_view_cmd, check=True, text=True, capture_output=True)
+                subprocess.run(samtools_sort_cmd, check=True, text=True, capture_output=True)
+                subprocess.run(samtools_index_cmd, check=True, text=True, capture_output=True)
+                bam_files.append(sorted_bam_file)
+            except subprocess.CalledProcessError as e:
+                print(f"Error processing SAM/BAM files: {e.stderr}")
+                return
+
+        # Generate depth file
+
+        depth_file = os.path.join(dir_path, "depth.txt")
+        jgi_cmd = ["jgi_summarize_bam_contig_depths", "--outputDepth", depth_file] + bam_files
+        try:
+            subprocess.run(jgi_cmd, check=True, text=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            print("Error executing jgi_summarize_bam_contig_depths command:", e.stderr)
+            return
+
+        # Run Metabat2
+        metabat2_cmd = [
+            "metabat2",
+            "-i", contig_file,
+            "-a", depth_file,
+            "-o", os.path.join(output_dir, "bin")
+        ]
+        try:
+            result = subprocess.run(metabat2_cmd, check=True, text=True, capture_output=True)
+            print("Metabat2 command executed successfully:", result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("Error executing Metabat2 command:", e.stderr)
 
     def run_racon(self, read_file_path, sample_name):
         overlaps = f"{self.assembly_out}{sample_name}/{sample_name}_overlaps.paf"
@@ -145,18 +244,31 @@ class FunctionalAnalysisRunner():
             print(cmd)
             os.system(cmd)
 
-    def run_medaka(self, read_file_path, sample_name):
-        racon_out = f"{self.assembly_out}{sample_name}/{sample_name}_racon_2.fasta"
+    def run_medaka_consensus(self, assembly_file, read_file, dir_path, model="r941_min_high_g303"):
+        output_dir = os.path.join(dir_path, "medaka_corrected")
 
-        # cmd = '~/miniconda3/etc/profile.d/conda.sh && conda activate medaka'
-        # subprocess.call(cmd,shell=True,executable='/bin/bash')
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
-        # os.system("conda activate medaka")
-        process = subprocess.Popen(
-            "conda run -n medaka medaka_consensus")
+        consensus_output = os.path.join(output_dir, "consensus.hdf")
+        print(self.cpus)
 
-        cmd = f"medaka_consensus -i {read_file_path} -d {racon_out} -o {self.assembly_out}/{sample_name}/ -t {self.cpus} -m r941_min_hac_g507"
-        subprocess.call(cmd)
+        # Run Medaka consensus
+        medaka_cmd = [
+            "medaka_consensus",
+            "-i", read_file,
+            "-d", assembly_file,
+            "-o", output_dir,
+            "-m", model,
+            "-t", str(self.cpus)
+        ]
+        try:
+            print(f"medaka cmd: {medaka_cmd}")
+            result = subprocess.run(medaka_cmd, check=True, text=True, capture_output=True)
+            print("Medaka consensus command executed successfully:", result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("Error executing Medaka consensus command:", e.stderr)
 
     def run_binning(self, sample_name):
         try:
@@ -196,7 +308,7 @@ class FunctionalAnalysisRunner():
         read_extractor_cmd = f"read-extractor -i {ROOT}/src/resources/pipeline_out/{sample_name}/consensus.daa  -o {ROOT}/src/resources/pipeline_out/{sample_name}/bins/%t.fasta -c Taxonomy --frameShiftCorrect"
         subprocess.call(read_extractor_cmd)
 
-    # TODO: integrate daa-meganizer and read-extractor into MMonitor
+
     # daa-meganizer -i $daa -mdb /abscratch/lucas/databases/megan-mapping-annotree-June-2021.db -t 48 --lcaCoveragePercent 51 -lg
     # read-extractor -i $daa -o $output_folder/extracted_reads/%t.fasta -c Taxonomy --frameShiftCorrect
     def run_prokka(self, bin_folder_path):
@@ -234,6 +346,150 @@ class FunctionalAnalysisRunner():
             df_list.append(data)
         df = pd.concat(df_list)
         df.to_csv(path_to_prokka_output + "keggcharter.tsv", sep='\t')
+
+    def env_exists(self, env_name):
+        try:
+            envs = subprocess.check_output(['conda', 'env', 'list'], text=True)
+            return any(env_name in line for line in envs.splitlines())
+        except subprocess.CalledProcessError as e:
+            print(f"Error checking conda environments: {e.stderr}")
+            return False
+
+    def create_conda_env_from_yaml(self, yaml_file="environment.yml"):
+        yaml_path = os.path.join(self.resources_path, yaml_file)
+        env_name = self.get_env_name_from_yaml(yaml_path)
+
+        if self.env_exists(env_name):
+            print(f"Environment '{env_name}' already exists. Updating the environment.")
+            try:
+                subprocess.run(['conda', 'env', 'update', '-f', yaml_path], check=True)
+                print(f"Conda environment '{env_name}' updated successfully.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error updating conda environment '{env_name}': {e.stderr}")
+                raise
+        else:
+            print(f"Creating conda environment '{env_name}' from {yaml_file}.")
+            try:
+                subprocess.run(['conda', 'env', 'create', '-f', yaml_path], check=True)
+                print(f"Conda environment created from {yaml_file} successfully.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error creating conda environment from {yaml_file}: {e.stderr}")
+                raise
+
+    def get_env_name_from_yaml(self, yaml_path):
+        with open(yaml_path, 'r') as f:
+            for line in f:
+                if line.startswith('name:'):
+                    return line.split(':')[1].strip()
+        raise ValueError(f"Could not find environment name in {yaml_path}")
+
+    def run_checkm2(self, bins_dir, dir_path):
+        output_dir = os.path.join(dir_path, "checkm2_results")
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        checkm2_cmd = [
+            "checkm2", "predict",
+            "-x", "fa",
+            "-i", bins_dir,
+            "-o", output_dir,
+            "--threads", str(self.cpus),
+            "--force"
+        ]
+
+        conda_prefix = subprocess.check_output(['conda', 'info', '--base'], text=True).strip()
+        activate_env = os.path.join(conda_prefix, 'etc', 'profile.d', 'conda.sh')
+        command = f'source {activate_env} && conda activate mmonitor && {" ".join(checkm2_cmd)}'
+
+        try:
+            print(f"checkm2 cmd: {command}")
+            subprocess.run(command, shell=True, check=True, text=True, executable='/bin/bash', capture_output=True)
+            print("CheckM2 command executed successfully.")
+        except subprocess.CalledProcessError as e:
+            print("Error executing CheckM2 command:", e.stderr)
+            print("Attempting to download CheckM2 database...")
+            try:
+                download_cmd = f'source {activate_env} && conda activate checkm2 && checkm2 database --download'
+                subprocess.run(download_cmd, shell=True, check=True, text=True, executable='/bin/bash', capture_output=True)
+                print("CheckM2 database downloaded successfully. Retrying command...")
+                subprocess.run(command, shell=True, check=True, text=True, executable='/bin/bash', capture_output=True)
+                print("CheckM2 command executed successfully after downloading the database.")
+            except subprocess.CalledProcessError as db_e:
+                print("Error downloading CheckM2 database or retrying the command:", db_e.stderr)
+
+    def run_bakta(self, input_file, output_dir):
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        bakta_cmd = [
+            "bakta",
+            "--db", self.resources_path,
+            "--input", input_file,
+            "--output", output_dir,
+            "--threads", str(self.cpus)
+        ]
+
+        conda_prefix = subprocess.check_output(['conda', 'info', '--base'], text=True).strip()
+        activate_env = os.path.join(conda_prefix, 'etc', 'profile.d', 'conda.sh')
+        command = f'source {activate_env} && conda activate mmonitor && {" ".join(bakta_cmd)}'
+        try:
+            print(f"bakta cmd: {bakta_cmd}")
+            result = subprocess.run(command, shell=True, check=True, text=True, executable='/bin/bash', capture_output=True)
+            print("Bakta command executed successfully:", result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("Error executing Bakta command:", e.stderr)
+            print("Attempting to download Bakta database...")
+            try:
+                download_cmd = ["bakta_db", "download", "--output", self.resources_path, "--type full"]
+                subprocess.run(download_cmd, check=True, text=True, capture_output=True)
+                print("Bakta database downloaded successfully. Retrying command...")
+                subprocess.run(bakta_cmd, check=True, text=True, capture_output=True)
+                print("Bakta command executed successfully after downloading the database.")
+            except subprocess.CalledProcessError as db_e:
+                print("Error downloading CheckM2 database or retrying the command:", db_e.stderr)
+
+    def run_gtdb_tk(self, bins_dir, dir_path):
+        output_dir = os.path.join(dir_path, "gtdbtk_results")
+
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        gtdbtk_cmd = [
+            "gtdbtk", "classify_wf",
+            "--genome_dir", bins_dir,
+            "--out_dir", output_dir,
+            "-x", ".fa",
+            "--cpus", str(self.cpus),
+            "--mash_db", "/mnt/disk2/db/release220/" #TODO: replace with correct PATH this was only quick fix for testing
+        ]
+        try:
+            print(f"gtdbtk cmd: {gtdbtk_cmd}")
+            result = subprocess.run(gtdbtk_cmd, check=True, text=True, capture_output=True)
+            print("GTDB-Tk command executed successfully:", result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("Error executing GTDB-Tk command:", e.stderr)
+
+        try:
+            classification_file = os.path.join(output_dir, "gtdbtk.bac120.summary.tsv")
+            classifications = pd.read_csv(classification_file, sep='\t')
+
+            for index, row in classifications.iterrows():
+                bin_name = row['user_genome']
+                taxonomy = row['classification']
+                taxonomy_name = taxonomy.split(';')[-1].strip()
+                taxonomy_name = taxonomy_name.replace(' ', '_')
+                old_bin_path = os.path.join(bins_dir, f"{bin_name}.fa")
+                new_bin_path = os.path.join(bins_dir, f"{taxonomy_name}.fa")
+
+                if os.path.exists(old_bin_path):
+                    os.rename(old_bin_path, new_bin_path)
+                    print(f"Renamed {old_bin_path} to {new_bin_path}")
+                else:
+                    print(f"Bin file {old_bin_path} does not exist and cannot be renamed.")
+        except Exception as e:
+            print(f"Error processing GTDB-Tk results: {e}")
 
     def run_keggcharter(self, kegg_out, keggcharter_input):
         # self.create_keggcharter_input(keggcharter_input)

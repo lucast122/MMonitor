@@ -34,7 +34,7 @@ from mmonitor.userside.EmuRunner import EmuRunner
 from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
-from mmonitor.userside.functional_analysis import FunctionalAnalysisRunner
+from mmonitor.userside.FunctionalRunner import FunctionalAnalysisRunner
 
 
 import tkinter as tk
@@ -623,7 +623,7 @@ class GUI(ctk.CTk):
                 print(e)
                 return
             files = self.input_window.file_paths_single_sample
-            self.emu_runner.run_emu(files, sample_name, 0.1)
+            self.emu_runner.run_emu(files, sample_name, 0.005)
             print("add statistics")
             self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                 sample_date)
@@ -637,7 +637,7 @@ class GUI(ctk.CTk):
                 project_name = self.input_window.multi_sample_input["project_names"][index]
                 subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
                 sample_date = self.input_window.multi_sample_input["dates"][index]
-                self.emu_runner.run_emu(files, sample_name, 0.1)
+                self.emu_runner.run_emu(files, sample_name, 0.005)
                 self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                     sample_date)
 
