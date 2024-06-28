@@ -13,13 +13,13 @@ from tkinter import *
 from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
-
+from mmonitor.userside.OutputWindow import OutputWindow
 import customtkinter as ctk
 import numpy as np
 from CTkMessagebox import CTkMessagebox
 from PIL import Image
 from customtkinter import CTkImage
-from future.moves.tkinter import filedialog
+from customtkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
 
@@ -114,6 +114,7 @@ class GUI(ctk.CTk):
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
         self.sample_date = None
+        console = OutputWindow()
 
     def init_layout(self):
         ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -288,7 +289,7 @@ class GUI(ctk.CTk):
     def create_project(self):
         filename = filedialog.asksaveasfilename(
             initialdir='projects/',
-            title="Choose place to safe the project data"
+            title="Choose place to save the project data"
         )
         filename += ".sqlite3"
         self.db_path = filename
@@ -527,7 +528,7 @@ class GUI(ctk.CTk):
         #                                      sample_name, project_name, sample_date)
 
     def add_statistics(self, fastq_file, sample_name, project_name, subproject_name, sample_date):
-        fastq_stats = FastqStatistics(fastq_file)
+        fastq_stats = FastqStatistics(file_path=fastq_file)
 
         # Calculate statistics
         fastq_stats.quality_statistics()
@@ -591,7 +592,7 @@ class GUI(ctk.CTk):
                 print(e)
                 return
             files = self.input_window.file_paths_single_sample
-            self.emu_runner.run_emu(files, sample_name, 0.1)
+            self.emu_runner.run_emu(files, sample_name, 0.01)
             print("add statistics")
             self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                 sample_date)
@@ -674,37 +675,13 @@ class GUI(ctk.CTk):
 
 
 # this method updates the django db after with the new db_config after the user saves a new db config
-def update_db_config_path(self):
-    self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
+    def update_db_config_path(self):
+        self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
 
-    def on_open(self, ws):
-        print("WebSocket connection opened.")
-        # Now that the connection is open, you can send your message
-        send_message(ws, "Your message here")
 
-        print(f"WebSocket error: {error}")
 
-    def on_error(self, ws, error):
-        print(f"WebSocket error: {error}")
 
-    def on_close(self, ws, close_status_code, close_msg):
-        print(f"WebSocket closed. Code: {close_status_code}, Message: {close_msg}")
 
-    def send_message(self, ws, message):
-        if ws.sock and ws.sock.connected:
-            ws.send(message)
-        else:
-            print("WebSocket is not connected. Attempting to reconnect...")
-            # Here you can attempt to reconnect if you wish
-
-    # Later in your code, when you want to send a message:
-    # def send_server_notification(self):
-    #     ws = websocket.WebSocketApp("ws://134.2.78.150:8020/ws/notifications/",
-    #                                 on_open=self.on_open,
-    #                                 on_error=self.on_error,
-    #                                 on_close=self.on_close)
-    #     self.send_message(ws, "TEST")
-    #     ws.run_forever()
 
 
 class ToolTip:

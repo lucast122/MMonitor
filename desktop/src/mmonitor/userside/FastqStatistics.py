@@ -22,7 +22,7 @@ class FastqStatistics:
             print(f"Loaded files in {end_time - start_time} seconds")
         else:
             start_time = time.time()
-            self.load_file()
+            self.load_file(file_path)
             end_time = time.time()
             print(f"Loaded file in {end_time - start_time} seconds")
 
