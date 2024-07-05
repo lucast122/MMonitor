@@ -2,7 +2,7 @@ import tkinter as tk
 from threading import Thread
 
 import customtkinter as ctk
-
+from userside.MMonitorCMD import MMonitorCMD
 
 class PipelinePopup(ctk.CTkToplevel):
 
@@ -20,6 +20,7 @@ class PipelinePopup(ctk.CTkToplevel):
         self.binning = tk.BooleanVar()
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
+        self.cmd_runner = MMonitorCMD()
 
         self.geometry("440x390")
         self.minsize(440, 390)
@@ -78,10 +79,9 @@ class PipelinePopup(ctk.CTkToplevel):
             thread_16s = Thread(target=self.gui.taxonomy_nanopore_16s)
             thread_16s.start()
 
-        # if self.assembly.get():
-            # Wrapped in a lambda to defer execution
-        # thread_assembly = Thread(target=lambda: (seq_file, sample_name))
-        # thread_assembly.start()
+        if self.assembly.get():
+        thread_assembly = Thread(target=self.cmd_runner.)
+        thread_assembly.start()
 
         # if self.correction.get():
         #     self.gui.functional_analysis_runner.run_racon(seq_file, sample_name)

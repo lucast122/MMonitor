@@ -43,10 +43,12 @@ class DjangoDBInterface:
         try:
             with open(db_config, 'r') as file:
                 self._db_config = json.load(file)
+
         except FileNotFoundError as e:
             print("DB config not found")
             print(e)
         self._connection = None
+
 
     def get_user_id(self, username: str, password: str):
         django_url = f"http://{self._db_config['host']}:8021/users/get_user_id/"
@@ -233,3 +235,16 @@ class DjangoDBInterface:
 
         except Exception as e:
             print(e)
+
+    def upload_fastq_file(self, file_path, name, description=''):
+        url = f"http://{self._db_config['host']}:8021/upload/"
+        files = {'file': open(file_path, 'rb')}
+        data = {'name': name, 'description': description}
+        response = requests.post(url, files=files, data=data)
+        return response.status_code, response.json()
+
+    def get_fastq_files(self):
+        url = f"http://{self._db_config['host']}:8021/fasq/"
+        response = requests.get(url)
+        return response.status_code, response.json()
+
