@@ -42,10 +42,10 @@ class EmuRunner:
 
         #remove concatenated files from sequence list to avoid concatenating twice
         sequence_list = [s for s in sequence_list if "concatenated" not in s]
-        print(sequence_list)
+        # print(sequence_list)
         concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
         self.concat_file_name = concat_file_name
-        print(f"concat_file_name: {concat_file_name}")
+        # print(f"concat_file_name: {concat_file_name}")
         if not os.path.exists(concat_file_name):
             self.concatenate_fastq_files(sequence_list, concat_file_name)
 
@@ -81,8 +81,8 @@ class EmuRunner:
                                                                                       db_species_tids,
                                                                                       .01,
                                                                                       input_threshold=min_abundance)
-            print(f_full)
-            print(f_set_thresh)
+            # print(f_full)
+            # print(f_set_thresh)
 
             emu.freq_to_lineage_df(f_full, tsv_out, df_taxonomy,
                                    counts_assigned, counts_unassigned, True)
@@ -107,7 +107,7 @@ class EmuRunner:
         found = False
         try:
             for file in os.listdir(folder_path):
-                print(file)
+                # print(file)
                 if file.endswith(".fastq") or file.endswith(".fq") or file.endswith(".fasta") or file.endswith(
                         ".fastq.gz"):
                     files.append(f"{folder_path}/{file}")

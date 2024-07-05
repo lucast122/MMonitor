@@ -39,19 +39,19 @@ def convert_date_format(date_str):
 
 
 class DjangoDBInterface:
+
     def __init__(self, db_config: str):
+        self.port = 8021
         try:
             with open(db_config, 'r') as file:
                 self._db_config = json.load(file)
-
         except FileNotFoundError as e:
             print("DB config not found")
             print(e)
         self._connection = None
 
-
     def get_user_id(self, username: str, password: str):
-        django_url = f"http://{self._db_config['host']}:8021/users/get_user_id/"
+        django_url = f"http://{self._db_config['host']}:{self.port}/users/get_user_id/"
         response = pyrequests.post(django_url, data={'username': username, 'password': password})
         if response.status_code == 200:
             return response.json()['user_id']
@@ -59,7 +59,7 @@ class DjangoDBInterface:
             return None
 
     def get_unique_sample_ids(self):
-        django_url = f"http://{self._db_config['host']}:8021/users/get_unique_sample_ids/"
+        django_url = f"http://{self._db_config['host']}:{self.port}/users/get_unique_sample_ids/"
         response = pyrequests.post(django_url,
                                    data={'username': self._db_config['user'], 'password': self._db_config['password']})
         if response.status_code == 200:
@@ -89,14 +89,25 @@ class DjangoDBInterface:
                 f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
             return
 
-        df = pd.read_csv(
-            f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
-            sep='\t',
-            header=None,
-            usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
-            names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
-                   'Clade', 'Subspecies', "count"]
-        )
+        try:
+            df = pd.read_csv(
+                f"{emu_out_path}/{sample_name}_rel-abundance-threshold.tsv",
+                sep='\t',
+                header=None,
+                usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
+                names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
+                       'Clade', 'Subspecies', "count"]
+            )
+        except FileNotFoundError as e:
+            df = pd.read_csv(
+                f"{emu_out_path}/{sample_name}_rel-abundance.tsv",
+                sep='\t',
+                header=None,
+                usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13],
+                names=['Taxid', 'Abundance', 'Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum', 'Superkingdom',
+                       'Clade', 'Subspecies', "count"]
+            )
+
         df.fillna("Not Available", inplace=True)
         df.sort_values('Abundance', ascending=False, inplace=True)
         df = df.iloc[1:]  # Skipping the first row, assuming it's headers or unwanted data
@@ -131,7 +142,7 @@ class DjangoDBInterface:
         # Send all records in one request
         try:
             response = pyrequests.post(
-                f"http://{self._db_config['host']}:8021/users/overwrite_nanopore_record/",
+                f"http://{self._db_config['host']}:{self.port}/users/overwrite_nanopore_record/",
                 json=records,  # Send the list of records
                 auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
             )
@@ -158,6 +169,7 @@ class DjangoDBInterface:
         df['Sample'] = sample_name
         df['Sample_date'] = date
         df = df[df['Rank'] == "S"]
+        df = df[df['abundance'] > 1]
         df = df.drop(columns='Rank')
 
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
@@ -204,7 +216,7 @@ class DjangoDBInterface:
         # print(f"Sending record: {records}")
         try:
             response = pyrequests.post(
-                f"http://{self._db_config['host']}:8021/users/overwrite_nanopore_record/",
+                f"http://{self._db_config['host']}:{self.port}/users/overwrite_nanopore_record/",
                 json=records,  # Send the list of records
                 auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
             )
@@ -226,7 +238,7 @@ class DjangoDBInterface:
         # print(f"Sending record: {record_data}")
         try:
             response = pyrequests.post(
-                f"http://{self._db_config['host']}:8021/users/add_sequencing_statistics/",
+                f"http://{self._db_config['host']}:{self.port}/users/add_sequencing_statistics/",
                 json=record_data,
                 auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
             )
@@ -235,16 +247,3 @@ class DjangoDBInterface:
 
         except Exception as e:
             print(e)
-
-    def upload_fastq_file(self, file_path, name, description=''):
-        url = f"http://{self._db_config['host']}:8021/upload/"
-        files = {'file': open(file_path, 'rb')}
-        data = {'name': name, 'description': description}
-        response = requests.post(url, files=files, data=data)
-        return response.status_code, response.json()
-
-    def get_fastq_files(self):
-        url = f"http://{self._db_config['host']}:8021/fasq/"
-        response = requests.get(url)
-        return response.status_code, response.json()
-

@@ -3,16 +3,26 @@ import logging
 import multiprocessing
 import os
 import subprocess
-
 from build_mmonitor_pyinstaller import ROOT
 from Bio import SeqIO
-import gzip
 from concurrent.futures import ThreadPoolExecutor
 import concurrent
 from threading import Lock
 import gzip
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Manager
+import shutil
+
+def process_file(file, temp_dir):
+    is_gzipped = file.endswith('.gz')
+    temp_file = os.path.join(temp_dir, os.path.basename(file) + ".tmp")
+
+    open_func = gzip.open if is_gzipped else open
+
+    with open_func(file, 'rt') as infile, open(temp_file, 'wt') as outfile:
+        shutil.copyfileobj(infile, outfile)
+
+    return temp_file
 
 class CentrifugeRunner:
 
@@ -21,22 +31,6 @@ class CentrifugeRunner:
         self.check_centrifuge()
         self.cent_out = ""
         self.concat_file_name = ""
-
-    @staticmethod
-    def process_file(file, outfile_lock, outfile):
-        """
-        Process a single FASTQ or FASTQ.GZ file and write to the output file.
-
-        :param file: Path to the FASTQ or FASTQ.GZ file.
-        :param outfile_lock: A lock for thread-safe writing to the output file.
-        :param outfile: Handle to the output gzipped FASTQ file.
-        """
-        file_open = gzip.open if file.endswith('.gz') else open
-        with file_open(file, 'rt') as handle:
-            for record in SeqIO.parse(handle, "fastq"):
-                with outfile_lock:
-                    SeqIO.write(record, outfile, "fastq")
-
 
     @staticmethod
     def concatenate_files_in_memory(file_paths):
@@ -51,23 +45,45 @@ class CentrifugeRunner:
         return concatenated_content
 
     @staticmethod
-    def process_file(file, shared_list):
-        with gzip.open(file, 'rt') as infile:
-            file_content = infile.read()
-        shared_list.append(file_content)
+    def concatenate_gzipped_files(input_files, output_file):
+        print("Concatenating gzipped fastq files to prepare for analysis...")
+        with open(output_file, 'wb') as outfile:
+            for file in input_files:
+                with open(file, 'rb') as infile:
+                    shutil.copyfileobj(infile, outfile)
+
+    @staticmethod
+    def concatenate_fastq_fast(input_files, output_file, is_gzipped=False):
+        print("Concatenating fastq files to prepare for analysis...")
+        open_func = gzip.open if is_gzipped else open
+        with open_func(output_file, 'wb') as outfile:
+            for file in input_files:
+                with open_func(file, 'rb') as infile:
+                    # Copy the contents of each input file to the output file
+                    shutil.copyfileobj(infile, outfile)
 
     @staticmethod
     def concatenate_fastq_parallel(files, output_file):
         files_to_process = [file for file in files if "concatenated" not in file]
+        print("files to process:")
+        print(files_to_process)
+        print(f"Concatenating {len(files_to_process)} files to {output_file} ...")
 
-        with Manager() as manager:
-            shared_list = manager.list()  # shared list to collect file contents
-            with ProcessPoolExecutor() as executor:
-                executor.map(CentrifugeRunner.process_file, files_to_process, [shared_list] * len(files_to_process))
+        temp_dir = "temp_fastq"
+        os.makedirs(temp_dir, exist_ok=True)
 
-            with gzip.open(output_file, 'wt') as outfile:
-                for content in shared_list:
-                    outfile.write(content)
+        # Use process_file directly without lambda
+        with ProcessPoolExecutor(max_workers=12) as executor:
+            temp_files = list(executor.map(process_file, files_to_process, [temp_dir] * len(files_to_process)))
+
+        with gzip.open(output_file, 'wt') as outfile:
+            for temp_file in temp_files:
+                with open(temp_file, 'rt') as infile:
+                    shutil.copyfileobj(infile, outfile)
+                os.remove(temp_file)
+
+        shutil.rmtree(temp_dir)
+        print(f"Concatenation completed: {output_file}")
 
     @staticmethod
     def concatenate_to_tempfile(file_paths):
@@ -144,22 +160,23 @@ class CentrifugeRunner:
             self.logger.error(
                 "Make sure that centrifuge is installed and on the sytem path. For more info visit http://www.ccb.jhu.edu/software/centrifuge/manual.shtml")
 
-    def run_centrifuge(self, sequence_list,sample_name,database_path):
-        print(sequence_list)
+    def run_centrifuge(self, concat_file_path,sample_name,database_path):
+        # print(sequence_list)
         #remove concatenated files from sequence list to avoid concatenating twice
-        sequence_list = [s for s in sequence_list if "concatenated" not in s]
-        concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
-        self.concat_file_name = concat_file_name
-
+        # sequence_list = [s for s in sequence_list if "concatenated" not in s]
+        # concat_file_name = f"{os.path.dirname(sequence_list[0])}/{sample_name}_concatenated.fastq.gz"
+        self.concat_file_name = concat_file_path
+        print(concat_file_path)
         self.cent_out = f"{ROOT}/src/resources/pipeline_out/{sample_name}_cent_out"
 
-        concatenate_fastq_files(sequence_list, concat_file_name)
-        if sequence_list[0].lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
-            cmd = f'centrifuge -x "{database_path}" -U {concat_file_name} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
+        # self.concatenate_fastq_files(sequence_list,concat_file_name)
+        # self.concatenate_fastq_parallel(sequence_list, concat_file_name)
+
+        if concat_file_path.lower().endswith(('.fq', '.fastq', '.fastq.gz', '.fq.gz')):
+            cmd = f'centrifuge -x "{database_path}" -U {concat_file_path} -p {multiprocessing.cpu_count()} -S {self.cent_out}'
             print(cmd)
             os.system(cmd)
-            make_kraken_report(database_path)
-            os.remove(self.concat_file_name)
+            self.make_kraken_report(database_path, self.cent_out)
             return
 
     def get_files_from_folder(self, folder_path):
