@@ -20,7 +20,7 @@ import numpy as np
 from CTkMessagebox import CTkMessagebox
 from PIL import Image
 from customtkinter import CTkImage
-from future.moves.tkinter import filedialog
+from customtkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
 # from mmonitor.Tooltip import ToolTip
@@ -34,8 +34,8 @@ from mmonitor.userside.EmuRunner import EmuRunner
 from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
-from mmonitor.userside.FunctionalRunner import FunctionalAnalysisRunner
-
+from mmonitor.userside.FunctionalRunner import FunctionalRunner
+from userside.MMonitorCMD import MMonitorCMD
 
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
@@ -43,7 +43,7 @@ import customtkinter as ctk
 import sys
 import traceback
 # Global constants for version and dimensions
-VERSION = "v1.0.1 beta"
+VERSION = "v1.0.2"
 MAIN_WINDOW_X: int = 300
 MAIN_WINDOW_Y: int = 900
 
@@ -80,7 +80,9 @@ class RedirectText:
         self.widget = widget
 
     def write(self, text):
+        self.widget.configure(state='normal')  # Enable the widget to insert text
         self.widget.insert(tk.END, text)
+        self.widget.configure(state='disabled')  # Disable the widget to make it read-only
         self.widget.see(tk.END)
 
     # def flush(self):
@@ -110,17 +112,20 @@ class GUI(ctk.CTk):
         
         self.console_scrollbar = ctk.CTkScrollbar(self.console_frame, command=self.console_text.yview)
         self.console_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.console_text.config(yscrollcommand=self.console_scrollbar.set)
+        self.console_text.config(yscrollcommand=self.console_scrollbar.set, state="disabled")
+
         
         # Redirect stdout and stderr to the console
-        sys.stdout = RedirectText(self.console_text)
-        sys.stderr = RedirectText(self.console_text)
+        # sys.stdout = RedirectText(self.console_text)
+        # sys.stderr = RedirectText(self.console_text)
+
 
         self.pipeline_popup = None
         self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
         self.progress_bar_exists = False
         self.input_window = None
         self.download_progress = 0
+        self.cmd_runner = MMonitorCMD()
 
         # self.db_mysql.create_db()
 
@@ -130,7 +135,7 @@ class GUI(ctk.CTk):
         self.db_path = None
         self.centrifuge_runner = CentrifugeRunner()
         self.emu_runner = EmuRunner()
-        self.functional_analysis_runner = FunctionalAnalysisRunner()
+        self.functional_analysis_runner = FunctionalRunner()
         self.dashapp = None
         self.monitor_thread = None
 
@@ -590,6 +595,32 @@ class GUI(ctk.CTk):
 
         self.django_db.send_sequencing_statistics(data)
 
+    def get_metadata_from_input_window(self):
+        if not self.input_window.process_multiple_samples:
+            sample_name = str(self.input_window.sample_name)  # Get the content of the entry and convert to string
+            project_name = str(self.input_window.project_name)
+            subproject_name = str(self.input_window.subproject_name)
+            try:
+                sample_date = self.input_window.selected_date.strftime('%Y-%m-%d')  # Convert date to string format
+            except AttributeError as e:
+                sample_date = datetime.today()
+                self.open_popup(f"AttributeError. Please fill out all input fields or use CSV for sample input.",
+                                f"AttributeError", icon="cancel")
+                print(e)
+                return
+            files = self.input_window.file_paths_single_sample
+            return sample_name, project_name, subproject_name, sample_date, files
+        else:
+            files = self.input_window.multi_sample_input["file_paths_lists"]
+            sample_names = self.input_window.multi_sample_input["sample_names"]
+            project_names = self.input_window.multi_sample_input["project_names"]
+            subproject_names = self.input_window.multi_sample_input["subproject_names"]
+            sample_dates = self.input_window.multi_sample_input["dates"]
+            return sample_names, project_names, subproject_names, sample_dates, files
+
+
+
+
     def taxonomy_nanopore_16s(self):
         global sample_name
 
@@ -623,7 +654,7 @@ class GUI(ctk.CTk):
                 print(e)
                 return
             files = self.input_window.file_paths_single_sample
-            self.emu_runner.run_emu(files, sample_name, 0.005)
+            self.emu_runner.run_emu(files, sample_name, 0.01)
             print("add statistics")
             self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                 sample_date)
@@ -637,7 +668,7 @@ class GUI(ctk.CTk):
                 project_name = self.input_window.multi_sample_input["project_names"][index]
                 subproject_name = self.input_window.multi_sample_input["subproject_names"][index]
                 sample_date = self.input_window.multi_sample_input["dates"][index]
-                self.emu_runner.run_emu(files, sample_name, 0.005)
+                self.emu_runner.run_emu(files, sample_name, 0.01)
                 self.add_statistics(self.emu_runner.concat_file_name, sample_name, project_name, subproject_name,
                                     sample_date)
 
@@ -652,6 +683,21 @@ class GUI(ctk.CTk):
         #                                          subproject_name)
 
         self.show_info("Analysis complete. You can start monitoring now.")
+
+    def functional_pipeline(self):
+        self.open_input_window_and_wait()
+        if self.input_window.do_quit:
+            return
+        if self.input_window.process_multiple_samples:
+            sample_name, project_name, subproject_name, sample_date, files = self.get_metadata_from_input_window()
+            self.cmd_runner.assembly_pipeline(sample_name, project_name, subproject_name, sample_date, files)
+        else:
+            sample_names, project_names, subproject_names, sample_dates, files = self.get_metadata_from_input_window()
+            for idx, sample in enumerate(sample_names):
+                self.cmd_runner.assembly_pipeline(sample_names[idx], project_names[idx], subproject_names[idx],
+                                                  sample_dates[idx], files[idx])
+
+
 
     def open_input_window_and_wait(self):
         self.input_window = InputWindow(self, self.emu_runner)

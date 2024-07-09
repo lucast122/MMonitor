@@ -74,9 +74,9 @@ class MMonitorCMD:
         self.emu_runner = EmuRunner()
         self.centrifuge_runner = CentrifugeRunner()
         self.functional_runner = FunctionalRunner()
-        self.args = self.parse_arguments()
+        # self.args = self.parse_arguments()
         self.db_config = {}
-        self.django_db = DjangoDBInterface(self.args.config)
+        # self.django_db = DjangoDBInterface(self.args.config)
         self.pipeline_out = os.path.join(ROOT, "src", "resources", "pipeline_out")
 
     def parse_arguments(self):
@@ -561,58 +561,22 @@ class MMonitorCMD:
             for concat_file in concat_files_list:
                 os.remove(concat_file)
 
-    def assembly_pipeline(self):
-        # self.functional_runner.create_conda_env_from_yaml()
-        if not self.args.multicsv:
-            sample_name = str(self.args.sample)
-            if not self.args.overwrite and self.check_sample_in_db(sample_name):
-                print("Sample is already in DB use --overwrite to overwrite it...")
-                return
-            project_name = str(self.args.project)
-            subproject_name = str(self.args.subproject)
-            sample_date = self.args.date if self.args.date else datetime.now().strftime('%Y-%m-%d')
+    def assembly_pipeline(self, s_name, p_name, sp_name, s_date, fils):
+        concat_file_name = self.concatenate_files(fils, s_name)
+        contig_file_path = self.functional_runner.run_flye(concat_file_name, s_name, True, True)
+        out_path = os.path.join(self.pipeline_out, s_name)
+        self.functional_runner.run_medaka_consensus(contig_file_path, concat_file_name, out_path)
 
-            files = self.get_files_from_folder(self.args.input, False)
-            concat_file_name = self.concatenate_files(files, sample_name)
+        print(f" contig_file_path: {contig_file_path}")
+        print(f" concat_file_path: {concat_file_name}")
+        print(f" out_path: {out_path}")
+        self.functional_runner.run_metabat2_pipeline(contig_file_path, concat_file_name, out_path)
+        bins_dir = os.path.join(out_path, "metabat_bins")
+        bakta_dir = os.path.join(out_path, "bakta_results")
 
-            contig_file_path = self.functional_runner.run_flye(concat_file_name, sample_name, True, True)
-
-            out_path = os.path.join(self.pipeline_out, sample_name)
-            self.functional_runner.run_medaka_consensus(contig_file_path, concat_file_name, out_path)
-
-            print(f" contig_file_path: {contig_file_path}")
-            print(f" concat_file_path: {concat_file_name}")
-            print(f" out_path: {out_path}")
-
-            self.functional_runner.run_metabat2_pipeline(contig_file_path, concat_file_name, out_path)
-            bins_dir = os.path.join(out_path, "metabat_bins")
-            bakta_dir = os.path.join(out_path, "bakta_results")
-
-            # self.functional_runner.run_checkm2(bins_dir, out_path)
-            # self.functional_runner.run_bakta(contig_file_path, bakta_dir)
-            self.functional_runner.run_gtdb_tk(bins_dir, out_path)
-
-        else:
-            self.load_from_csv()
-            print("Processing multiple samples")
-            for index, file_path_list in enumerate(self.multi_sample_input["file_paths_lists"]):
-                files = file_path_list
-                sample_name = self.multi_sample_input["sample_names"][index]
-                if not self.args.overwrite and self.check_sample_in_db(sample_name):
-                    print(
-                        f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample...")
-                    continue
-
-                project_name = self.multi_sample_input["project_names"][index]
-                subproject_name = self.multi_sample_input["subproject_names"][index]
-                sample_date = self.multi_sample_input["dates"][index]
-
-                concat_file_name = self.concatenate_files(files, sample_name)
-                contig_file_path = self.functional_runner.run_flye(concat_file_name, sample_name, True, True)
-
-                out_path = os.path.join(self.pipeline_out, sample_name)
-                self.functional_runner.run_metabat2_pipeline(contig_file_path, concat_file_name, out_path)
-
+        # self.functional_runner.run_checkm2(bins_dir, out_path)
+        # self.functional_runner.run_bakta(contig_file_path, bakta_dir)
+        self.functional_runner.run_gtdb_tk(bins_dir, out_path)
 
 class OutputLogger:
     def __init__(self, log_file_path):
@@ -665,23 +629,101 @@ class OutputLogger:
 # Example usage
 
 if __name__ == "__main__":
+    def run_user_choice(sample_name, project_name, subproject_name, sample_date, files):
+        if command_runner.args.analysis == "taxonomy-16s":
+            command_runner.taxonomy_nanopore_16s()
+        if command_runner.args.analysis == "taxonomy-wgs":
+            command_runner.taxonomy_nanopore_wgs()
+        if command_runner.args.analysis == "stats":
+            command_runner.update_only_statistics()
+        if command_runner.args.analysis == "assembly":
+            command_runner.assembly_pipeline(sample_name, project_name, subproject_name, sample_date, files)
+
     command_runner = MMonitorCMD()
     print(command_runner.args)
     command_runner.load_config()
+    command_runner.args = command_runner.parse_arguments()
+    command_runner.django_db = DjangoDBInterface(command_runner.args.config)
+
+    if not command_runner.args.multicsv:
+        sample_name = str(command_runner.args.sample)
+        if not command_runner.args.overwrite and self.check_sample_in_db(sample_name):
+            print("Sample is already in DB use --overwrite to overwrite it...")
+            pass
+        project_name = str(command_runner.args.project)
+        subproject_name = str(command_runner.args.subproject)
+        sample_date = command_runner.args.date if command_runner.args.date else datetime.now().strftime('%Y-%m-%d')
+
+        files = command_runner.get_files_from_folder(command_runner.args.input, False)
+        concat_file_name = command_runner.concatenate_files(files, sample_name)
+
+        print(f" contig_file_path: {contig_file_path}")
+        print(f" concat_file_path: {concat_file_name}")
+        print(f" out_path: {out_path}")
+        run_user_choice(sample_name, project_name, subproject_name, sample_date, files)
+    else:
+        command_runner.load_from_csv()
+        print("Processing multiple samples")
+        concat_files_list = []
+        all_file_paths = []
+        sample_names_to_process = []
+        project_names = []
+        subproject_names = []
+        sample_dates = []
+        for index, file_path_list in enumerate(command_runner.multi_sample_input["file_paths_lists"]):
+            files = file_path_list
+            all_file_paths.append(files)
+            sample_name = command_runner.multi_sample_input["sample_names"][index]
+            print(f"Analyzing amplicon data for sample {sample_name}.")
+            # when a sample is already in the database and user does not want to overwrite quit now
+            if not command_runner.args.overwrite:
+                if command_runner.check_sample_in_db(sample_name):
+                    print(
+                        f"Sample {sample_name} already in DB and overwrite not specified, continue with next sample...")
+                    continue
+
+            sample_names_to_process.append(sample_name)
+            if files[index].endswith(".gz"):
+                concat_file_name = f"{os.path.dirname(files[index])}/{sample_name}_concatenated.fastq.gz"
+            else:
+                concat_file_name = f"{os.path.dirname(files[index])}/{sample_name}_concatenated.fastq"
+            concat_files_list.append(concat_file_name)
+
+            project_name = command_runner.multi_sample_input["project_names"][index]
+            subproject_name = command_runner.multi_sample_input["subproject_names"][index]
+            sample_date = command_runner.multi_sample_input["dates"][index]
+
+            project_names.append(project_name)
+            subproject_names.append(subproject_name)
+            sample_dates.append(sample_date)
+
+        for idx, files in enumerate(all_file_paths):
+            sample_name = command_runner.multi_sample_input["sample_names"][idx]
+            total_files = len(all_file_paths)
+            print(f"Concatenating fastq files... ({idx + 1}/{total_files})")
+            if files[idx].endswith(".gz"):
+                concat_file_name = f"{os.path.dirname(files[idx])}/{sample_name}_concatenated.fastq.gz"
+                CentrifugeRunner.concatenate_gzipped_files(files, concat_file_name)
+            else:
+                concat_file_name = f"{os.path.dirname(files[idx])}/{sample_name}_concatenated.fastq"
+                CentrifugeRunner.concatenate_fastq_fast(files, concat_file_name, False)
+            concat_files_list.append(concat_file_name)
+        for idx, sample in enumerate(sample_names_to_process):
+            run_user_choice(command_runner.multi_sample_input["sample_names"][idx],
+                            command_runner.multi_sample_input["project_names"][idx],
+                            command_runner.multi_sample_input["subproject_names"][idx],
+                            command_runner.multi_sample_input["dates"][idx],
+                            files
+                            )
+
+
+
+
 
     logger = OutputLogger(os.path.join(ROOT, 'src', 'resources', 'mmonitor_log.txt'))
     # logger.start_logging()
 
     # Your script's operations here. All stdout will be written to 'output_log.txt'.
-
-    if command_runner.args.analysis == "taxonomy-16s":
-        command_runner.taxonomy_nanopore_16s()
-    if command_runner.args.analysis == "taxonomy-wgs":
-        command_runner.taxonomy_nanopore_wgs()
-    if command_runner.args.analysis == "stats":
-        command_runner.update_only_statistics()
-    if command_runner.args.analysis == "assembly":
-        command_runner.assembly_pipeline()
 
 
     # logger.stop_logging()

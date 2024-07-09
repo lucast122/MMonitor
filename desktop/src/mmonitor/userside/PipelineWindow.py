@@ -2,10 +2,9 @@ import tkinter as tk
 from threading import Thread
 
 import customtkinter as ctk
-from userside.MMonitorCMD import MMonitorCMD
+
 
 class PipelinePopup(ctk.CTkToplevel):
-
     def __init__(self, parent, gui_ref):
         super().__init__()
         ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -20,7 +19,6 @@ class PipelinePopup(ctk.CTkToplevel):
         self.binning = tk.BooleanVar()
         self.annotation = tk.BooleanVar()
         self.kegg = tk.BooleanVar()
-        self.cmd_runner = MMonitorCMD()
 
         self.geometry("440x390")
         self.minsize(440, 390)
@@ -55,11 +53,6 @@ class PipelinePopup(ctk.CTkToplevel):
         quit_btn = ctk.CTkButton(self, text="Quit", command=self.destroy, corner_radius=10)
         quit_btn.pack(pady=5)
 
-    def on_kaiju_selected(self):
-        # Assuming you have a way to get the sample_name, e.g., from a GUI component
-        sample_name = self.get_selected_sample_name()
-
-        self.gui.handle_kaiju_output(sample_name)
 
 
     def run_analysis_pipeline(self):
@@ -80,8 +73,9 @@ class PipelinePopup(ctk.CTkToplevel):
             thread_16s.start()
 
         if self.assembly.get():
-        thread_assembly = Thread(target=self.cmd_runner.)
-        thread_assembly.start()
+            thread_assembly = Thread(target=self.gui.functional_pipeline)
+            thread_assembly.start()
+            pass
 
         # if self.correction.get():
         #     self.gui.functional_analysis_runner.run_racon(seq_file, sample_name)
