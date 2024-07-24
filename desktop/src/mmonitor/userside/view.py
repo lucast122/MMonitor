@@ -15,11 +15,10 @@ from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
 from tkinter import messagebox, scrolledtext
-import customtkinter as ctk
-import numpy as np
-from CTkMessagebox import CTkMessagebox
+import numpy as npfrom
 from PIL import Image
 from customtkinter import CTkImage
+
 from customtkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
@@ -36,7 +35,6 @@ from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
 from mmonitor.userside.FunctionalRunner import FunctionalRunner
 from userside.MMonitorCMD import MMonitorCMD
-
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
 import customtkinter as ctk
@@ -802,7 +800,7 @@ class ToolTip:
 
         label = tk.Label(self.tip_window, text=self.tip_text, foreground="black", background="white", relief="solid",
                          borderwidth=1,
-                         font=("Helvetica", "12", "normal"))
+                         font=("Helvetica", "12", "normal"))access 'https://github.com/lucast122/MMonitor.git/':
         label.pack(ipadx=1)
 
     def hide_tip(self, event=None):

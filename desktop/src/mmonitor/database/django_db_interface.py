@@ -84,12 +84,15 @@ class DjangoDBInterface:
         if user_id is None:
             print("Invalid user credentials")
             return
+        try:
+            sample_ids = self.get_unique_sample_ids()
+            if sample_name in sample_ids and not overwrite:
+                print(
+                    f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
+                return
+        except TypeError as e:
+            print(f"Type error {e}")
 
-        sample_ids = self.get_unique_sample_ids()
-        if sample_name in sample_ids and not overwrite:
-            print(
-                f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
-            return
 
         try:
             df = pd.read_csv(
