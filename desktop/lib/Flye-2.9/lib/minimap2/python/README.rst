@@ -77,7 +77,9 @@ This constructor accepts the following arguments:
 
 * **min_chain_score**: minimum chaing score
 
-* **bw**: chaining and alignment band width
+* **bw**: chaining and alignment band width (initial chaining and extension)
+
+* **bw_long**: chaining and alignment band width (RMQ-based rechaining and closing gaps)
 
 * **best_n**: max number of alignments to return
 
@@ -144,7 +146,7 @@ properties:
 * **mlen**: length of the matching bases in the alignment, excluding ambiguous
   base matches.
 
-* **NM**: number of mismatches, gaps and ambiguous poistions in the alignment
+* **NM**: number of mismatches, gaps and ambiguous positions in the alignment
 
 * **trans_strand**: transcript strand. +1 if on the forward strand; -1 if on the
   reverse strand; 0 if unknown

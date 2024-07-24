@@ -55,6 +55,7 @@ class MMonitorCMD:
             for dirpath, _, filenames in os.walk(folder_path):
                 for file in filenames:
                     if file.endswith((".fastq", ".fq", ".fasta", ".fastq.gz")) and "concatenated" not in file:
+                        print(file)
                         files.append(os.path.join(dirpath, file))
         else:
             for file in os.listdir(folder_path):
@@ -180,7 +181,7 @@ class MMonitorCMD:
         file_extension = ".fastq.gz" if files[0].endswith(".gz") else ".fastq"
 
         # Ensure the first file has a valid directory path
-        first_file_dir = os.path.abspath(files[0])
+        first_file_dir = os.path.dirname(files[0])
         if not first_file_dir:
             raise ValueError("The directory of the first file is invalid.")
 
@@ -589,6 +590,7 @@ class MMonitorCMD:
         print(f" contig_file_path: {contig_file_path}")
         print(f" concat_file_path: {concat_file_name}")
         print(f" out_path: {out_path}")
+        os.startfile(out_path)
         self.functional_runner.run_metabat2_pipeline(contig_file_path, concat_file_name, out_path)
         bins_dir = os.path.join(out_path, "metabat_bins")
         bakta_dir = os.path.join(out_path, "bakta_results")

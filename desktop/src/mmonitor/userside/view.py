@@ -18,7 +18,7 @@ from tkinter import messagebox, scrolledtext
 import numpy as npfrom
 from PIL import Image
 from customtkinter import CTkImage
-
+import CTkMessagebox
 from customtkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
@@ -114,8 +114,8 @@ class GUI(ctk.CTk):
 
         
         # Redirect stdout and stderr to the console
-        # sys.stdout = RedirectText(self.console_text)
-        # sys.stderr = RedirectText(self.console_text)
+        sys.stdout = RedirectText(self.console_text)
+        sys.stderr = RedirectText(self.console_text)
 
 
         self.pipeline_popup = None
@@ -686,7 +686,7 @@ class GUI(ctk.CTk):
         self.open_input_window_and_wait()
         if self.input_window.do_quit:
             return
-        if self.input_window.process_multiple_samples:
+        if not self.input_window.process_multiple_samples:
             sample_name, project_name, subproject_name, sample_date, files = self.get_metadata_from_input_window()
             self.cmd_runner.assembly_pipeline(sample_name, project_name, subproject_name, sample_date, files)
         else:

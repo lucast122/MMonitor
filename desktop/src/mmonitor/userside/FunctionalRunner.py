@@ -29,7 +29,7 @@ class FunctionalRunner:
         self.working_directory = os.getcwd()
         # get absolute path of all tools used and safe as class variable
         # os.chdir("../../lib/")
-        self.flye_path = os.path.abspath(f"{ROOT}/lib/Flye-2.9/bin/flye")
+        self.flye_path = os.path.abspath(f"{ROOT}/lib/Flye-2.9.4/bin/flye")
         self.resources_path = os.path.join(ROOT,"src","resources")
 
 

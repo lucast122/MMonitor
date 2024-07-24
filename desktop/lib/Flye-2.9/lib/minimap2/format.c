@@ -119,6 +119,7 @@ int mm_write_sam_hdr(const mm_idx_t *idx, const char *rg, const char *ver, int a
 {
 	kstring_t str = {0,0,0};
 	int ret = 0;
+	mm_sprintf_lite(&str, "@HD\tVN:1.6\tSO:unsorted\tGO:query\n");
 	if (idx) {
 		uint32_t i;
 		for (i = 0; i < idx->n_seq; ++i)
@@ -138,14 +139,52 @@ int mm_write_sam_hdr(const mm_idx_t *idx, const char *rg, const char *ver, int a
 	return ret;
 }
 
-static void write_cs_core(kstring_t *s, const uint8_t *tseq, const uint8_t *qseq, const mm_reg1_t *r, char *tmp, int no_iden, int write_tag)
+static void write_indel_ds(kstring_t *str, int64_t len, const uint8_t *seq, int64_t ll, int64_t lr) // write an indel to ds; adapted from minigraph
 {
-	int i, q_off, t_off;
-	if (write_tag) mm_sprintf_lite(s, "\tcs:Z:");
+	int64_t i;
+	if (ll + lr >= len) {
+		mm_sprintf_lite(str, "[");
+		for (i = 0; i < len; ++i)
+			mm_sprintf_lite(str, "%c", "acgtn"[seq[i]]);
+		mm_sprintf_lite(str, "]");
+	} else {
+		int64_t k = 0;
+		if (ll > 0) {
+			mm_sprintf_lite(str, "[");
+			for (i = 0; i < ll; ++i)
+				mm_sprintf_lite(str, "%c", "acgtn"[seq[k+i]]);
+			mm_sprintf_lite(str, "]");
+			k += ll;
+		}
+		for (i = 0; i < len - lr - ll; ++i)
+			mm_sprintf_lite(str, "%c", "acgtn"[seq[k+i]]);
+		k += len - lr - ll;
+		if (lr > 0) {
+			mm_sprintf_lite(str, "[");
+			for (i = 0; i < lr; ++i)
+				mm_sprintf_lite(str, "%c", "acgtn"[seq[k+i]]);
+			mm_sprintf_lite(str, "]");
+		}
+	}
+}
+
+static void write_cs_ds_core(kstring_t *s, const uint8_t *tseq, const uint8_t *qseq, const mm_reg1_t *r, char *tmp, int no_iden, int is_ds, int write_tag)
+{
+	int i, q_off, t_off, q_len = 0, t_len = 0;
+	if (write_tag) mm_sprintf_lite(s, "\t%cs:Z:", is_ds? 'd' : 'c');
+	for (i = 0; i < (int)r->p->n_cigar; ++i) {
+		int op = r->p->cigar[i]&0xf, len = r->p->cigar[i]>>4;
+		if (op == MM_CIGAR_MATCH || op == MM_CIGAR_EQ_MATCH || op == MM_CIGAR_X_MISMATCH)
+			q_len += len, t_len += len;
+		else if (op == MM_CIGAR_INS)
+			q_len += len;
+		else if (op == MM_CIGAR_DEL || op == MM_CIGAR_N_SKIP)
+			t_len += len;
+	}
 	for (i = q_off = t_off = 0; i < (int)r->p->n_cigar; ++i) {
 		int j, op = r->p->cigar[i]&0xf, len = r->p->cigar[i]>>4;
-		assert((op >= 0 && op <= 3) || op == 7 || op == 8);
-		if (op == 0 || op == 7 || op == 8) { // match
+		assert((op >= MM_CIGAR_MATCH && op <= MM_CIGAR_N_SKIP) || op == MM_CIGAR_EQ_MATCH || op == MM_CIGAR_X_MISMATCH);
+		if (op == MM_CIGAR_MATCH || op == MM_CIGAR_EQ_MATCH || op == MM_CIGAR_X_MISMATCH) {
 			int l_tmp = 0;
 			for (j = 0; j < len; ++j) {
 				if (qseq[q_off + j] != tseq[t_off + j]) {
@@ -166,15 +205,43 @@ static void write_cs_core(kstring_t *s, const uint8_t *tseq, const uint8_t *qseq
 				} else mm_sprintf_lite(s, ":%d", l_tmp);
 			}
 			q_off += len, t_off += len;
-		} else if (op == 1) { // insertion to ref
-			for (j = 0, tmp[len] = 0; j < len; ++j)
-				tmp[j] = "acgtn"[qseq[q_off + j]];
-			mm_sprintf_lite(s, "+%s", tmp);
+		} else if (op == MM_CIGAR_INS) {
+			if (is_ds) {
+				int z, ll, lr, y = q_off;
+				for (z = 1; z <= len; ++z)
+					if (y - z < 0 || qseq[y + len - z] != qseq[y - z])
+						break;
+				lr = z - 1;
+				for (z = 0; z < len; ++z)
+					if (y + len + z >= q_len || qseq[y + len + z] != qseq[y + z])
+						break;
+				ll = z;
+				mm_sprintf_lite(s, "+");
+				write_indel_ds(s, len, &qseq[y], ll, lr);
+			} else {
+				for (j = 0, tmp[len] = 0; j < len; ++j)
+					tmp[j] = "acgtn"[qseq[q_off + j]];
+				mm_sprintf_lite(s, "+%s", tmp);
+			}
 			q_off += len;
-		} else if (op == 2) { // deletion from ref
-			for (j = 0, tmp[len] = 0; j < len; ++j)
-				tmp[j] = "acgtn"[tseq[t_off + j]];
-			mm_sprintf_lite(s, "-%s", tmp);
+		} else if (op == MM_CIGAR_DEL) {
+			if (is_ds) {
+				int z, ll, lr, x = t_off;
+				for (z = 1; z <= len; ++z)
+					if (x - z < 0 || tseq[x + len - z] != tseq[x - z])
+						break;
+				lr = z - 1;
+				for (z = 0; z < len; ++z)
+					if (x + len + z >= t_len || tseq[x + z] != tseq[x + len + z])
+						break;
+				ll = z;
+				mm_sprintf_lite(s, "-");
+				write_indel_ds(s, len, &tseq[x], ll, lr);
+			} else {
+				for (j = 0, tmp[len] = 0; j < len; ++j)
+					tmp[j] = "acgtn"[tseq[t_off + j]];
+				mm_sprintf_lite(s, "-%s", tmp);
+			}
 			t_off += len;
 		} else { // intron
 			assert(len >= 2);
@@ -192,8 +259,8 @@ static void write_MD_core(kstring_t *s, const uint8_t *tseq, const uint8_t *qseq
 	if (write_tag) mm_sprintf_lite(s, "\tMD:Z:");
 	for (i = q_off = t_off = 0; i < (int)r->p->n_cigar; ++i) {
 		int j, op = r->p->cigar[i]&0xf, len = r->p->cigar[i]>>4;
-		assert((op >= 0 && op <= 3) || op == 7 || op == 8);
-		if (op == 0 || op == 7 || op == 8) { // match
+		assert((op >= MM_CIGAR_MATCH && op <= MM_CIGAR_N_SKIP) || op == MM_CIGAR_EQ_MATCH || op == MM_CIGAR_X_MISMATCH);
+		if (op == MM_CIGAR_MATCH || op == MM_CIGAR_EQ_MATCH || op == MM_CIGAR_X_MISMATCH) {
 			for (j = 0; j < len; ++j) {
 				if (qseq[q_off + j] != tseq[t_off + j]) {
 					mm_sprintf_lite(s, "%d%c", l_MD, "ACGTN"[tseq[t_off + j]]);
@@ -201,15 +268,15 @@ static void write_MD_core(kstring_t *s, const uint8_t *tseq, const uint8_t *qseq
 				} else ++l_MD;
 			}
 			q_off += len, t_off += len;
-		} else if (op == 1) { // insertion to ref
+		} else if (op == MM_CIGAR_INS) {
 			q_off += len;
-		} else if (op == 2) { // deletion from ref
+		} else if (op == MM_CIGAR_DEL) {
 			for (j = 0, tmp[len] = 0; j < len; ++j)
 				tmp[j] = "ACGTN"[tseq[t_off + j]];
 			mm_sprintf_lite(s, "%d^%s", l_MD, tmp);
 			l_MD = 0;
 			t_off += len;
-		} else if (op == 3) { // reference skip
+		} else if (op == MM_CIGAR_N_SKIP) {
 			t_off += len;
 		}
 	}
@@ -217,7 +284,7 @@ static void write_MD_core(kstring_t *s, const uint8_t *tseq, const uint8_t *qseq
 	assert(t_off == r->re - r->rs && q_off == r->qe - r->qs);
 }
 
-static void write_cs_or_MD(void *km, kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const mm_reg1_t *r, int no_iden, int is_MD, int write_tag)
+static void write_cs_ds_or_MD(void *km, kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const mm_reg1_t *r, int no_iden, int is_MD, int is_ds, int write_tag, int is_qstrand)
 {
 	extern unsigned char seq_nt4_table[256];
 	int i;
@@ -227,29 +294,35 @@ static void write_cs_or_MD(void *km, kstring_t *s, const mm_idx_t *mi, const mm_
 	qseq = (uint8_t*)kmalloc(km, r->qe - r->qs);
 	tseq = (uint8_t*)kmalloc(km, r->re - r->rs);
 	tmp = (char*)kmalloc(km, r->re - r->rs > r->qe - r->qs? r->re - r->rs + 1 : r->qe - r->qs + 1);
-	mm_idx_getseq(mi, r->rid, r->rs, r->re, tseq);
-	if (!r->rev) {
+	if (is_qstrand) {
+		mm_idx_getseq2(mi, r->rev, r->rid, r->rs, r->re, tseq);
 		for (i = r->qs; i < r->qe; ++i)
 			qseq[i - r->qs] = seq_nt4_table[(uint8_t)t->seq[i]];
 	} else {
-		for (i = r->qs; i < r->qe; ++i) {
-			uint8_t c = seq_nt4_table[(uint8_t)t->seq[i]];
-			qseq[r->qe - i - 1] = c >= 4? 4 : 3 - c;
+		mm_idx_getseq(mi, r->rid, r->rs, r->re, tseq);
+		if (!r->rev) {
+			for (i = r->qs; i < r->qe; ++i)
+				qseq[i - r->qs] = seq_nt4_table[(uint8_t)t->seq[i]];
+		} else {
+			for (i = r->qs; i < r->qe; ++i) {
+				uint8_t c = seq_nt4_table[(uint8_t)t->seq[i]];
+				qseq[r->qe - i - 1] = c >= 4? 4 : 3 - c;
+			}
 		}
 	}
 	if (is_MD) write_MD_core(s, tseq, qseq, r, tmp, write_tag);
-	else write_cs_core(s, tseq, qseq, r, tmp, no_iden, write_tag);
+	else write_cs_ds_core(s, tseq, qseq, r, tmp, no_iden, is_ds, write_tag);
 	kfree(km, qseq); kfree(km, tseq); kfree(km, tmp);
 }
 
-int mm_gen_cs_or_MD(void *km, char **buf, int *max_len, const mm_idx_t *mi, const mm_reg1_t *r, const char *seq, int is_MD, int no_iden)
+int mm_gen_cs_or_MD(void *km, char **buf, int *max_len, const mm_idx_t *mi, const mm_reg1_t *r, const char *seq, int is_MD, int no_iden, int is_qstrand)
 {
 	mm_bseq1_t t;
 	kstring_t str;
 	str.s = *buf, str.l = 0, str.m = *max_len;
 	t.l_seq = strlen(seq);
 	t.seq = (char*)seq;
-	write_cs_or_MD(km, &str, mi, &t, r, no_iden, is_MD, 0);
+	write_cs_ds_or_MD(km, &str, mi, &t, r, no_iden, is_MD, 0, 0, is_qstrand);
 	*max_len = str.m;
 	*buf = str.s;
 	return str.l;
@@ -257,24 +330,12 @@ int mm_gen_cs_or_MD(void *km, char **buf, int *max_len, const mm_idx_t *mi, cons
 
 int mm_gen_cs(void *km, char **buf, int *max_len, const mm_idx_t *mi, const mm_reg1_t *r, const char *seq, int no_iden)
 {
-	return mm_gen_cs_or_MD(km, buf, max_len, mi, r, seq, 0, no_iden);
+	return mm_gen_cs_or_MD(km, buf, max_len, mi, r, seq, 0, no_iden, 0);
 }
 
 int mm_gen_MD(void *km, char **buf, int *max_len, const mm_idx_t *mi, const mm_reg1_t *r, const char *seq)
 {
-	return mm_gen_cs_or_MD(km, buf, max_len, mi, r, seq, 1, 0);
-}
-
-double mm_event_identity(const mm_reg1_t *r)
-{
-	int32_t i, n_gapo = 0, n_gap = 0;
-	if (r->p == 0) return -1.0f;
-	for (i = 0; i < r->p->n_cigar; ++i) {
-		int32_t op = r->p->cigar[i] & 0xf, len = r->p->cigar[i] >> 4;
-		if (op == 1 || op == 2)
-			++n_gapo, n_gap += len;
-	}
-	return (double)r->mlen / (r->blen + r->p->n_ambi - n_gap + n_gapo);
+	return mm_gen_cs_or_MD(km, buf, max_len, mi, r, seq, 1, 0, 0);
 }
 
 static inline void write_tags(kstring_t *s, const mm_reg1_t *r)
@@ -283,7 +344,7 @@ static inline void write_tags(kstring_t *s, const mm_reg1_t *r)
 	if (r->id == r->parent) type = r->inv? 'I' : 'P';
 	else type = r->inv? 'i' : 'S';
 	if (r->p) {
-		mm_sprintf_lite(s, "\tNM:i:%d\tms:i:%d\tAS:i:%d\tnn:i:%d", r->blen - r->mlen + r->p->n_ambi, r->p->dp_max, r->p->dp_score, r->p->n_ambi);
+		mm_sprintf_lite(s, "\tNM:i:%d\tms:i:%d\tAS:i:%d\tnn:i:%d", r->blen - r->mlen + r->p->n_ambi, r->p->dp_max0, r->p->dp_score, r->p->n_ambi);
 		if (r->p->trans_strand == 1 || r->p->trans_strand == 2)
 			mm_sprintf_lite(s, "\tts:A:%c", "?+-?"[r->p->trans_strand]);
 	}
@@ -305,7 +366,7 @@ static inline void write_tags(kstring_t *s, const mm_reg1_t *r)
 	if (r->split) mm_sprintf_lite(s, "\tzd:i:%d", r->split);
 }
 
-void mm_write_paf3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const mm_reg1_t *r, void *km, int opt_flag, int rep_len)
+void mm_write_paf3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const mm_reg1_t *r, void *km, int64_t opt_flag, int rep_len)
 {
 	s->l = 0;
 	if (r == 0) {
@@ -316,7 +377,11 @@ void mm_write_paf3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const 
 	mm_sprintf_lite(s, "%s\t%d\t%d\t%d\t%c\t", t->name, t->l_seq, r->qs, r->qe, "+-"[r->rev]);
 	if (mi->seq[r->rid].name) mm_sprintf_lite(s, "%s", mi->seq[r->rid].name);
 	else mm_sprintf_lite(s, "%d", r->rid);
-	mm_sprintf_lite(s, "\t%d\t%d\t%d", mi->seq[r->rid].len, r->rs, r->re);
+	mm_sprintf_lite(s, "\t%d", mi->seq[r->rid].len);
+	if ((opt_flag & MM_F_QSTRAND) && r->rev)
+		mm_sprintf_lite(s, "\t%d\t%d", mi->seq[r->rid].len - r->re, mi->seq[r->rid].len - r->rs);
+	else
+		mm_sprintf_lite(s, "\t%d\t%d", r->rs, r->re);
 	mm_sprintf_lite(s, "\t%d\t%d", r->mlen, r->blen);
 	mm_sprintf_lite(s, "\t%d", r->mapq);
 	write_tags(s, r);
@@ -325,15 +390,15 @@ void mm_write_paf3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const 
 		uint32_t k;
 		mm_sprintf_lite(s, "\tcg:Z:");
 		for (k = 0; k < r->p->n_cigar; ++k)
-			mm_sprintf_lite(s, "%d%c", r->p->cigar[k]>>4, "MIDNSHP=XB"[r->p->cigar[k]&0xf]);
+			mm_sprintf_lite(s, "%d%c", r->p->cigar[k]>>4, MM_CIGAR_STR[r->p->cigar[k]&0xf]);
 	}
-	if (r->p && (opt_flag & (MM_F_OUT_CS|MM_F_OUT_MD)))
-		write_cs_or_MD(km, s, mi, t, r, !(opt_flag&MM_F_OUT_CS_LONG), opt_flag&MM_F_OUT_MD, 1);
+	if (r->p && (opt_flag & (MM_F_OUT_CS|MM_F_OUT_DS|MM_F_OUT_MD)))
+		write_cs_ds_or_MD(km, s, mi, t, r, !(opt_flag&MM_F_OUT_CS_LONG), !!(opt_flag&MM_F_OUT_MD), !!(opt_flag&MM_F_OUT_DS), 1, !!(opt_flag&MM_F_QSTRAND));
 	if ((opt_flag & MM_F_COPY_COMMENT) && t->comment)
 		mm_sprintf_lite(s, "\t%s", t->comment);
 }
 
-void mm_write_paf(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const mm_reg1_t *r, void *km, int opt_flag)
+void mm_write_paf(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, const mm_reg1_t *r, void *km, int64_t opt_flag)
 {
 	mm_write_paf3(s, mi, t, r, km, opt_flag, -1);
 }
@@ -362,7 +427,7 @@ static inline const mm_reg1_t *get_sam_pri(int n_regs, const mm_reg1_t *regs)
 	return NULL;
 }
 
-static void write_sam_cigar(kstring_t *s, int sam_flag, int in_tag, int qlen, const mm_reg1_t *r, int opt_flag)
+static void write_sam_cigar(kstring_t *s, int sam_flag, int in_tag, int qlen, const mm_reg1_t *r, int64_t opt_flag)
 {
 	if (r->p == 0) {
 		mm_sprintf_lite(s, "*");
@@ -371,7 +436,7 @@ static void write_sam_cigar(kstring_t *s, int sam_flag, int in_tag, int qlen, co
 		clip_len[0] = r->rev? qlen - r->qe : r->qs;
 		clip_len[1] = r->rev? r->qs : qlen - r->qe;
 		if (in_tag) {
-			int clip_char = ((sam_flag&0x800 || (sam_flag&0x100 && opt_flag&MM_F_SECONDARY_SEQ)) &&
+			int clip_char = (((sam_flag&0x800) || ((sam_flag&0x100) && (opt_flag&MM_F_SECONDARY_SEQ))) &&
 							 !(opt_flag&MM_F_SOFTCLIP)) ? 5 : 4;
 			mm_sprintf_lite(s, "\tCG:B:I");
 			if (clip_len[0]) mm_sprintf_lite(s, ",%u", clip_len[0]<<4|clip_char);
@@ -379,18 +444,18 @@ static void write_sam_cigar(kstring_t *s, int sam_flag, int in_tag, int qlen, co
 				mm_sprintf_lite(s, ",%u", r->p->cigar[k]);
 			if (clip_len[1]) mm_sprintf_lite(s, ",%u", clip_len[1]<<4|clip_char);
 		} else {
-			int clip_char = ((sam_flag&0x800 || (sam_flag&0x100 && opt_flag&MM_F_SECONDARY_SEQ)) &&
+			int clip_char = (((sam_flag&0x800) || ((sam_flag&0x100) && (opt_flag&MM_F_SECONDARY_SEQ))) &&
 							 !(opt_flag&MM_F_SOFTCLIP)) ? 'H' : 'S';
 			assert(clip_len[0] < qlen && clip_len[1] < qlen);
 			if (clip_len[0]) mm_sprintf_lite(s, "%d%c", clip_len[0], clip_char);
 			for (k = 0; k < r->p->n_cigar; ++k)
-				mm_sprintf_lite(s, "%d%c", r->p->cigar[k]>>4, "MIDNSHP=XB"[r->p->cigar[k]&0xf]);
+				mm_sprintf_lite(s, "%d%c", r->p->cigar[k]>>4, MM_CIGAR_STR[r->p->cigar[k]&0xf]);
 			if (clip_len[1]) mm_sprintf_lite(s, "%d%c", clip_len[1], clip_char);
 		}
 	}
 }
 
-void mm_write_sam3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, int seg_idx, int reg_idx, int n_seg, const int *n_regss, const mm_reg1_t *const* regss, void *km, int opt_flag, int rep_len)
+void mm_write_sam3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, int seg_idx, int reg_idx, int n_seg, const int *n_regss, const mm_reg1_t *const* regss, void *km, int64_t opt_flag, int rep_len)
 {
 	const int max_bam_cigar_op = 65535;
 	int flag, n_regs = n_regss[seg_idx], cigar_in_tag = 0;
@@ -536,8 +601,8 @@ void mm_write_sam3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, int se
 				}
 			}
 		}
-		if (r->p && (opt_flag & (MM_F_OUT_CS|MM_F_OUT_MD)))
-			write_cs_or_MD(km, s, mi, t, r, !(opt_flag&MM_F_OUT_CS_LONG), opt_flag&MM_F_OUT_MD, 1);
+		if (r->p && (opt_flag & (MM_F_OUT_CS|MM_F_OUT_DS|MM_F_OUT_MD)))
+			write_cs_ds_or_MD(km, s, mi, t, r, !(opt_flag&MM_F_OUT_CS_LONG), opt_flag&MM_F_OUT_MD, !!(opt_flag&MM_F_OUT_DS), 1, 0);
 		if (cigar_in_tag)
 			write_sam_cigar(s, flag, 1, t->l_seq, r, opt_flag);
 	}
@@ -549,7 +614,7 @@ void mm_write_sam3(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, int se
 	s->s[s->l] = 0; // we always have room for an extra byte (see str_enlarge)
 }
 
-void mm_write_sam2(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, int seg_idx, int reg_idx, int n_seg, const int *n_regss, const mm_reg1_t *const* regss, void *km, int opt_flag)
+void mm_write_sam2(kstring_t *s, const mm_idx_t *mi, const mm_bseq1_t *t, int seg_idx, int reg_idx, int n_seg, const int *n_regss, const mm_reg1_t *const* regss, void *km, int64_t opt_flag)
 {
 	mm_write_sam3(s, mi, t, seg_idx, reg_idx, n_seg, n_regss, regss, km, opt_flag, -1);
 }

@@ -24,16 +24,17 @@ paftools.js splice2bed anno.gtf > anno.bed             # convert GTF/GFF3 to BED
 - [Getting Started](#started)
 - [Introduction](#intro)
 - [Evaluation](#eval)
-    - [Evaluating mapping accuracy with simulated reads](#mapeval)
-    - [Evaluating read overlap sensitivity](#oveval)
+  - [Evaluating mapping accuracy with simulated reads](#mapeval)
+  - [Evaluating read overlap sensitivity](#oveval)
 - [Calling Variants from Assemblies](#asmvar)
 
 ## <a name="intro"></a>Introduction
 
-paftools.js is a script that processes alignments in the [PAF format][paf], such as converting between formats,
-evaluating mapping accuracy, lifting over BED files based on alignment, and calling variants from assembly-to-assembly
-alignment. This script *requires* the [k8 Javascript shell][k8] to run. On Linux or Mac, you can download the
-precompiled k8 binary with:
+paftools.js is a script that processes alignments in the [PAF format][paf],
+such as converting between formats, evaluating mapping accuracy, lifting over
+BED files based on alignment, and calling variants from assembly-to-assembly
+alignment. This script *requires* the [k8 Javascript shell][k8] to run. On
+Linux or Mac, you can download the precompiled k8 binary with:
 
 ```sh
 curl -L https://github.com/attractivechaos/k8/releases/download/v0.2.4/k8-0.2.4.tar.bz2 | tar -jxf -
@@ -41,8 +42,8 @@ cp k8-0.2.4/k8-`uname -s` $HOME/bin/k8  # assuming $HOME/bin in your $PATH
 ```
 
 It is highly recommended to copy the executable `k8` to a directory on your
-`$PATH` such as `/usr/bin/env` can find it. Like python scripts, once you install `k8`, you can launch paftools.js in
-one of the two ways:
+`$PATH` such as `/usr/bin/env` can find it. Like python scripts, once you
+install `k8`, you can launch paftools.js in one of the two ways:
 
 ```sh
 path/to/paftools.js             # only if k8 is on your $PATH
@@ -80,8 +81,8 @@ paftools.js seamlessly reads both plain text files and gzip'd text files.
 
 The **pbsim2fq** command of paftools.js converts the MAF output of [pbsim][pbsim]
 to FASTQ and encodes the true mapping position in the read name in a format like
-`S1_33!chr1!225258409!225267761!-`. Similarly, the **mason2fq** command converts [mason2][mason2] simulated SAM to
-FASTQ.
+`S1_33!chr1!225258409!225267761!-`. Similarly, the **mason2fq** command
+converts [mason2][mason2] simulated SAM to FASTQ.
 
 Command **mapeval** evaluates mapped SAM/PAF. Here is example output:
 
@@ -102,11 +103,14 @@ Q       0       31      17      0.003778147     33085
 U       3
 ```
 
-where each Q-line gives the quality threshold, the number of reads mapped with mapping quality equal to or greater than
-the threshold, number of wrong mappings, accumulative mapping error rate and the accumulative number of mapped reads.
-The U-line, if present, gives the number of unmapped reads if they are present in the SAM file.
+where each Q-line gives the quality threshold, the number of reads mapped with
+mapping quality equal to or greater than the threshold, number of wrong
+mappings, accumulative mapping error rate and the accumulative number of
+mapped reads. The U-line, if present, gives the number of unmapped reads if
+they are present in the SAM file.
 
-Suppose the reported mapping coordinate overlap with the true coordinate like the following:
+Suppose the reported mapping coordinate overlap with the true coordinate like
+the following:
 
 ```
 truth:   --------------------
@@ -114,12 +118,13 @@ mapper:           ----------------------
          |<- l1 ->|<-- o -->|<-- l2 -->|
 ```
 
-Let `r=o/(l1+o+l2)`. The reported mapping is considered correct if `r>0.1` by default.
+Let `r=o/(l1+o+l2)`. The reported mapping is considered correct if `r>0.1` by
+default.
 
 ### <a name="oveval"></a>Evaluating read overlap sensitivity
 
-Command **ov-eval** takes *sorted* read-to-reference alignment and read overlaps in PAF as input, and evaluates the
-sensitivity. For example:
+Command **ov-eval** takes *sorted* read-to-reference alignment and read
+overlaps in PAF as input, and evaluates the sensitivity. For example:
 
 ```sh
 minimap2 -cx map-pb ref.fa reads.fq.gz | sort -k6,6 -k8,8n > reads-to-ref.paf
@@ -129,9 +134,10 @@ k8 ov-eval.js reads-to-ref.paf ovlp.paf
 
 ## <a name="asmvar"></a>Calling Variants from Haploid Assemblies
 
-The **call** command of paftools.js calls variants from coordinate-sorted assembly-to-reference alignment. It calls
-variants from the [cs tag][cs] and identifies confident/callable regions as those covered by exactly one contig. Here
-are example command lines:
+The **call** command of paftools.js calls variants from coordinate-sorted
+assembly-to-reference alignment. It calls variants from the [cs tag][cs] and
+identifies confident/callable regions as those covered by exactly one contig.
+Here are example command lines:
 
 ```sh
 minimap2 -cx asm5 -t8 --cs ref.fa asm.fa > asm.paf  # keeping this file is recommended; --cs required!
@@ -152,23 +158,22 @@ V   chr1    2326051 2326052 1   60  c   t   LJII01000171.1  1273658 1273659 +
 V   chr1    2326287 2326288 1   60  c   t   LJII01000171.1  1273894 1273895 +
 ```
 
-where a line starting with `R` gives regions covered by one query contig, and a V-line encodes a variant in the
-following format: chr, start, end, query depth, mapping quality, REF allele, ALT allele, query name, query start, end
-and the query orientation. Generally, you should only look at variants where column 5 is one.
+where a line starting with `R` gives regions covered by one query contig, and a
+V-line encodes a variant in the following format: chr, start, end, query depth,
+mapping quality, REF allele, ALT allele, query name, query start, end and the
+query orientation. Generally, you should only look at variants where column 5
+is one.
 
-By default, when calling variants, "paftools.js call" ignores alignments 50kb or shorter; when deriving callable
-regions, it ignores alignments 10kb or shorter. It uses two thresholds to avoid edge effects. These defaults are
+By default, when calling variants, "paftools.js call" ignores alignments 50kb
+or shorter; when deriving callable regions, it ignores alignments 10kb or
+shorter.  It uses two thresholds to avoid edge effects. These defaults are
 designed for long-read assemblies. For short reads, both should be reduced.
 
 
+
 [paf]: https://github.com/lh3/miniasm/blob/master/PAF.md
-
 [cs]: https://github.com/lh3/minimap2#cs
-
 [k8]: https://github.com/attractivechaos/k8
-
 [maf]: https://genome.ucsc.edu/FAQ/FAQformat#format5
-
 [pbsim]: https://github.com/pfaucon/PBSIM-PacBio-Simulator
-
 [mason2]: https://github.com/seqan/seqan/tree/master/apps/mason2
