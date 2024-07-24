@@ -2,7 +2,7 @@
 
 This shall serve as a small example on how to use MMonitor with some test data. We will be doing taxonomic analysis of 6 16S rRNA samples using a small coverage, followed by an evaluation using the MMonitor dashboard including some basic statistics and metadata correlations.
 
-1. Go to the website www.mmonitor.de and register a new user. Remember the username and password for later.
+1. If you are not registered yet go to the [website](https://mmonitor.org) to do so. You will need the username and password later to login.
 2. Clone this repository:
    `git clone https://github.com/lucast122/MMonitor`
 3. There should be a filled called 'sample_list.csv' in the MMonitor/desktop/mmonitor_tutorial subfolder. Change the paths in the 'sample folder' column so they match the actual path of the files on your    computer. For example in the row describing sample1 you should enter the full path to the folder sample 1, do the same for the other samples.   
