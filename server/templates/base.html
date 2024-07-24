@@ -1,24 +1,23 @@
 {% load static %}
-<link rel="stylesheet" type="text/css" href="{% static 'base.css' %}">
+
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-
-
-
-
-
-
+<link rel="stylesheet" type="text/css" href="{% static 'base.css' %}">
 
 
 <!DOCTYPE html>
+
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Metagenome Monitor</title>
 </head>
 <body>
+
+
 <ul class="menu">
-    <li class="menu"><a class="menu" href="{% url "main:index" %}">Home</a></li>
+    <li class="menu"><a class="menu" href="{% url "main:index" %}">Info</a></li>
     {% if user.is_authenticated %}
         <li class="menu"><a class="menu" href="{% url "dashboard:index" %}">Dashboard</a></li>
     {% endif %}
@@ -27,7 +26,11 @@
     {% endif %}
 
     {% if user.is_authenticated %}
+        <li class="menu" style="float:right"><a class="menu" href="{% url "users:submit_feedback" %}">Submit Feedback</a></li>
         <li class="menu" style="float:right"><a class="menu" href="{% url "users:logout" %}">Log out</a></li>
+
+
+
     {% else %}
         <li style="float:right" class="menu" ><a class="menu" href="{% url "users:register" %}">Register</a></li>
         <li style="float:right" class="menu" ><a class="menu" href="{% url "users:login" %}">Log in</a></li>
@@ -35,5 +38,6 @@
 </ul>
 
 {% block content %}{% endblock content %}
+
 </body>
 </html>

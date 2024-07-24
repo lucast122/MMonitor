@@ -1,24 +1,30 @@
 import sys
+import customtkinter as ctk
 import tkinter as tk
 
 
-class OutputWindow(tk.Toplevel):
+class OutputWindow(ctk.CTkToplevel):
     def __init__(self, master=None, **kwargs):
         super().__init__(master, **kwargs)
 
         # Set title
-        self.title("Output Window")
+        self.title("MMonitor Console")
+        app = self
 
-        # Create a scrollbar
-        scrollbar = tk.Scrollbar(self)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Create a scrollable textbox
+        self.text = tk.Text(app, wrap=tk.NONE, highlightthickness=0)
+        self.text.grid(row=0, column=0, sticky="nsew")
 
-        # Create a text widget
-        self.text = tk.Text(self, wrap=tk.NONE, yscrollcommand=scrollbar.set)
-        self.text.pack(expand=True, fill=tk.BOTH)
+        # Create CTk scrollbar
+        ctk_textbox_scrollbar = ctk.CTkScrollbar(app, command=self.text.yview)
+        ctk_textbox_scrollbar.grid(row=0, column=1, sticky="ns")
 
-        # Configure scrollbar for text widget
-        scrollbar.config(command=self.text.yview)
+        # Connect textbox scroll event to CTk scrollbar
+        self.text.configure(yscrollcommand=ctk_textbox_scrollbar.set)
+
+        # Configure grid layout weights
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
         # Redirect stdout to this window
         sys.stdout = self
@@ -35,17 +41,3 @@ class OutputWindow(tk.Toplevel):
         # Restore stdout to its original state
         sys.stdout = sys.__stdout__
         self.destroy()
-
-
-# Example of usage
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-
-    output_win = OutputWindow()
-    print("Starting process...")
-    for i in range(10):
-        print(f"Processing {i}...")
-    print("Process completed!")
-
-    root.mainloop()

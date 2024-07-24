@@ -1,8 +1,6 @@
 import json
 from json import loads, dumps
 from typing import List, Tuple, Any
-
-import mysql.connector
 import pandas as pd
 from sqlalchemy import create_engine
 

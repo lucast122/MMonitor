@@ -1,14 +1,24 @@
-from os.path import isfile, join
+from os.path import join
 
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import render
 
-from .dashapp.database.mmonitor_db_mysql import MMonitorDBInterfaceMySQL
-from .dashapp.calculations.horizon_r import generate_image
 from .dashapp.index import Index
 
-# db = MMonitorDBInterfaceMySQL()
+
+@login_required
+def get_user_id(request):
+    # Get the session ID from the URL parameters
+    if request.user.is_authenticated:
+        user_id = request.user.id
+        # If a user ID was found, return it
+        if user_id:
+            return JsonResponse({'user_id': user_id})
+
+    # If no session ID was provided, or no user ID was found, return an error
+    return JsonResponse({'error': 'No session ID provided or no user found'}, status=400)
 
 
 @login_required
@@ -18,6 +28,8 @@ def index(request):
 
 @login_required
 def load_app(request, name):
+    user_id = request.user.id  # Assuming the user is authenticated
+    index_instance = Index(user_id=user_id)
     return render(request, 'dashboard/dashapp.html', context={'name': name})
 
 

@@ -137,7 +137,7 @@ class FunctionalRunner:
 
         # Construct Flye command
         flye_cmd = [
-            "flye",
+            f"{self.flye_path}",
             read_type, read_file_path,
             "--out-dir", os.path.join(output_dir, sample_name),
             "-t", str(self.cpus)

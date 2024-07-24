@@ -5,7 +5,6 @@ import customtkinter as ctk
 
 
 class PipelinePopup(ctk.CTkToplevel):
-
     def __init__(self, parent, gui_ref):
         super().__init__()
         ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -36,9 +35,9 @@ class PipelinePopup(ctk.CTkToplevel):
         label_functional.pack(pady=10)
 
         # Taxonomy checkboxes
-        ctk.CTkCheckBox(frame_taxonomy, text='Quick taxonomy nanopore', variable=self.taxonomy_nanopore_wgs).pack(
+        ctk.CTkCheckBox(frame_taxonomy, text='Taxonomy whole genome nanopore', variable=self.taxonomy_nanopore_wgs).pack(
             pady=2)
-        ctk.CTkCheckBox(frame_taxonomy, text='Quick taxonomy 16s nanopore',
+        ctk.CTkCheckBox(frame_taxonomy, text='Taxonomy 16S-rRNA reads nanopore',
                         variable=self.taxonomy_nanopore_16s_bool).pack(pady=2)
 
         # Functional analysis checkboxes
@@ -54,11 +53,6 @@ class PipelinePopup(ctk.CTkToplevel):
         quit_btn = ctk.CTkButton(self, text="Quit", command=self.destroy, corner_radius=10)
         quit_btn.pack(pady=5)
 
-    def on_kaiju_selected(self):
-        # Assuming you have a way to get the sample_name, e.g., from a GUI component
-        sample_name = self.get_selected_sample_name()
-
-        self.gui.handle_kaiju_output(sample_name)
 
 
     def run_analysis_pipeline(self):
@@ -78,13 +72,15 @@ class PipelinePopup(ctk.CTkToplevel):
             thread_16s = Thread(target=self.gui.taxonomy_nanopore_16s)
             thread_16s.start()
 
-        # if self.assembly.get():
-        #     Wrapped in a lambda to defer execution
-        # thread_assembly = Thread(target=lambda: self.gui.functional_analysis_runner.run_flye(seq_file, sample_name))
-        # thread_assembly.start()
+        if self.assembly.get():
+            thread_assembly = Thread(target=self.gui.functional_pipeline)
+            thread_assembly.start()
+            pass
 
-        # if self.correction.get():
-        #     self.gui.functional_analysis_runner.run_racon(seq_file, sample_name)
+        if self.correction.get():
+            self.gui.django_db.process_mags_and_upload("/Users/timo/Documents/spirito/mags", overwrite=True)
+
+
 
         # if self.binning.get():
         #     self.gui.functional_analysis_runner.run_binning(sample_name)

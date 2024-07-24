@@ -1,31 +1,144 @@
 ul.menu {
   list-style-type: none;
-  margin: 0;
-  padding: 0;
+  margin: 0px;
+  padding: 0px;
   overflow: hidden;
-  background-color: #444E57; !important;
+  background-color: #16262C; !important;
 }
-li a:hover.menu {
-    background-color: #B22222 !important;
-    color: white;
-}
+
 li.menu {
   float: left;
-    background-color: #444E57; !important;
-    color: white;
-
-
+  background-color: #16262C; !important;
+  color: white;
 }
 
-li a.menu {
+li.menu a {
   display: block;
   color: white;
-  text-align: center;
-  padding: 14px 16px;
+  text-align: left;
+
   text-decoration: none;
 }
 
-li a:hover.menu {
-  background-color: #B22222 !important;
+li.menu a:hover {
+    color: black;
+
 }
 
+.dash-checklist .checklist-entry label {
+  padding: 10px;
+}
+
+li.menu a {
+  background-color: #16262C !important;
+  color: white !important;
+  padding: 14px 25px;
+  text-align: center;
+  text-decoration: none;
+
+
+}
+
+li.menu a:link {
+  background-color: #16262C !important;
+}
+
+li.menu a:visited {
+  background-color: #16262C !important;
+}
+
+li.menu a:hover {
+
+}
+
+li.menu a:active {
+
+}
+/* Reset some default browser styles */
+body, h1, h2, h3, p, ul, ol, li, a {
+    margin: 2px;
+    padding: 5px;
+    font-family: 'Helvetica', sans-serif;
+    text-decoration: none;
+}
+
+body {
+    background-color: #f4f4f4;
+    color: #333;
+    font-size: 16px;
+    line-height: 1.2;
+    margin: 5px;
+}
+
+header, section, footer {
+
+    margin: 10px auto;
+    padding: 10px;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+header {
+    text-align: center;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 5px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 1px;
+}
+
+h1 {
+    color: #555;
+}
+
+h2 {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+}
+
+p {
+    margin-bottom: 5px;
+}
+
+ul, ol {
+    margin-bottom: 20px;
+    padding-left: 20px;
+}
+
+li {
+    margin-bottom: 0px;
+}
+
+a {
+    color: #3498db;
+    transition: color 0.3s;
+
+}
+
+a:hover {
+    color: #2980b9;
+}
+
+img {
+    max-width: 100%;
+    display: block;
+    margin: 0px 0;
+    align-content: center;
+}
+
+footer {
+    text-align: center;
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+    color: #888;
+}
+.compact-github {
+  display: inline-block; /* This makes the image inline but able to have width and height */
+  width: auto; /* You can set a specific width if you want */
+  height: 50px;
+  margin-bottom: 0; /* Resets the bottom margin for this specific image */
+    padding: 0px;
+    margin: 0px;
+}
