@@ -1,4 +1,4 @@
-![alt text](http://www.mmonitor.org:8021/static/mmonitor_banner.png)
+![alt text](http://www.mmonitor.org/static/mmonitor_banner.png)
 
 Check out the webpage www.mmonitor.org for latest build and usage instructions.
 # Metagenome Monitor
