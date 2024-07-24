@@ -800,7 +800,7 @@ class ToolTip:
 
         label = tk.Label(self.tip_window, text=self.tip_text, foreground="black", background="white", relief="solid",
                          borderwidth=1,
-                         font=("Helvetica", "12", "normal"))access 'https://github.com/lucast122/MMonitor.git/':
+                         font=("Helvetica", "12", "normal"))
         label.pack(ipadx=1)
 
     def hide_tip(self, event=None):
