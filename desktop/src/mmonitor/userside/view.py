@@ -15,9 +15,7 @@ from tkinter import simpledialog
 from tkinter import ttk
 from webbrowser import open_new
 from tkinter import messagebox, scrolledtext
-import customtkinter as ctk
-import numpy as np
-from CTkMessagebox import CTkMessagebox
+import numpy as npfrom
 from PIL import Image
 from customtkinter import CTkImage
 from future.moves.tkinter import filedialog
@@ -34,9 +32,7 @@ from mmonitor.userside.EmuRunner import EmuRunner
 from mmonitor.userside.FastqStatistics import FastqStatistics
 from mmonitor.userside.InputWindow import InputWindow
 from mmonitor.userside.PipelineWindow import PipelinePopup
-from mmonitor.userside.FunctionalRunner import FunctionalAnalysisRunner
-
-
+from mmonitor.userside.FunctionalRunner import FunctionalRunner
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
 import customtkinter as ctk
@@ -113,8 +109,8 @@ class GUI(ctk.CTk):
         self.console_text.config(yscrollcommand=self.console_scrollbar.set)
         
         # Redirect stdout and stderr to the console
-        sys.stdout = RedirectText(self.console_text)
-        sys.stderr = RedirectText(self.console_text)
+       # sys.stdout = RedirectText(self.console_text)
+       # sys.stderr = RedirectText(self.console_text)
 
         self.pipeline_popup = None
         self.django_db = DjangoDBInterface(f"{ROOT}/src/resources/db_config.json")
@@ -130,7 +126,7 @@ class GUI(ctk.CTk):
         self.db_path = None
         self.centrifuge_runner = CentrifugeRunner()
         self.emu_runner = EmuRunner()
-        self.functional_analysis_runner = FunctionalAnalysisRunner()
+        self.functional_analysis_runner = FunctionalRunner()
         self.dashapp = None
         self.monitor_thread = None
 
