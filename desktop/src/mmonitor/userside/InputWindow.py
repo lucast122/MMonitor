@@ -16,10 +16,12 @@ def get_files_from_folder(folder_path):
     files = []
 
     # We will use os.walk for recursive search
-    for dirpath, dirnames, filenames in os.walk(folder_path):
-        for file in filenames:
-            if file.endswith((".fastq", ".fq", ".fasta", ".fastq.gz")) and "concatenated" not in file:
-                files.append(os.path.join(dirpath, file))
+    for file in os.listdir(folder_path):
+        full_path = os.path.join(folder_path, file)
+        print(full_path)
+        if os.path.isfile(full_path) and file.endswith(
+                (".fastq", ".fq", ".fasta", ".fastq.gz")) and "concatenated" not in file:
+            files.append(full_path)
 
     # If no files were found, log an error
     if not files:
@@ -230,7 +232,7 @@ class InputWindow(ctk.CTkToplevel):
         self.file_display.config(state=tk.NORMAL)
         for file in files:
             self.file_paths_single_sample.append(file)
-            self.file_display.insert(tk.END, os.path.basename(file) + "\n")
+            self.file_display.insert(tk.END, os.path.abspath(file) + "\n")
         self.file_display.config(state=tk.DISABLED)
 
     def open_popup(self, text, title, icon):

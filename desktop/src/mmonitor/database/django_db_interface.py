@@ -1,4 +1,6 @@
+import base64
 import json
+import os
 from json import loads
 from typing import List, Tuple, Any
 
@@ -227,23 +229,71 @@ class DjangoDBInterface:
         except Exception as e:
             print(e)
 
-    def send_sequencing_statistics(self, record_data):
-        import requests as pyrequests
-        from requests.auth import HTTPBasicAuth
+    def upload_mag(self, mag_data):
+        url = f"http://{self._db_config['host']}:{self.port}/users/add_mag/"
+        auth = HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
+        headers = {
+            "Content-Type": "application/json"
+        }
+        response = pyrequests.post(url, headers=headers, data=json.dumps(mag_data), auth=auth)
 
-        # Fetch the user_id using the provided method
+        # Check if response content is not empty
+        if response.content:
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                print("Error decoding JSON response:", response.content)
+                return {"status": "error", "error": "Invalid JSON response"}
+        else:
+            print("Empty response content")
+            return {"status": "error", "error": "Empty response content"}
+
+    def parse_genbank_file(self, file_path):
+        with open(file_path, 'r') as file:
+            return file.read()
+
+    def process_mags_and_upload(self, mag_folder, overwrite=False):
         user_id = self.get_user_id(self._db_config['user'], self._db_config['password'])
-        record_data["user_id"] = user_id
+        if user_id is None:
+            print("Invalid user credentials")
+            return
 
-        # print(f"Sending record: {record_data}")
-        try:
-            response = pyrequests.post(
-                f"http://{self._db_config['host']}:{self.port}/users/add_sequencing_statistics/",
-                json=record_data,
-                auth=HTTPBasicAuth(self._db_config['user'], self._db_config['password'])
-            )
-            if response.status_code != 200:
-                print(f"Failed to add record: {response.content}")
+        sample_ids = self.get_unique_sample_ids()
 
-        except Exception as e:
-            print(e)
+        for mag_file in os.listdir(mag_folder):
+            if not mag_file.endswith('.fa'):
+                continue
+
+            sample_name = os.path.splitext(mag_file)[0]
+            if sample_name in sample_ids and not overwrite:
+                print(
+                    f"Skipping sample {sample_name} as it is already in the database. Select overwrite to reprocess a sample.")
+                continue
+
+            # Read the FASTA file using Biopython
+            with open(os.path.join(mag_folder, mag_file), 'r') as file:
+                sequence_data = ""
+                for record in SeqIO.parse(file, "fasta"):
+                    sequence_data += str(record.seq)
+
+            genbank_file = os.path.join(mag_folder, f"{sample_name}.gbk")
+            bakta_annotations = ""
+            if os.path.exists(genbank_file):
+                bakta_annotations = self.parse_genbank_file(genbank_file)
+
+
+
+            mag_data = {
+                "name": sample_name,
+                "sequence": sequence_data,
+                "completeness": 95.0,
+                "contamination": 0.5,
+                "bakta_annotations": bakta_annotations
+            }
+
+            response = self.upload_mag(mag_data)
+            if response.get("status") == "success":
+                print(f"MAG {sample_name} uploaded successfully.")
+            else:
+                print(f"Failed to upload MAG {sample_name}: {response.get('error')}")
+

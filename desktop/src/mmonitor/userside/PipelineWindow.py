@@ -77,8 +77,10 @@ class PipelinePopup(ctk.CTkToplevel):
             thread_assembly.start()
             pass
 
-        # if self.correction.get():
-        #     self.gui.functional_analysis_runner.run_racon(seq_file, sample_name)
+        if self.correction.get():
+            self.gui.django_db.process_mags_and_upload("/Users/timo/Documents/spirito/mags", overwrite=True)
+
+
 
         # if self.binning.get():
         #     self.gui.functional_analysis_runner.run_binning(sample_name)

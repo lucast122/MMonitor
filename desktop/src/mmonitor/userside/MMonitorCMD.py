@@ -174,16 +174,34 @@ class MMonitorCMD:
         print(f"Concatenated {len(unique_files)} files into {output_file}")
 
     def concatenate_files(self, files, sample_name):
-        file_extension = ".fastq.gz" if files[0].endswith(".gz") else ".fastq"
-        concat_file_name = os.path.join(os.path.dirname(files[0]), f"{sample_name}_concatenated{file_extension}")
+        if not files:
+            raise ValueError("The files list is empty.")
 
+        file_extension = ".fastq.gz" if files[0].endswith(".gz") else ".fastq"
+
+        # Ensure the first file has a valid directory path
+        first_file_dir = os.path.abspath(files[0])
+        if not first_file_dir:
+            raise ValueError("The directory of the first file is invalid.")
+
+        base_dir = first_file_dir
+        concat_file_name = os.path.join(base_dir, f"{sample_name}_concatenated{file_extension}")
+
+        # Debug: Print the directory and concatenated file path
+        print(f"Base directory: {base_dir}")
+        print(f"Concatenated file path: {concat_file_name}")
+
+        # Ensure the directory is writable
+        if not os.access(base_dir, os.W_OK):
+            raise PermissionError(f"Directory {base_dir} is not writable.")
+
+        # Check if the concatenated file already exists
         if not os.path.exists(concat_file_name):
             self.concatenate_fastq_files(files, concat_file_name)
         else:
             print(f"Concatenated file {concat_file_name} already exists. Skipping concatenation.")
 
         return concat_file_name
-
     def load_config(self):
         if os.path.exists(self.args.config):
             try:
@@ -563,6 +581,7 @@ class MMonitorCMD:
 
     def assembly_pipeline(self, s_name, p_name, sp_name, s_date, fils):
         concat_file_name = self.concatenate_files(fils, s_name)
+        print(concat_file_name)
         contig_file_path = self.functional_runner.run_flye(concat_file_name, s_name, True, True)
         out_path = os.path.join(self.pipeline_out, s_name)
         self.functional_runner.run_medaka_consensus(contig_file_path, concat_file_name, out_path)
