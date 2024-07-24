@@ -18,7 +18,7 @@ from tkinter import messagebox, scrolledtext
 import numpy as npfrom
 from PIL import Image
 from customtkinter import CTkImage
-from future.moves.tkinter import filedialog
+from tkinter import filedialog
 from requests import post
 from tkcalendar import Calendar
 # from mmonitor.Tooltip import ToolTip
